@@ -261,7 +261,6 @@ class Gltf{
     // https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_010_Materials.md
 
     getMaterial( id: number | undefined ) : any{
-        console.log( id );
         if( !this.json.materials ){ console.warn( "No Materials in GLTF File" ); return null; }
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

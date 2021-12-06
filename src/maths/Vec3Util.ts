@@ -12,6 +12,23 @@ class Vec3Util{
         );
     }
 
+    static lenSqr( a: vec3, b: vec3 ): number{
+        return  (a[ 0 ]-b[ 0 ]) ** 2 + 
+                (a[ 1 ]-b[ 1 ]) ** 2 + 
+                (a[ 2 ]-b[ 2 ]) ** 2 ;
+    }
+
+    static isZero( v: vec3 ): boolean { return ( v[0] == 0 && v[1] == 0 && v[2] == 0 ); }
+
+    /** When values are very small, like less then 0.000001, just make it zero */
+    static nearZero( out: vec3, v: vec3 ) : vec3{
+        out[ 0 ] = ( Math.abs( v[ 0 ] ) <= 1e-6 )? 0 : v[ 0 ];
+        out[ 1 ] = ( Math.abs( v[ 1 ] ) <= 1e-6 )? 0 : v[ 1 ];
+        out[ 2 ] = ( Math.abs( v[ 2 ] ) <= 1e-6 )? 0 : v[ 2 ];
+        return out;
+    }
+    
+
     /** Used to get data from a flat buffer */
     static fromBuf( out: vec3, ary : Array<number> | Float32Array, idx: number ) : vec3 {
         out[ 0 ]  = ary[ idx ];

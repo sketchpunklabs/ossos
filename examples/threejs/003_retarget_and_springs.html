@@ -1,0 +1,139 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { THREE }           from './_lib/Starter.js';
+import { UtilGltf2, Gltf2 }         from './_lib/UtilGltf2.js';
+import Util3js                      from './_lib/Util.js';
+
+import { Armature, Bone, SkinMTX }  from '../../src/armature/index';
+import { Clip, Animator, Retarget } from '../../src/animation/index';
+import BoneSpring                   from '../../src/bonespring/index';
+
+import BoneViewMesh                 from './_lib/BoneViewMesh.js';
+import SkinMTXMaterial              from './_lib/SkinMTXMaterial.js';
+//#endregion
+
+//#region MAIN
+let App;
+let Ref = {};
+
+function onRender( dt=0, et=0 ){
+    const targetPose = Ref.retarget.getTargetPose();                // Get Target Pose 4 reuse
+    Ref.retarget.animateNext( dt );                                 // Retarget Animation
+    Ref.tarSprings.updatePose( dt, targetPose, true );              // Apply Springs to Pose
+
+    Ref.srcBoneView.updateFromPose( Ref.retarget.getClipPose() );   // Update Source Bone View
+    Ref.tarBoneView.updateFromPose( targetPose );                   // Update Target Bone View
+    Ref.tarArm.updateSkinFromPose( targetPose );                    // Update Skinned Mesh
+}
+
+window.addEventListener( "load", async _=>{
+    App = new Starter( { webgl2:true, grid:true } );
+    App.setCamera( 0, 20, 4, [0,0.8,0] );
+    App.onRender = onRender;
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup Retargeting
+    Ref.retarget = new Retarget();
+    Ref.retarget.anim.inPlace = true;
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Load Source & Target - Each will update Retarget with their info
+    const [ glSrc, glTar, tex ] = await Promise.all([
+        Gltf2.fetch( '../_res/anim/Walking.gltf' ),
+        Gltf2.fetch( '../_res/models/tina/tina.gltf' ),
+        Util3js.loadTexture( '../_res/models/tina/initialShadingGroup_albedo.jpg' )
+    ]);
+
+    tex.flipY = false;
+
+    setup_source( glSrc );
+    setup_target( glTar, tex );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Final Setups
+    Ref.retarget.bind();                                              // Bind the Two Skeletons Together
+    Ref.tarSprings.setRestPose( Ref.retarget.getTargetPose( true ) ); // Bind the Springs to the starting pose of the target
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.render();
+});
+
+function armature_from_gltf( gltf, defaultBoneLen = 0.07 ){
+    const arm  = new Armature();
+    const skin = gltf.getSkin();
+
+    for( let j of skin.joints ){
+        arm.addBone( j.name, j.parentIndex, j.rotation, j.position, j.scale );
+    }
+
+    // Create Bind Pose
+    arm.bind( SkinMTX, defaultBoneLen );
+
+    // Armature has a Transform on itself sometimes
+    // Apply it at the Offset Transform gets preapplied to the root
+    arm.offset.set( skin.rotation, skin.position, skin.scale );
+
+    return arm;
+}
+
+function setup_source( gltf ){
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const arm       = armature_from_gltf( gltf );   // Get Animation Skeleton
+    const anim      = gltf.getAnimation();          // Get Animation
+    const clip      = Clip.fromGLTF2( anim );       // ... Convert to Clip
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const boneView  = new BoneViewMesh( arm );      // 3JS Example of making a BoneView from Armature Data
+    boneView.material.uniforms.meshScl.value = 2.0; // Mixamo Skeletons comes with an offset transform which causes the bones to scale badly
+    boneView.material.uniforms.dirScl.value  = 1;   // ... So make the bones bigger to offset that massive downscaling.
+    App.add( boneView );                            // Add to Scene for rendering
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.srcBoneView = boneView;
+    Ref.retarget
+        .setClipArmature( arm )
+        .setClip( clip );
+
+    boneView.updateFromPose( Ref.retarget.getClipPose( true, true ) );
+}
+
+function setup_target( gltf, tex ){
+    const arm = armature_from_gltf( gltf );   // Get Target Skeleton
+    Ref.tarArm = arm;
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const boneView  = new BoneViewMesh( arm );      // 3JS Example of making a BoneView from Armature Data
+    boneView.position.x = 1;                        // Move the bones to the side
+    App.add( boneView );                            // Add to Scene for rendering
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.tarBoneView = boneView;
+    Ref.retarget
+        .setTargetArmature( arm )
+        .getTargetPose().fromGLTF2( gltf.getPose() );   // Resting Pose is A, but requires T for retargeting
+                                                        // So pull TPose from file & apply it as the starting pose for retargeting
+    boneView.updateFromPose( Ref.retarget.getTargetPose( true, true ) );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.tarSprings = new BoneSpring( arm );        
+    Ref.tarSprings
+        .addRotChain( 'braidr', ["hair.L.002","hair.L.004","hair.L.003","hair.L.005"], 3, 0.8 )
+        .addRotChain( 'braidl', ["hair.R.002","hair.R.004","hair.R.003","hair.R.005"], 3, 0.8 )
+        .addPosChain( "boot1", [ "breast.L" ], 3, 0.2 )
+        .addPosChain( "boot2", [ "breast.R" ], 3, 0.2 )
+    ;
+        
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const mat  = SkinMTXMaterial( tex || 'cyan', arm.getSkinOffsets()[0] );
+    const mesh = UtilGltf2.loadMesh( gltf, null, mat );
+    mesh.position.x = -1;
+    App.add( mesh );
+}
+//#endregion
+
+</script>
+</body></html>
