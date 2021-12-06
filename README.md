@@ -58,12 +58,12 @@ App.add( mesh );
 - [ ] Complete FullBody IK Prototype
 - [ ] Port over Trianglution Solver ( Alternative to CCD )
 - [ ] Port over Natural CCD ( Extended version of CCD )
-- [ ] Create an implementation for FABIK
+- [ ] Create an implementation of FABIK
 - [ ] Figure out how to implement VRIK
 - [ ] Bone Slots / Attachments
 - [ ] Actions or State Machine based Animator
 - [ ] Build Examples in other Rendering Engines like BabylonJS
-- [ ] Port over Auto Skinning ( Need WebGPU compute shaders for this )
+- [ ] Remake Auto Skinning ( Need WebGPU compute shaders for this )
 - [ ] Bone Constraints
 - [ ] Procedural Animation ProtoTyping
 - [ ] Far Future - Create & Share animations with a Web Editor Tool
@@ -77,7 +77,7 @@ There are some things I've been wanting for my prototyping for awhile. Here's a 
   * **Thoughs** :
     * Would like a female with detachable cat ears & tail
     * Prefer stylized designs ( Really digging the Art Direction of Arcane )
-    * Just a base mesh, doesn't need to be skinned or textured
+    * Just a base mesh, does not need to be skinned or textured
 
 * `Collection of Mobility Animations`
   * **Purpose** : Less data overall if not baked which gives me a chance to experiment with different interpolations for animation beyond just linear / cubic. Would be a nice thing to have for the community to use as a starting point for their projects.
