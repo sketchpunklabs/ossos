@@ -1,0 +1,93 @@
+
+
+//#region OLD LIB's FUNCTIONS
+/*
+    // Binary Buffer can exist in GLTF file encoded in base64. 
+    // This function converts the data into an ArrayBuffer.
+    static parse_b64_buffer( json ){
+        let buf = json.buffers[ 0 ];
+        if( buf.uri.substr(0,5) != "data:" ) return null;
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Create and Fill DataView with buffer data
+        let pos		= buf.uri.indexOf( "base64," ) + 7,
+            blob	= window.atob( buf.uri.substr( pos ) ),
+            ary_buf = new ArrayBuffer( blob.length ),
+            dv		= new DataView( ary_buf );
+
+        for( let i=0; i < blob.length; i++ ) dv.setUint8( i, blob.charCodeAt( i ) );
+
+        return ary_buf;
+    }
+
+
+    //https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#glb-file-format-specification
+    const GLB_MAGIC	= 0x46546C67;
+    const GLB_JSON	= 0x4E4F534A;
+    const GLB_BIN	= 0x004E4942;
+    function parse_glb( arybuf ){
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        let dv		= new DataView( arybuf );
+        let magic	= dv.getUint32( 0, true );
+        if( magic != GLB_MAGIC ){
+            console.error("GLB's Magic Number does not match.");
+            return null;
+        }
+
+        let version	= dv.getUint32( 4, true );
+        if( version != 2 ){
+            console.error("GLB is number version 2.");
+            return null;
+        }
+
+        let main_blen	= dv.getUint32( 8, true );
+        console.log( "Version :", version );
+        console.log( "Binary Length :", main_blen );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // LOAD CHUNK 0 & 1 TESTING
+
+        let chk0_len	= dv.getUint32( 12, true );
+        let chk0_type	= dv.getUint32( 16, true );
+
+        if( chk0_type != GLB_JSON ){
+            console.error("GLB Chunk 0 is not the type: JSON ");
+            return null;
+        }
+
+        let chk0_offset	= 20;						// Start of JSON
+        let chk1_offset	= chk0_offset + chk0_len;	// Start of BIN's 8 byte header
+
+        let chk1_len	= dv.getUint32( chk1_offset, true );
+        let chk1_type	= dv.getUint32( chk1_offset+4, true );
+
+        if( chk1_type != GLB_BIN ){ //TODO, this does not have to exist, just means no bin data.
+            console.error("GLB Chunk 1 is not the type: BIN ");
+            return null;
+        }
+
+        chk1_offset += 8; // Skip the Header
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // PARSE JSON
+        let txt_decoder	= new TextDecoder( "utf8" );
+        let json_bytes	= new Uint8Array( arybuf, chk0_offset, chk0_len );
+        let json_text	= txt_decoder.decode( json_bytes );
+        let json		= JSON.parse( json_text );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // PARSE BIN - TODO, Not efficent to slice the array buffer
+        // but need to fix GLTF parser to have a root offset to use 
+        // original buffer.
+        let bin = arybuf.slice( chk1_offset );
+
+        if( bin.byteLength != chk1_len ){
+            console.error( "GLB Bin length does not match value in header.");
+            return null;
+        }
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        return [ json, bin ];
+    }
+*/
+//#endregion

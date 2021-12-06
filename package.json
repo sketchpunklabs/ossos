@@ -1,0 +1,38 @@
+{
+    "name"          : "ossos",
+    "version"       : "0.0.1",
+    "author"        : "Pedro Sousa ( Vor @ SketchPunk Labs )",
+    "description"   : "",
+    "keywords"      : [ "animation", "skeleton", "inverse kinematrics", "armature", "ikrig" ],
+    "license"       : "MIT",
+
+    "homepage"      : "https://github.com/sketchpunklabs/ossos#readme",
+    "repository"    : { "type": "git", "url": "git+https://github.com/sketchpunklabs/ossos.git" },
+    "bugs"          : { "url": "https://github.com/sketchpunklabs/ossos/issues" },
+
+    "files"         : [ "dist" ],
+    "main"          : "./dist/ossos.cjs.js",
+    "module"        : "./dist/ossos.es.js",
+    "types"         : "./dist/ossos.d.ts",
+    "exports": {
+        ".": {
+            "import"  : "./dist/ossos.es.js",
+            "require" : "./dist/ossos.cjs.js"
+        }
+    },
+
+    "scripts"       : {
+        "dev"           : "vite",
+        "build"         : "vite build",
+        "build:types"   : "tsc --declaration --noEmit false --emitDeclarationOnly --strict false --outDir ./dist",
+        "build:site"    : "vite build --mode site",
+        "preview-site"  : "vite preview"
+    },
+
+    "devDependencies": {
+        "typescript"    : "^4.5.2",
+        "gl-matrix"     : "^3.4.3",
+        "vite"          : "^2.6.14",
+        "three"         : "^0.135.0"
+    }
+}

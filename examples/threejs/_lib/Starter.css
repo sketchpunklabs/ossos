@@ -1,0 +1,9 @@
+body {
+    margin: 0;
+    background-color: #000;
+    color: #fff;
+    font-family: monospace;
+    font-size: 12px;
+    overscroll-behavior: none;
+}
+canvas{ display: block; }
