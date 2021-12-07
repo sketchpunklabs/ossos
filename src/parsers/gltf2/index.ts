@@ -6,7 +6,7 @@ import { Animation, Track, ETransform, ELerp }  from './Animation';
 import { Pose }                                 from './Pose';
 //#endregion
 
-class Gltf{
+class Gltf2{
     //#region MAIN
     json    : any;
     bin     : ArrayBuffer;
@@ -488,7 +488,7 @@ class Gltf{
 
     //#region STATIC
 
-    static async fetch( url: string ) : Promise< Gltf | null >{
+    static async fetch( url: string ) : Promise< Gltf2 | null >{
         let   bin : ArrayBuffer | undefined;
         const json = await fetch( url )
             .then( r=>{ return (r.ok)? r.json() : null } );
@@ -500,11 +500,11 @@ class Gltf{
             bin        = await fetch( path + json.buffers[ 0 ].uri ).then( r=>r.arrayBuffer() );
         }
 
-        return new Gltf( json, bin );
+        return new Gltf2( json, bin );
     }
 
     //#endregion ///////////////////////////////////////////////////////////////////////
 }
 
-export default Gltf;
+export default Gltf2;
 export { Accessor };

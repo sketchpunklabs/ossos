@@ -47,7 +47,7 @@ export default ( { command, mode } ) => {
                 minify          : false,
 
                 lib             : {
-                    entry   : path.resolve( __dirname, "src/index.ts" ),
+                    entry   : path.resolve( __dirname, "src/ossos.ts" ),
                     name    : "ossos",
                     formats : [ "es", "cjs" ],
                 },

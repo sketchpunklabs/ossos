@@ -2,7 +2,7 @@
     "name"          : "ossos",
     "version"       : "0.0.1",
     "author"        : "Pedro Sousa ( Vor @ SketchPunk Labs )",
-    "description"   : "",
+    "description"   : "Character Animation System",
     "keywords"      : [ "animation", "skeleton", "inverse kinematrics", "armature", "ikrig" ],
     "license"       : "MIT",
 
@@ -26,12 +26,16 @@
         "build"         : "vite build",
         "build:types"   : "tsc --declaration --noEmit false --emitDeclarationOnly --strict false --outDir ./dist",
         "build:site"    : "vite build --mode site",
+        "pack"          : "npm pack",
         "preview-site"  : "vite preview"
+    },
+
+    "dependencies": {
+        "gl-matrix"     : "^3.4.3"
     },
 
     "devDependencies": {
         "typescript"    : "^4.5.2",
-        "gl-matrix"     : "^3.4.3",
         "vite"          : "^2.6.14",
         "three"         : "^0.135.0"
     }

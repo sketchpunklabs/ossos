@@ -10,6 +10,13 @@ This project focus is to allow animating 3D character in web application, games,
 
 I like to look at this as being the IMGUI of Character Animations :)
 
+### Setup ###
+
+```
+npm install
+npm run dev
+```
+
 ### Usage ###
 
 This example is the basic boiler plate example of how to pull mesh & skeletal data from a GLTF2 file then using a custom THREE.JS Material to render mesh that can be posed or animated.
