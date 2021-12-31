@@ -28,7 +28,7 @@ class Vec3Util{
         return out;
     }
     
-
+    //#region LOADING / CONVERSION
     /** Used to get data from a flat buffer */
     static fromBuf( out: vec3, ary : Array<number> | Float32Array, idx: number ) : vec3 {
         out[ 0 ]  = ary[ idx ];
@@ -59,6 +59,9 @@ class Vec3Util{
         v[ 2 ] = o.z;
         return v;
     }
+
+    static toArray( v: vec3 ): number[]{ return [ v[0], v[1], v[2] ]; }
+    //#endregion
 
 }
 

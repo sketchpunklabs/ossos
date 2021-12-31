@@ -8,9 +8,7 @@
 
 
 ### Character Animation Library ###
-This project focus is to allow animating 3D character in web application, games, metaverses, etc that are rendered in WebGL / WebGPU. Some of the big goals is to create something that is independent from any rendering engine while trying to be more collaborative in its design the betterment of the web. The biggest inspiration for me and one of the main goals is to achieve something similar to Ubisoft's GDC Talk & Demo of their IK Rigs animation system.
-
-I like to look at this as being the IMGUI of Character Animations :)
+This project is working toward a complete character skinning & animation library for the web. First most, this library is focused on being independent from any rendering engine with examples of how to use it in webgl based engines like threejs. The one big focus is recreating the IK Rig & IK Animations type system that was demoed several years ago from Ubisoft's GDC talk on IK Rigs. With many game engines like Unity and Unreal developing their own IK Rig like systems, this project helps fill the void for web based engines like threejs, babylon, etc. Hopefully with enough help we can create something just as good as the big boys, maybe even better since its free & open source.
 
 ### Setup ###
 
@@ -53,6 +51,9 @@ App.add( mesh );
 * Bone Springs ( Rotation & Translation )
 * Basic Animator based on Tracks
 * Basic Animation Retargeting for similar skeletal meshes
+* IK Rigs - Basic Biped
+* IK Animation Retargeting using IK Rigs
+* IK Solvers - Aim/SwingTwist, SwingTwistEnds, Limb
 * GLTF2 Asset Parsing for cherry picking what you need to load.
 * Several examples using ThreeJS for rendering
   * Some extra fun examples like converting animations to Data Textures
@@ -61,13 +62,16 @@ App.add( mesh );
 
 ---
 ## Future Plans ##
-- [ ] Rebuilding IK Rigs as a new version for this project
-- [ ] Port over my Single Pass IK Solvers ( Aim, Limb, Z, Piston, Arc, ArcSin, Trapezoid, Spring )
-- [ ] Rebuild IK Animation Retargeting for this project
-- [ ] Complete FullBody IK Prototype
+- [x] Rewrite IK Rigs
+- [x] Port over starting IK Solvers ( Aim / SwingTwist, Limb, SwingTwistEnds )
+- [x] Rewrite IK Animation Retargeting
+- [ ] Port over extra single pass IK Solvers ( Z, Piston, Arc, ArcSin, Trapezoid, Spring )
+- [ ] Create an implementation of FABIK
+- [ ] Create solver based on Catenary Curve
 - [ ] Port over Trianglution Solver ( Alternative to CCD )
 - [ ] Port over Natural CCD ( Extended version of CCD )
-- [ ] Create an implementation of FABIK
+- [x] Complete FullBody IK Prototype
+- [ ] Revisit FullBody IK, Make it mores stable & user friendly
 - [ ] Figure out how to implement VRIK
 - [ ] Bone Slots / Attachments
 - [ ] Actions or State Machine based Animator
@@ -94,15 +98,3 @@ There are some things I've been wanting for my prototyping for awhile. Here's a 
       * Something that looks nice & blends well together, doesn't look choppy
       * Walk, Run, Idle, Crawl, Jump. Maybe Flying & Swimming
       * Prefer not to be baked
-  
-* `IK Bot`
-  * **Purpose** : Something to use for procedural generation & animation prototyping. Having the arm/leg made as pieces can allow me to create chains of various sizes procedurally to play with various IK solvers.
-  * **Inspiration** : https://twitter.com/WokkieG/status/1429130029422743561?s=20
-  * **Thoughs** :
-      * Round Robot so its easy to just place limbs anywhere and really play with things
-      * Instead of arms, create two types of "Bones" that can be connected in chains. One with a ball joint, the other with a hinge joint. This can help with demoing future constraints prototypes
-      * Ball joint base for connecting chain to the round body
-      * Some sort of Hand or Feet part to attach at the end of the chain
-      * Does not need to be skinned or textured
-      * Some hard edges in the design would be cool
-

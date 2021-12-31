@@ -4,12 +4,13 @@ import type Armature    from './Armature.js';
 import type Bone        from './Bone.js';
 import { vec3, quat }   from 'gl-matrix';
 import Transform        from '../maths/Transform';
+import Vec3Util from '../maths/Vec3Util';
 //#endregion
 
 class Pose{
     //#region MAIN
     arm     !: Armature;
-    bones   !: Bone[];   // Clone of Armature Bones
+    bones   !: Bone[];          // Clone of Armature Bones
     offset  = new Transform();  // Pose Transform Offset, useful to apply parent mesh transform
 
     constructor( arm ?: Armature ){
@@ -145,7 +146,7 @@ class Pose{
 
 
     //#region COMPUTE
-    updateWorld( useOffset=false ): this{
+    updateWorld( useOffset=true ): this{
         let i, b;
         for( i=0; i < this.bones.length; i++ ){
             b = this.bones[ i ];
@@ -153,6 +154,73 @@ class Pose{
             if( b.pidx != null ) b.world.fromMul( this.bones[ b.pidx ].world, b.local );
             else if( useOffset ) b.world.fromMul( this.offset, b.local );
             else                 b.world.copy( b.local );                      
+        }
+
+        return this;
+    }
+
+    getWorldTransform( bIdx: number, out ?: Transform ): Transform{
+        out ??= new Transform();
+        
+        let bone = this.bones[ bIdx ];  // get Initial Bone
+        out.copy( bone.local );         // Starting Transform
+
+        // Loop up the heirarchy till we hit the root bone
+        while( bone.pidx != null ){
+            bone = this.bones[ bone.pidx ];
+            out.pmul( bone.local );
+        }
+
+        // Add offset at the end
+        out.pmul( this.offset );
+        return out;
+    }
+
+    getWorldRotation( bIdx: number, out ?: quat ): quat{
+        out ??= quat.create();
+        
+        let bone = this.bones[ bIdx ];      // get Initial Bone
+        //out.copy( bone.local.rot );     // Starting Rotation
+        quat.copy( out, bone.local.rot );   // Starting Rotation
+
+        // Loop up the heirarchy till we hit the root bone
+        while( bone.pidx != null ){
+            bone = this.bones[ bone.pidx ];
+            //out.pmul( bone.local.rot );
+            quat.mul( out, bone.local.rot, out );
+        }
+
+        // Add offset at the end
+        //out.pmul( this.offset.rot );
+        quat.mul( out, this.offset.rot, out );
+        return out;
+    }
+
+    updateBoneLengths( defaultBoneLen=0 ): this{
+        const bCnt = this.bones.length;
+        let b: Bone, p: Bone;
+        
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Compute Bone Length from Children to Parent Bones
+        // Leaf bones don't have children, so no way to determine this length
+        for( let i=bCnt-1; i >= 0; i-- ){
+            //-------------------------------
+            b = this.bones[ i ];
+            if( b.pidx == null ) continue;  // No Parent to compute its length.
+
+            //-------------------------------
+            // Parent Bone, Compute its length based on its position and the current bone.
+            p       = this.bones[ b.pidx ];       
+            p.len   = Vec3Util.len( p.world.pos, b.world.pos );
+        }
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Set a default size for Leaf bones
+        if( defaultBoneLen != 0 ){
+            for( let i=0; i < bCnt; i++ ){
+                b = this.bones[ i ];
+                if( b.len == 0 ) b.len = defaultBoneLen;
+            }
         }
 
         return this;

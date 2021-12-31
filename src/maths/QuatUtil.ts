@@ -1,4 +1,4 @@
-import { quat }  from 'gl-matrix'
+import { quat, vec3 }  from 'gl-matrix'
 
 class QuatUtil{
 
@@ -42,6 +42,27 @@ class QuatUtil{
     /** Checks if on opposite hemisphere, if so, negate change quat */
     static dotNegate( out: quat, chg: quat, chk: quat ): quat{ 
         if( quat.dot( chg, chk ) < 0 ) this.negate( out, chg );
+        return out;
+    }
+
+    /** PreMultiple an Axis Angle to this quaternions */
+    static pmulAxisAngle( out:quat, axis: vec3, angle: number, q:quat ) : quat{
+        const half = angle * .5,
+              s    = Math.sin( half ),
+              ax   = axis[0] * s,	// A Quat based on Axis Angle
+              ay   = axis[1] * s, 
+              az   = axis[2] * s,
+              aw   = Math.cos( half ),
+
+              bx   = q[0],		// B of mul
+              by   = q[1],
+              bz   = q[2],
+              bw   = q[3];
+        // Quat.mul( a, b );
+        out[ 0 ] = ax * bw + aw * bx + ay * bz - az * by;
+        out[ 1 ] = ay * bw + aw * by + az * bx - ax * bz;
+        out[ 2 ] = az * bw + aw * bz + ax * by - ay * bx;
+        out[ 3 ] = aw * bw - ax * bx - ay * by - az * bz;
         return out;
     }
 

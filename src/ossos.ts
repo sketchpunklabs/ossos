@@ -13,6 +13,12 @@ import {
 }                                                           from './maths/index';
 
 import Gltf2, { Accessor }                                  from './parsers/gltf2/index';
+
+import {
+    IKData, BipedIKPose, IKRig, BipedRig, IKChain, IKLink, 
+    SwingTwistEndsSolver, SwingTwistSolver, LimbSolver, HipSolver,
+}                                                           from './ikrig/index';
+
 //#endregion
 
 //#region EXPORTS
@@ -21,7 +27,9 @@ export {
     Armature, Bone, Pose, SkinMTX, SkinDQ, SkinDQT,
     BoneSpring,
     Maths, Transform, DualQuatUtil, Mat4Util, QuatUtil, Vec3Util, Vec4Util,
-    Gltf2, Accessor
+    Gltf2, Accessor,
+    IKData, BipedIKPose,  IKRig, BipedRig, IKChain, IKLink,
+    SwingTwistEndsSolver, SwingTwistSolver, LimbSolver, HipSolver,
 };
 
 export type{
