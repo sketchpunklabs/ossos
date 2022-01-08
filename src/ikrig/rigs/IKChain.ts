@@ -26,7 +26,7 @@ class IKLink{
     static fromBone( b: Bone ): IKLink{
         const l = new IKLink( b.idx, b.len );
         l.bind.copy( b.local );
-        l.pidx = ( b.pidx != null )? b.pidx : -1;
+        l.pidx = b.pidx;
         return l;
     }
     //#endregion
@@ -45,6 +45,13 @@ class IKChain{
     //#endregion
 
     //#region SETTERS
+    addBone( b: Bone ): this{
+        this.length += b.len;
+        this.links.push( IKLink.fromBone( b ) );
+        this.count++;
+        return this;
+    }
+
     setBones( bNames: string[], arm: Armature ): this{
         let b: Bone | null;
         let n: string;
@@ -184,9 +191,6 @@ class IKChain{
         const eff: vec3 = lnk.effectorDir.slice( 0 ) as vec3;   // Clone the Directions
         const pol: vec3 = lnk.poleDir.slice( 0 ) as vec3;
 
-        //b.world.rot.transformVec3( eff );      
-        //b.world.rot.transformVec3( pol );
-        
         // Transform Directions
         vec3.transformQuat( eff as vec3, eff as vec3, b.world.rot );
         vec3.transformQuat( pol as vec3, pol as vec3, b.world.rot );
@@ -194,7 +198,7 @@ class IKChain{
         return [ eff, pol ];
     }
 
-    bindAltDirections( pose: Pose, effectorDir: number[], poleDir: number[] ): this{
+    bindAltDirections( pose: Pose, effectorDir: vec3, poleDir: vec3 ): this{
         let l: IKLink;
         let v   = vec3.create(); //new Vec3();
         let inv = quat.create(); //new Quat();
@@ -202,17 +206,22 @@ class IKChain{
         for( l of this.links ){
             quat.invert( inv, pose.bones[ l.idx ].world.rot );
 
-            vec3.transformQuat( v, effectorDir as vec3, inv );
-            vec3.copy( l.effectorDir as vec3, v );
+            vec3.transformQuat( v, effectorDir, inv );
+            vec3.copy( l.effectorDir, v );
 
-            vec3.transformQuat( v, poleDir as vec3, inv );
-            vec3.copy( l.poleDir as vec3, v );
-
-            //inv.fromInvert( pose.bones[ l.idx ].world.rot );
-            //v.fromQuat( inv, effectorDir ).copyTo( l.effectorDir );
-            //v.fromQuat( inv, poleDir ).copyTo( l.poleDir );
+            vec3.transformQuat( v, poleDir, inv );
+            vec3.copy( l.poleDir, v );
         }
 
+        return this;
+    }
+
+    setAltDirections( effectorDir: vec3, poleDir: vec3 ): this{
+        let l: IKLink;
+        for( l of this.links ){
+            vec3.copy( l.effectorDir, effectorDir );
+            vec3.copy( l.poleDir, poleDir );
+        }
         return this;
     }
     //#endregion

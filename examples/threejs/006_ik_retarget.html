@@ -158,7 +158,7 @@ class IKPoseVisualize{
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Position Offset
-        if( b.pidx == null ) T0.fromMul( pose.offset, lnk.bind );                     // Use Offset if there is no parent
+        if( b.pidx == -1 )   T0.fromMul( pose.offset, lnk.bind );                     // Use Offset if there is no parent
         else                 pose.getWorldTransform( lnk.pidx, T0 ).mul( lnk.bind );  // Compute Parent's WorldSpace transform, then add local bind pose to it.
 
         vec3.scaleAndAdd( V0, T0.pos, ik.pos, ik.bindHeight / T0.pos[ 1 ]  );

@@ -4,7 +4,7 @@ import Transform        from '../maths/Transform';
 class Bone{
     name    : string;           // Name of Bone
     idx     : number;           // Bone Index
-    pidx    : number | null;    // Index to Parent Bone if not root
+    pidx    : number;           // Index to Parent Bone if not root. -1 means no parent
     len     : number;           // Length of the Bone
 
     local   = new Transform();  // Local Transform of Resting Pose
@@ -13,7 +13,7 @@ class Bone{
     constructor( name: string, idx: number, len=0 ){
         this.name   = name;
         this.idx    = idx;
-        this.pidx   = null;
+        this.pidx   = -1;
         this.len    = len;
     }
 

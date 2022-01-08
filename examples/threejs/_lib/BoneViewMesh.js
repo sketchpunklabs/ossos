@@ -28,6 +28,12 @@ class BoneViewMesh extends THREE.Mesh{
         super( geo, mat );
     }
 
+    setScales( meshScl = 0.02, dirScl=2.0 ){
+        this.material.uniforms.meshScl.value    = meshScl;
+        this.material.uniforms.dirScl.value     = dirScl;
+        return this;
+    }
+
     updateFromPose( pose ){
         const rot = this.material.uniforms.boneRot.value;
         const pos = this.material.uniforms.bonePos.value;

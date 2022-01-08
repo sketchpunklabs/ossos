@@ -100,14 +100,11 @@ class Pose{
 
     //#region OPERATIONS
     rotLocal( bone: number|string, deg:number, axis='x' ): this{
-        const bIdx = (typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
+        const bIdx = ( typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
         if( bIdx != undefined ){
             const q     = this.bones[ bIdx ].local.rot;
             const rad   = deg * Math.PI / 180;
             switch( axis ){
-                //case 'y'    : q.rotY( rad ); break;
-                //case 'z'    : q.rotZ( rad ); break;
-                //default     : q.rotX( rad ); break;
                 case 'y' : quat.rotateY( q, q, rad ); break;
                 case 'z' : quat.rotateZ( q, q, rad ); break;
                 default  : quat.rotateX( q, q, rad ); break;
@@ -117,7 +114,7 @@ class Pose{
     }
 
     moveLocal( bone: number|string, offset:vec3 ): this{
-        const bIdx = (typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
+        const bIdx = ( typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
         //if( bIdx != undefined ) this.bones[ bIdx ].local.pos.add( offset );
         
         if( bIdx != undefined ){
@@ -133,11 +130,9 @@ class Pose{
         if( bIdx != undefined ){
             const scl = this.bones[ bIdx ].local.scl;
             if( v instanceof Array || v instanceof Float32Array )
-                //this.bones[ bIdx ].local.scl.copy( v );
                 vec3.copy( scl, v as vec3 );
             else
                 vec3.set( scl, v, v, v );
-                //this.bones[ bIdx ].local.scl.xyz( v, v, v );
         }else console.warn( 'Bone not found, ', bone );
 
         return this;
@@ -151,7 +146,7 @@ class Pose{
         for( i=0; i < this.bones.length; i++ ){
             b = this.bones[ i ];
 
-            if( b.pidx != null ) b.world.fromMul( this.bones[ b.pidx ].world, b.local );
+            if( b.pidx != -1 )   b.world.fromMul( this.bones[ b.pidx ].world, b.local );
             else if( useOffset ) b.world.fromMul( this.offset, b.local );
             else                 b.world.copy( b.local );                      
         }
@@ -161,12 +156,13 @@ class Pose{
 
     getWorldTransform( bIdx: number, out ?: Transform ): Transform{
         out ??= new Transform();
+        if( bIdx == -1 ) return out.copy( this.offset );
         
         let bone = this.bones[ bIdx ];  // get Initial Bone
         out.copy( bone.local );         // Starting Transform
 
         // Loop up the heirarchy till we hit the root bone
-        while( bone.pidx != null ){
+        while( bone.pidx != -1 ){
             bone = this.bones[ bone.pidx ];
             out.pmul( bone.local );
         }
@@ -178,20 +174,18 @@ class Pose{
 
     getWorldRotation( bIdx: number, out ?: quat ): quat{
         out ??= quat.create();
-        
+        if( bIdx == -1 ){ quat.copy( out, this.offset.rot ); return out; }
+
         let bone = this.bones[ bIdx ];      // get Initial Bone
-        //out.copy( bone.local.rot );     // Starting Rotation
         quat.copy( out, bone.local.rot );   // Starting Rotation
 
         // Loop up the heirarchy till we hit the root bone
-        while( bone.pidx != null ){
+        while( bone.pidx != -1 ){
             bone = this.bones[ bone.pidx ];
-            //out.pmul( bone.local.rot );
             quat.mul( out, bone.local.rot, out );
         }
 
         // Add offset at the end
-        //out.pmul( this.offset.rot );
         quat.mul( out, this.offset.rot, out );
         return out;
     }
@@ -206,7 +200,7 @@ class Pose{
         for( let i=bCnt-1; i >= 0; i-- ){
             //-------------------------------
             b = this.bones[ i ];
-            if( b.pidx == null ) continue;  // No Parent to compute its length.
+            if( b.pidx == -1 ) continue;  // No Parent to compute its length.
 
             //-------------------------------
             // Parent Bone, Compute its length based on its position and the current bone.

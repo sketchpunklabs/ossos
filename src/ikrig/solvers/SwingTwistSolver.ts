@@ -1,7 +1,7 @@
 //#region IMPORTS
 import type Pose                from '../../armature/Pose';
 import type { IKChain, IKLink } from '../rigs/IKChain';
-import type { ISolver }         from './ISolver';
+import type { ISolver }         from './support/ISolver';
 import type { IKData }          from '..';
 
 import { Transform }            from '../../maths';

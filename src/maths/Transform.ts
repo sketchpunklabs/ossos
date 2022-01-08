@@ -43,6 +43,10 @@ class Transform{
         return this;
     }
 
+    setPos( v: vec3 ): this{ vec3.copy( this.pos, v ); return this; }
+    setRot( v: quat ): this{ quat.copy( this.rot, v ); return this; }
+    setScl( v: vec3 ): this{ vec3.copy( this.scl, v ); return this; }
+
     clone() : Transform{ return new Transform( this ); }
 
     //#endregion ////////////////////////////////////////////////////////

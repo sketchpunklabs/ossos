@@ -1,0 +1,26 @@
+=========================================================================
+VERSION : 0.0.0.3
+
+New
+- New IK Solvers:
+  - ArcSolver
+  - ArcSinSolver
+  - FabrikSolver
+  - NaturalCCDSolver
+  - PistonSolver
+  - SpringSolver
+  - SwingTwistChainSolver
+  - TrapezoidSolver
+  - ZSolver
+  - FabrikSolver
+  - NaturalCCDSolver
+  - CatenarySolver
+
+Changes
+- Bone.pidx is no longer nullable. -1 is used to denote there is no parent
+- Pose.getWorldTransform & getWorldRotation handles bIdx == -1 by returning Pose.offset value.
+
+Fixes
+- Update the codebase to handle the Bone.pidx change.
+
+=========================================================================

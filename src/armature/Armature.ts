@@ -38,7 +38,10 @@ class Armature{
     //#endregion
 
     //#region GETTERS
-    newPose(): Pose{ return new Pose( this ); }
+    newPose( doWorldUpdate=false ): Pose{ 
+        const p = new Pose( this ); 
+        return ( doWorldUpdate )? p.updateWorld() : p;
+    }
 
     getBone( bName: string ): Bone | null {
         const idx = this.names.get( bName );
@@ -66,8 +69,8 @@ class Armature{
 
         for( let i=0; i < bCnt; i++ ){
             b = this.bones[ i ];
-            if( b.pidx != null ) b.world.fromMul( this.bones[ b.pidx ].world, b.local );
-            else                 b.world.copy( b.local );
+            if( b.pidx != -1 )  b.world.fromMul( this.bones[ b.pidx ].world, b.local );
+            else                b.world.copy( b.local );
         }
 
         return this;
@@ -83,7 +86,7 @@ class Armature{
         for( let i=bCnt-1; i >= 0; i-- ){
             //-------------------------------
             b = this.bones[ i ];
-            if( b.pidx == null ) continue;  // No Parent to compute its length.
+            if( b.pidx == -1 ) continue;  // No Parent to compute its length.
 
             //-------------------------------
             // Parent Bone, Compute its length based on its position and the current bone.

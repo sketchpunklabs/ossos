@@ -1,0 +1,171 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { THREE }           from './_lib/Starter.js';
+import ShapePointsMesh              from './_lib/ShapePointsMesh.js';
+import DynLineMesh                  from './_lib/DynLineMesh.js';
+
+import Cycle                        from '../_lib/Cycle.js';
+import { vec3, quat }               from 'gl-matrix';
+
+import Armature                     from '../../src/armature/Armature';
+import { IKChain }                  from '../../src/ikrig/rigs/IKChain';
+import BoneViewMesh                 from './_lib/BoneViewMesh.js';
+
+import {
+    LimbSolver,
+    ZSolver,
+    ArcSolver,
+    ArcSinSolver,
+    PistonSolver,
+    SpringSolver,
+    TrapezoidSolver,
+    FabrikSolver,
+    CatenarySolver,
+    NaturalCCDSolver,
+}                                   from '../../src/ikrig/solvers/index'
+//#endregion
+
+//#region MAIN
+let App;
+let Debug   = {};
+let Ref     = {};
+
+function onRender( dt=0, et=0 ){
+    Ref.cycle.tick( dt );
+    Ref.motion.update( Ref.cycle );
+    Debug.pnt.reset();
+    for( let c of Ref.chains ) c.apply( Ref.motion );
+}
+
+window.addEventListener( "load", async _=>{
+    App = new Starter( { webgl2:true, grid:true } );
+    App.setCamera( 90, 20, 6, [0,0.8,0] );
+    App.onRender = onRender;
+
+    App.add( ( Debug.pnt = new ShapePointsMesh() ) );
+    App.add( ( Debug.ln  = new DynLineMesh() ) );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.cycle   = new Cycle( 3 );
+    Ref.motion  = new LegMotion();
+    Ref.chains  = [
+        new ChainSolver( [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ], [0,1.5, 5.5], new NaturalCCDSolver().useArcSqrFactor( 0.05, 0.2, false ).setTries( 30 ).inWorldSpace() ),
+        new ChainSolver( [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ], [0,1.5, 4.5], new CatenarySolver() ),
+        new ChainSolver( [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ], [0,1.5, 3.5], new FabrikSolver().inWorldSpace() ),
+        new ChainSolver( [ 0.40,0.75,0.40], [0,1.5,2.5], new TrapezoidSolver().invertBend() ),    
+        new ChainSolver( [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ], [0,1.5, 1], new ArcSolver() ),
+        
+        new ChainSolver( [0.75,0.75], [0,1.5,-1.2], new LimbSolver() ),
+        new ChainSolver( [0.4,0.7,0.4], [0,1.5,-2.2], new ZSolver() ),
+        new ChainSolver( [ 0.26, 0.26, 0.26, 0.26, 0.26, 0.26 ], [0,1.5, -3.5], new SpringSolver() ),
+        new ChainSolver( [ 0.19, 0.19, 0.19, 0.19, 0.19, 0.19, 0.19, 0.19 ], [0,1.5, -4.5], new ArcSinSolver() ),
+        new ChainSolver( [ 0.5, 0.5, 0.5 ], [0,1.5, -5.5], new PistonSolver() ),
+    ];
+
+    for( let c of Ref.chains ) App.add( c.boneView );   // Add Bone Views to Scene
+
+    onRender( 0.6 );
+  
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.render();
+});
+//#endregion
+
+//#region LEG ANIMATION
+
+function lerp( a, b, t ){ return a * (1-t) + b * t; }
+function toRad( v ){ return v * 0.01745329251; }
+
+class LegMotion{
+    effectorOff = vec3.create();
+    effectorDir = vec3.create();
+    poleDir     = vec3.create();
+    distance    = 1;
+
+    origin      = [0,1.5,0];
+    q           = quat.create();
+    v           = vec3.create();
+    scl_off     = 1.95; // Cycle Offset for scale
+    scl_min     = 0.75;
+    scl_max     = 1.5;
+    rot_min     = 160;
+    rot_max     = 45;
+
+    update( cycle ){
+        const t         = cycle.asSin01();
+        this.distance   = lerp( this.scl_min, this.scl_max, cycle.asSin01( this.scl_off ) );
+
+        quat.setAxisAngle( this.q, [1,0,0], toRad( lerp( this.rot_max, this.rot_min, t ) ) );
+        vec3.transformQuat( this.effectorDir, [0,0,1], this.q );
+        vec3.transformQuat( this.poleDir,     [0,1,0], this.q );
+
+        // Effector offset to add to an origin
+        // Doing this to save from doing EffectorDir * Scale for each solver input, just add this to chain origin
+        vec3.scale( this.effectorOff, this.effectorDir, this.distance );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        Debug.pnt.reset();
+        Debug.ln.reset();
+
+        Debug.ln.add( this.origin, vec3.scaleAndAdd( this.v, this.origin, this.poleDir, 0.3 ), 0xffff00 );
+        Debug.ln.add( this.origin, vec3.add( this.v, this.origin, this.effectorOff ), 0x00ffff );
+        
+        Debug.pnt.add( this.origin, 0xffff00, 1.5 );
+        Debug.pnt.add( this.v, 0x00ffff, 2.0 );
+    }
+}
+
+//#endregion
+
+//#region CHAIN
+
+class ChainSolver{
+    constructor( aryLen, origin, solver ){
+        this.arm    = new Armature();
+        this.origin = origin;
+        this.v      = [0,0,0];
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const   len = aryLen.length;
+        let     b   = this.arm.addBone( 'bone0', null, null, [0,0,0] );
+
+        for( let i=1; i < len; i++ ){
+            b = this.arm.addBone( 'bone'+i, b.idx, null, [0,aryLen[i-1],0] );
+        }
+
+        this.arm.offset.setPos( origin );
+        this.arm.bind( null, aryLen[ len-1 ] ); // Use the Last Length as the default length since leaf bones can't compute length
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.chain = new IKChain();
+        this.chain.setSolver( solver );
+
+        for( let b of this.arm.bones ) this.chain.addBone( b );
+
+        // this.chain.setAltDirections( [0,1,0], [0,0,1] ); Dont really need to set it, Its the default directions for Chain Links
+        
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.pose       = this.arm.newPose( true );
+        this.boneView   = new BoneViewMesh( this.arm )
+            .updateFromPose( this.pose )
+            .setScales( 0.06, 1.5 );
+    }
+
+    apply( motion ){
+        vec3.add( this.v, this.origin, motion.effectorOff );
+        this.chain.solver.setTargetPos( this.v, motion.poleDir );
+        this.chain.resolveToPose( this.pose, Debug );
+
+        this.pose.updateWorld();
+        this.boneView.updateFromPose( this.pose );
+    }
+}
+
+//#endregion
+
+</script>
+</body></html>

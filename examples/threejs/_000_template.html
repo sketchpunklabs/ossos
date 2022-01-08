@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { THREE }           from './_lib/Starter.js';
+import ShapePointsMesh              from './_lib/ShapePointsMesh.js';
+import DynLineMesh                  from './_lib/DynLineMesh.js';
+
+import { vec3, quat }               from 'gl-matrix';
+import Transform                    from '../../src/maths/Transform';
+//#endregion
+
+//#region MAIN
+let App;
+let Debug   = {};
+let Ref     = {};
+
+function onRender( dt=0, et=0 ){
+
+}
+
+window.addEventListener( "load", async _=>{
+    App = new Starter( { webgl2:true, grid:true } );
+    App.setCamera( 0, 20, 4, [0,0.8,0] );
+    //App.onRender = onRender;
+
+    App.add( ( Debug.pnt = new ShapePointsMesh() ) );
+    App.add( ( Debug.ln  = new DynLineMesh() ) );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.render();
+});
+//#endregion
+
+
+//#region LOREM
+//#endregion
+
+</script>
+</body></html>

@@ -2,13 +2,14 @@
 import type Pose                    from '../../armature/Pose';
 import type { IKChain }             from "../rigs/IKChain";
 import type { IKData }              from '..';
+import type { ISolver }             from './support/ISolver';
 
 import { Transform }                from '../../maths';
 import { vec3 }                     from 'gl-matrix';
 import SwingTwistSolver             from "./SwingTwistSolver";
 //#endregion
 
-class HipSolver{
+class HipSolver implements ISolver{
     //#region MAIN
     isAbs       : boolean   = true;
     position    : vec3      = [0,0,0];
@@ -87,7 +88,7 @@ class HipSolver{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Figure out the Delta Change of the Hip Position from its Bind Pose to its Animated Pose
 
-        if( b.pidx == null ) tran.fromMul( pose.offset, lnk.bind );                     // Use Offset if there is no parent
+        if( b.pidx == -1 )   tran.fromMul( pose.offset, lnk.bind );                     // Use Offset if there is no parent
         else                 pose.getWorldTransform( lnk.pidx, tran ).mul( lnk.bind );  // Compute Parent's WorldSpace transform, then add local bind pose to it.
 
         vec3.sub( v, b.world.pos, tran.pos );   // Position Change from Bind Pose
