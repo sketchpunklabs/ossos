@@ -46,7 +46,7 @@ class SkinDQ implements ISkin {
 
             quat2.fromRotationTranslation( q, l.rot, l.pos );               // Local Space
 
-            if( b.pidx != null ) quat2.mul( q, world[ b.pidx ], q );        // Add Parent if Available
+            if( b.pidx != -1 ) quat2.mul( q, world[ b.pidx ], q );          // Add Parent if Available
                             
             quat2.invert( bind[ i ], q );                                   // Invert for Bind Pose
 
@@ -84,9 +84,9 @@ class SkinDQ implements ISkin {
             // Compute Worldspace Duak Quaternion for Each Bone
             // Make sure scale is applied in no way to prevent artifacts.
             q = this.world[ i ];
-            quat2.fromRotationTranslation( q, b.local.rot,  b.local.pos );  // Local Space Matrix
-            if( b.pidx != null ) quat2.mul( q, this.world[ b.pidx ], q );   // Add Parent if Available (PMUL)
-            else                 quat2.mul( q, offset, q );                 // Or use Offset on all root bones (PMUL)
+            quat2.fromRotationTranslation( q, b.local.rot,  b.local.pos ); // Local Space Matrix
+            if( b.pidx != -1 )  quat2.mul( q, this.world[ b.pidx ], q );   // Add Parent if Available (PMUL)
+            else                quat2.mul( q, offset, q );                 // Or use Offset on all root bones (PMUL)
 
             //----------------------------------------
             // Compute Offset Matrix that will be used for skin a mesh

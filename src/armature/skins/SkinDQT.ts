@@ -50,7 +50,7 @@ class SkinDQT implements ISkin {
             t = world[ i ];
 
             t.copy( b.local );
-            if( b.pidx != null ) t.pmul( world[ b.pidx ] );                 // Add Parent if Available
+            if( b.pidx != -1 ) t.pmul( world[ b.pidx ] );                   // Add Parent if Available
             bind[ i ].fromInvert( t );                                      // Invert for Bind Pose
 
             Vec4Util.toBuf( [0,0,0,1],  this.offsetQBuffer, i * 4 );        // Init Offsets : Quat Identity
@@ -84,8 +84,8 @@ class SkinDQT implements ISkin {
 
             //----------------------------------------
             // Compute Worldspace Transform for Each Bone
-            if( b.pidx != null ) ws.fromMul( this.world[ b.pidx ], b.local );  // Add Parent if Available
-            else                 ws.fromMul( offset, b.local );                // Or use pose Offset on all root bones
+            if( b.pidx != -1 )  ws.fromMul( this.world[ b.pidx ], b.local );  // Add Parent if Available
+            else                ws.fromMul( offset, b.local );                // Or use pose Offset on all root bones
 
             //----------------------------------------
             // Compute Offset Transform that will be used for skinning a mesh

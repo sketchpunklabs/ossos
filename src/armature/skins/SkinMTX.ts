@@ -41,8 +41,7 @@ class SkinMTX implements ISkin {
             //world[ i ].fromQuatTranScale( b.local.rot, b.local.pos, b.local.scl );  
             mat4.fromRotationTranslationScale( m, l.rot, l.pos, l.scl );    // Local Space Matrix
 
-            //if( b.pidx != null ) world[ i ].pmul( world[ b.pidx ] );                // Add Parent if Available
-            if( b.pidx != null ) mat4.mul( m, world[ b.pidx ], m );         // Add Parent if Available
+            if( b.pidx != -1 ) mat4.mul( m, world[ b.pidx ], m );           // Add Parent if Available
 
             //bind[ i ].fromInvert( world[ i ] );                                     
             mat4.invert( bind[ i ], m );                                    // Invert for Bind Pose
@@ -80,14 +79,10 @@ class SkinMTX implements ISkin {
 
             //----------------------------------------
             // Compute Worldspace Matrix for Each Bone
-            //this.world[ i ].fromQuatTranScale( b.local.rot, b.local.pos, b.local.scl ); // Local Space Matrix
-            //if( b.pidx != null ) this.world[ i ].pmul( this.world[ b.pidx ] );          // Add Parent if Available
-            //else                 this.world[ i ].pmul( offset );                        // Or use Offset on all root bones
-
             m = this.world[ i ];
             mat4.fromRotationTranslationScale( m, b.local.rot,  b.local.pos, b.local.scl ); // Local Space Matrix
-            if( b.pidx != null ) mat4.mul( m, this.world[ b.pidx ], m );                    // Add Parent if Available (PMUL)
-            else                 mat4.mul( m, offset, m );                                  // Or use Offset on all root bones (PMUL)
+            if( b.pidx != -1 )  mat4.mul( m, this.world[ b.pidx ], m );                     // Add Parent if Available (PMUL)
+            else                mat4.mul( m, offset, m );                                   // Or use Offset on all root bones (PMUL)
 
             //----------------------------------------
             // Compute Offset Matrix that will be used for skin a mesh

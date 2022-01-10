@@ -46,13 +46,8 @@ class BoneLink{
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // What is the From Parent WorldSpace Transform can we use?
-        //this.quatFromParent.copy(
-        //    ( fBone.pidx != null )? 
-        //        fromTPose.bones[ fBone.pidx ].world.rot :   // Bone's Parent
-        //        fromTPose.offset.rot                        // Pose Offset, most often its an identity value
-        //);
         quat.copy( this.quatFromParent,
-            ( fBone.pidx != null )? 
+            ( fBone.pidx != -1 )? 
                 fromTPose.bones[ fBone.pidx ].world.rot :   // Bone's Parent
                 fromTPose.offset.rot                        // Pose Offset, most often its an identity value
         );            
@@ -61,12 +56,7 @@ class BoneLink{
         // Caching the parent Bone of the "To Bone" and inverting it
         // This will make it easy to convert the final results back
         // to the TO Bone's Local Space.
-        //if( tBone.pidx != null )
-        //    this.toWorldLocal.fromInvert( toTPose.bones[ tBone.pidx ].world.rot );
-        //else
-        //    this.toWorldLocal.fromInvert( toTPose.offset.rot );
-
-        if( tBone.pidx != null )
+        if( tBone.pidx != -1 )
             quat.invert( this.toWorldLocal, toTPose.bones[ tBone.pidx ].world.rot );
         else
             quat.invert( this.toWorldLocal, toTPose.offset.rot );

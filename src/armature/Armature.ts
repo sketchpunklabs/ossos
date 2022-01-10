@@ -24,7 +24,7 @@ class Armature{
         this.names.set( name, idx );
 
         if( pos || rot || scl )                 bone.setLocal( rot, pos, scl );
-        if( pidx != null && pidx != undefined ) bone.pidx = pidx;
+        if( pidx != null && pidx != undefined && pidx != -1 ) bone.pidx = pidx;
 		
 		return bone;
     }

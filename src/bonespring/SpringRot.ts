@@ -42,8 +42,8 @@ class SpringRot implements ISpringType{
         // Find the Starting WorldSpace Transform
         si = chain.items[ 0 ];                                          // First Chain Link
         b  = pose.bones[ si.index ];                                    // Its Pose Bone
-        if( b.pidx != null ) pTran.copy( pose.bones[ b.pidx ].world );  // Use Parent's WS Transform
-        else                 pTran.copy( pose.offset );                 // Use Pose's Offset if there is no parent.
+        if( b.pidx != -1 )  pTran.copy( pose.bones[ b.pidx ].world );   // Use Parent's WS Transform
+        else                pTran.copy( pose.offset );                  // Use Pose's Offset if there is no parent.
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Start Processing Chain
