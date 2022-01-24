@@ -6,8 +6,8 @@ import SpringChain      from './SpringChain';
 //#endregion
 
 interface ISpringType{
-    setRestPose( chain: SpringChain, pose: Pose ): void;
-    updatePose( chain: SpringChain, pose: Pose, dt: number ): void;
+    setRestPose( chain: SpringChain, pose: Pose, resetSpring: boolean, debug ?: any ): void;
+    updatePose( chain: SpringChain, pose: Pose, dt: number, debug ?: any ): void;
 }
 
 class BoneSpring{
@@ -31,18 +31,18 @@ class BoneSpring{
         return this;
     }
 
-    setRestPose( pose: Pose ): this{
+    setRestPose( pose: Pose, resetSpring=true, debug ?: any ): this{
         let ch: SpringChain;
         for( ch of this.items.values() ){
-            ch.setRestPose( pose );
+            ch.setRestPose( pose, resetSpring, debug );
         }
         return this;
     }
 
-    updatePose( dt: number, pose: Pose, doWorldUpdate:false ): this{
+    updatePose( dt: number, pose: Pose, doWorldUpdate:false, debug ?: any ): this{
         let ch: SpringChain;
         for( ch of this.items.values() ){
-            ch.updatePose( dt, pose );    
+            ch.updatePose( dt, pose, debug );    
         }
 
         if( doWorldUpdate ) pose.updateWorld( true );

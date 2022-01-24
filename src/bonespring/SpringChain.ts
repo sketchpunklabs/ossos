@@ -42,8 +42,8 @@ class SpringChain{
         }
     }
 
-    setRestPose( pose: Pose ): void{ this.spring.setRestPose( this, pose ); }
-    updatePose( dt: number, pose: Pose ): void{ this.spring.updatePose( this, pose, dt ); }
+    setRestPose( pose: Pose, resetSpring=false, debug ?: any ): void{ this.spring.setRestPose( this, pose, resetSpring, debug ); }
+    updatePose( dt: number, pose: Pose, debug ?: any ): void{ this.spring.updatePose( this, pose, dt, debug ); }
 
     //#endregion
 }

@@ -137,6 +137,15 @@ class SkinDQ implements ISkin {
         };
         return o;
     }
+
+    clone(): SkinDQ{
+        const skin          = new SkinDQ();
+        skin.offsetQBuffer  = new Float32Array( this.offsetQBuffer );
+        skin.offsetPBuffer  = new Float32Array( this.offsetPBuffer );
+        skin.bind           = this.bind.map(  v=> quat2.clone( v ) );
+        skin.world          = this.world.map( v=> quat2.clone( v ) );
+        return skin;
+    }
 }
 
 export default SkinDQ;

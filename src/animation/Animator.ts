@@ -31,6 +31,7 @@ class Animator{
 
     //#region METHODS
     
+    resetClock(){ this.clock = 0; return this; }
     setClip( c: Clip ): this{ this.clip = c; return this; }
 
     /** Move Animation to the next possible frame. */
@@ -93,7 +94,7 @@ class Animator{
         return this;
     }
 
-    //endregion
+    //#endregion
 
     //#region INTERNAL
 
@@ -177,7 +178,7 @@ class Animator{
             fi.ti   = 1 - fi.t;
         }
     }
-    //endregion
+    //#endregion
 }
 
 export default Animator;

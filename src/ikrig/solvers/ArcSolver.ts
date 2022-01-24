@@ -38,13 +38,15 @@ function getOffset( t: number ): number{
 class ArcSolver extends SwingTwistBase{
     bendDir : number = 1;   // Switching to Negative will flip the rotation arc
 
+    invertBend(): this{ this.bendDir = -this.bendDir; return this; }
+
     resolve( chain: IKChain, pose: Pose, debug?:any ): void{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Start by Using SwingTwist to target the bone toward the EndEffector
         const ST            = this._swingTwist
         const [ rot, pt ]   = ST.getWorldRot( chain, pose, debug );
         const eff_len       = Vec3Util.len( ST.effectorPos, ST.originPos );
-        
+
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // If Distance to the end effector is at or over the chain length,
         // Just Apply SwingTwist to Root Bone.
@@ -54,6 +56,11 @@ class ArcSolver extends SwingTwistBase{
             pose.setLocalRot( chain.links[ 0 ].idx, rot );  // Save
             return;
         }
+
+        //debug.pnt.add( ST.effectorPos, 0xff0000, 0.5 );
+        //debug.pnt.add( ST.originPos, 0xff0000, 0.5 );
+        //debug.ln.add( ST.originPos, vec3.scaleAndAdd([0,0,0], ST.originPos, ST.effectorDir, ST.effectorScale ), 0x00ff00 );
+        //debug.ln.add( ST.originPos, vec3.scaleAndAdd([0,0,0], ST.originPos, ST.poleDir, ST.effectorScale ), 0xffff00 );
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Use the IK Length Scale to get the Arc angle out of 360 Degrees
@@ -76,10 +83,10 @@ class ArcSolver extends SwingTwistBase{
 
         const init_rot : quat = quat.copy( [0,0,0,0], rot );    // Root WS Rot, Save for Alignment  
         QuatUtil.pmulInvert( rot, rot, pt.rot );                // To Local
-        //pose.setLocalRot( lnk.idx, rot );                     // Dont Really need to save yet, save after realignment
-
+        
+        pose.setLocalRot( lnk.idx, rot );                       // Dont Really need to save yet, save after realignment
         pt.mul( rot, lnk.bind.pos, lnk.bind.scl );              // Set new Parent Transform for next bone
-
+        
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Apply Rotation Increment to each bone after the first one
         let i:number;

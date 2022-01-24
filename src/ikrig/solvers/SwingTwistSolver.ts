@@ -138,9 +138,11 @@ class SwingTwistSolver implements ISolver{
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Twist
-        vec3.transformQuat( dir, lnk.poleDir, rot );    // Get WS Binding Pole Direction of the Bone
-        quat.rotationTo( q, dir, this.poleDir );        // Rotation to IK Pole Direction
-        quat.mul( rot, q, rot );                        // Apply to Bone WS Rot + Swing
+        if( vec3.sqrLen( this.poleDir ) > 0.0001 ){
+            vec3.transformQuat( dir, lnk.poleDir, rot );    // Get WS Binding Pole Direction of the Bone
+            quat.rotationTo( q, dir, this.poleDir );        // Rotation to IK Pole Direction
+            quat.mul( rot, q, rot );                        // Apply to Bone WS Rot + Swing
+        }
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Kinda Hacky putting this here, but its the only time where there is access to chain's length for all extending solvers.

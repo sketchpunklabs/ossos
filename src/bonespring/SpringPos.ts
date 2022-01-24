@@ -10,7 +10,7 @@ import SpringItem                   from './SpringItem';
 
 class SpringPos implements ISpringType{
 
-    setRestPose( chain: SpringChain, pose: Pose ): void{
+    setRestPose( chain: SpringChain, pose: Pose, resetSpring=true, debug ?: any ): void{
         let si   : SpringItem;
         let b    : Bone;
 
@@ -21,7 +21,7 @@ class SpringPos implements ISpringType{
         }
     }
 
-    updatePose( chain: SpringChain, pose: Pose, dt: number ): void{
+    updatePose( chain: SpringChain, pose: Pose, dt: number, debug ?: any ): void{
         let si      : SpringItem;
         let b       : Bone;
         let pTran   = new Transform();

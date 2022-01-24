@@ -18,8 +18,6 @@ class SpringVec3 extends SpringBase {
     setTarget( v: vec3 ){ vec3.copy( this.tar, v ); return this; }
 
     reset( v: vec3 ){
-        vec3.set( v, 0, 0, 0 );
-
         if( v ){
             vec3.copy( this.val, v );
             vec3.copy( this.tar, v );

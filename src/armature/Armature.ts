@@ -35,6 +35,15 @@ class Armature{
         if( skin ) this.skin = new skin().init( this ); // Setup Skin BindPose
         return this;
     }
+
+    clone(): Armature{
+        const arm = new Armature();
+        arm.skin = this.skin?.clone();
+        arm.offset.copy( this.offset );
+        this.bones.forEach( b=>arm.bones.push( b.clone() ) );
+        this.names.forEach( (v:number,k:string)=>arm.names.set( k, v ) );
+        return arm;
+    }
     //#endregion
 
     //#region GETTERS
@@ -80,7 +89,6 @@ class Armature{
         const bCnt = this.bones.length;
         let b: Bone;
         let p: Bone;
-        //let v = vec3.create();
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         for( let i=bCnt-1; i >= 0; i-- ){
@@ -90,14 +98,8 @@ class Armature{
 
             //-------------------------------
             // Parent Bone, Compute its length based on its position and the current bone.
-            p = this.bones[ b.pidx ];       
-            
-            //p.len = Vec3.len( p.world.pos, b.world.pos ); // Oito
-            
-            //vec3.sub( v, p.world.pos, b.world.pos );      // gl-matrix
-            //p.len = vec3.len( v );
-            
-            p.len = Vec3Util.len( p.world.pos, b.world.pos ); // Compromise
+            p       = this.bones[ b.pidx ];                   
+            p.len   = Vec3Util.len( p.world.pos, b.world.pos ); // Compromise
         }
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

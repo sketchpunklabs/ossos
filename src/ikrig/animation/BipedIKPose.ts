@@ -61,6 +61,23 @@ class BipedIKPose{
             .setStartDir( this.spine.startEffectorDir, this.spine.startPoleDir )
             .setEndDir( this.spine.endEffectorDir, this.spine.endPoleDir );
     }
+
+    copy( r: BipedIKPose ): this{
+        this.hip.copy( r.hip );
+        this.spine.copy( r.spine );
+        this.head.copy( r.head );
+
+        this.armL.copy( r.armL );
+        this.armR.copy( r.armR );
+        this.legL.copy( r.legL );
+        this.legR.copy( r.legR );
+
+        this.handL.copy( r.handL );
+        this.handR.copy( r.handR );
+        this.footL.copy( r.footL );
+        this.footR.copy( r.footR );
+        return this;
+    }
 }
 
 export default BipedIKPose;

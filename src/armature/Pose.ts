@@ -5,6 +5,7 @@ import type Bone        from './Bone.js';
 import { vec3, quat }   from 'gl-matrix';
 import Transform        from '../maths/Transform';
 import Vec3Util from '../maths/Vec3Util';
+import { QuatUtil } from '../maths';
 //#endregion
 
 class Pose{
@@ -57,14 +58,12 @@ class Pose{
 
     setLocalPos( bone: number|string, v: vec3 ): this{
         const bIdx = ( typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
-        //if( bIdx != undefined ) this.bones[ bIdx ].local.pos.copy( v );
         if( bIdx != undefined ) vec3.copy( this.bones[ bIdx ].local.pos, v );
         return this;
     }
     
     setLocalRot( bone: number|string, v: quat ): this{
         const bIdx = ( typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
-        //if( bIdx != undefined ) this.bones[ bIdx ].local.rot.copy( v );
         if( bIdx != undefined ) quat.copy( this.bones[ bIdx ].local.rot, v );
         return this;
     }
@@ -74,9 +73,6 @@ class Pose{
         let b   : Bone;
         for( jnt of glPose.joints ){
             b = this.bones[ jnt.index ];
-            //if( jnt.rot ) b.local.rot.copy( jnt.rot );
-            //if( jnt.pos ) b.local.pos.copy( jnt.pos );
-            //if( jnt.scl ) b.local.scl.copy( jnt.scl );
             if( jnt.rot ) quat.copy( b.local.rot, jnt.rot as quat );
             if( jnt.pos ) vec3.copy( b.local.pos, jnt.pos as vec3 );
             if( jnt.scl ) vec3.copy( b.local.scl, jnt.scl as vec3 );
@@ -109,6 +105,25 @@ class Pose{
                 case 'z' : quat.rotateZ( q, q, rad ); break;
                 default  : quat.rotateX( q, q, rad ); break;
             } 
+        }else console.warn( 'Bone not found, ', bone );
+        return this;
+    }
+
+    rotWorld( bone: number|string, deg:number, axis='x' ): this{
+        const bIdx = ( typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
+        if( bIdx != undefined ){
+            const b: Bone   = this.bones[ bIdx ];                           // Get Bone
+            const p: quat   = this.getWorldRotation( b.pidx, [0,0,0,1] );   // Get Bone's Parent WorldSpace Rotation
+            const q: quat   = quat.mul( [0,0,0,1], p, b.local.rot );        // Get Bone's Worldspace Rotation
+            const rad       = deg * Math.PI / 180;                          // Degrees to Radians
+
+            switch( axis ){                                                 // Apply Axis Rotation
+                case 'y' : quat.rotateY( q, q, rad ); break;
+                case 'z' : quat.rotateZ( q, q, rad ); break;
+                default  : quat.rotateX( q, q, rad ); break;
+            }
+
+            QuatUtil.pmulInvert( b.local.rot, q, p );                       // To Local Space Conversion
         }else console.warn( 'Bone not found, ', bone );
         return this;
     }

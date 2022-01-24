@@ -127,6 +127,14 @@ class SkinMTX implements ISkin {
 
         return o;
     }
+
+    clone(): SkinMTX{
+        const skin = new SkinMTX();
+        skin.offsetBuffer   = new Float32Array( this.offsetBuffer );
+        skin.bind           = this.bind.map(  v=> mat4.clone( v ) );
+        skin.world          = this.world.map( v=> mat4.clone( v ) );
+        return skin;
+    }
 }
 
 export default SkinMTX;

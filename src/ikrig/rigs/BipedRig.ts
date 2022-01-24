@@ -1,16 +1,18 @@
 //#region IMPORTS
+import type { vec3 }                    from 'gl-matrix';
 import type Armature                    from '../../armature/Armature';
 import BoneMap, { BoneChain, BoneInfo } from '../../armature/BoneMap';
 import Pose                             from '../../armature/Pose';
 
-import HipSolver                from '../solvers/HipSolver';
-import LimbSolver               from '../solvers/LimbSolver';
-import SwingTwistSolver         from '../solvers/SwingTwistSolver';
+import HipSolver                        from '../solvers/HipSolver';
+import LimbSolver                       from '../solvers/LimbSolver';
+import SwingTwistSolver                 from '../solvers/SwingTwistSolver';
 //import SwingTwistChainSolver from '../solvers/SwingTwistChainSolver';
-import SwingTwistEndsSolver     from '../solvers/SwingTwistEndsSolver';
+import SwingTwistEndsSolver             from '../solvers/SwingTwistEndsSolver';
 
-import { IKChain }      from './IKChain';
-import IKRig            from './IKRig';
+import { IKChain }                      from './IKChain';
+import IKRig                            from './IKRig';
+
 
 //#endregion
 
@@ -139,12 +141,12 @@ class BipedRig extends IKRig{
     }
 
     _setAltDirection( pose: any ): void{
-        const FWD = [0,0,1];
-        const UP  = [0,1,0];
-        const DN  = [0,-1,0];
-        const R   = [-1,0,0];
-        const L   = [1,0,0];
-        const BAK = [0,0,-1];
+        const FWD : vec3 = [0,0,1];
+        const UP  : vec3 = [0,1,0];
+        const DN  : vec3 = [0,-1,0];
+        const R   : vec3 = [-1,0,0];
+        const L   : vec3 = [1,0,0];
+        const BAK : vec3 = [0,0,-1];
 
         if( this.hip )      this.hip.bindAltDirections( pose, FWD, UP );
         if( this.spine )    this.spine.bindAltDirections( pose, UP, FWD );

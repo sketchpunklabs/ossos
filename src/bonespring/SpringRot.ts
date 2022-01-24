@@ -12,23 +12,25 @@ import QuatUtil from '../maths/QuatUtil';
 
 class SpringRot implements ISpringType{
 
-    setRestPose( chain: SpringChain, pose: Pose ): void{
-        let si   : SpringItem;
-        let b    : Bone;
-        let tail = vec3.create();
+    setRestPose( chain: SpringChain, pose: Pose, resetSpring=true, debug ?: any ): void{
+        const tail = vec3.create();
+        let   si   : SpringItem;
+        let   b    : Bone;
 
         for( si of chain.items ){
-            b = pose.bones[ si.index ];     // Get Pose Bone
+            b = pose.bones[ si.index ];         // Get Pose Bone
+            
+            if( resetSpring ){
+                vec3.set( tail, 0, b.len, 0 );  // Tail's LocalSpace Position.
+                b.world.transformVec3( tail );  // Move Tail to WorldSpace
+                si.spring.reset( tail );        // Set Spring to Start at this Position.
+            }
 
-            vec3.set( tail, 0, b.len, 0 );  // Tail's LocalSpace Position.
-            b.world.transformVec3( tail );  // Move Tail to WorldSpace
-
-            si.spring.reset( tail );        // Set Spring to Start at this Position.
-            si.bind.copy( b.local );        // Copy LS Transform as this will be the Actual Rest Pose of the bone.
+            si.bind.copy( b.local );            // Copy LS Transform as this will be the Actual Rest Pose of the bone.
         }
     }
 
-    updatePose( chain: SpringChain, pose: Pose, dt: number ): void{
+    updatePose( chain: SpringChain, pose: Pose, dt: number, debug ?: any ): void{
         let si      : SpringItem;
         let b       : Bone;
         let tail    = vec3.create();
@@ -42,8 +44,8 @@ class SpringRot implements ISpringType{
         // Find the Starting WorldSpace Transform
         si = chain.items[ 0 ];                                          // First Chain Link
         b  = pose.bones[ si.index ];                                    // Its Pose Bone
-        if( b.pidx != -1 )  pTran.copy( pose.bones[ b.pidx ].world );   // Use Parent's WS Transform
-        else                pTran.copy( pose.offset );                  // Use Pose's Offset if there is no parent.
+
+        pose.getWorldTransform( b.pidx, pTran );
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Start Processing Chain
@@ -65,17 +67,6 @@ class SpringRot implements ISpringType{
             //----------------------------------------------
             // Compute the rotation based on two direction, one is our bone's position toward
             // its resting tail position with the other toward our spring tail position.
-
-            /* OITO
-            va.fromSub( tail, cTran.pos ).norm();           // Resting Ray
-            vb.fromSub( si.spring.val, cTran.pos ).norm();  // Spring Ray
-
-            rot .fromUnitVecs( va, vb )                     // Resting to Spring
-                .dotNegate( cTran.rot )                     // Prevent any Artificates
-                .mul( cTran.rot )                           // Apply spring rotation to our resting rotation
-                .pmulInvert( pTran.rot );                   // Use parent to convert to Local Space
-            */
-
             vec3.sub( va, tail, cTran.pos );            // Resting Ray
             vec3.normalize( va, va );
 

@@ -8,6 +8,7 @@ export interface ISkin{
     updateFromPose( pose: Pose ): this;
     getOffsets(): Array< unknown >;
     getTextureInfo( frameCount: number ): TTextureInfo;
+    clone():ISkin;
 }
 
 export type TTextureInfo = {
