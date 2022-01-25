@@ -3,6 +3,7 @@ import Accessor                                 from './Accessor';
 import { Mesh, Primitive }                      from './Mesh';
 import { Skin, SkinJoint }                      from './Skin';
 import { Animation, Track, ETransform, ELerp }  from './Animation';
+import { Texture }                              from './Texture';
 import { Pose }                                 from './Pose';
 //#endregion
 
@@ -273,6 +274,24 @@ class Gltf2{
         }
 
         return mat;
+    }
+
+    // https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#texture-data
+    getTexture( id: number ): Texture | null{
+        const js    = this.json;
+        const t     = js.textures[ id ];
+        //const samp  = js.samplers[ t.sampler ];
+        const img   = js.images[ t.source ];
+        const bv    = js.bufferViews[ img.bufferView ];
+
+        const bAry  = new Uint8Array( this.bin, bv.byteOffset, bv.byteLength );
+        const tex   = new Texture();
+        tex.index   = id;
+        tex.name    = img.name;
+        tex.mime    = img.mimeType;
+        tex.blob    = new Blob( [ bAry ], { type: img.mimeType } );
+
+        return tex;
     }
 
     //#endregion ///////////////////////////////////////////////////////////////////////
