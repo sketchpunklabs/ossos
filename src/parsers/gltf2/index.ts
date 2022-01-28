@@ -1,4 +1,5 @@
 //#region IMPORTS
+import parseGLB                                 from './Glb'; 
 import Accessor                                 from './Accessor';
 import { Mesh, Primitive }                      from './Mesh';
 import { Skin, SkinJoint }                      from './Skin';
@@ -508,18 +509,29 @@ class Gltf2{
     //#region STATIC
 
     static async fetch( url: string ) : Promise< Gltf2 | null >{
-        let   bin : ArrayBuffer | undefined;
-        const json = await fetch( url )
-            .then( r=>{ return (r.ok)? r.json() : null } );
+        const res = await fetch( url );
+        if( !res.ok ) return null;
 
-        if( !json ) return null;
+        switch( url.slice( -4 ).toLocaleLowerCase() ){
+            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case 'gltf':
+                let bin : ArrayBuffer | undefined;
+                const json = await res.json();
 
-        if( json.buffers && json.buffers.length > 0 ){
-            const path = url.substring( 0, url.lastIndexOf( '/') + 1 );
-            bin        = await fetch( path + json.buffers[ 0 ].uri ).then( r=>r.arrayBuffer() );
+                if( json.buffers && json.buffers.length > 0 ){
+                    const path = url.substring( 0, url.lastIndexOf( '/') + 1 );
+                    bin        = await fetch( path + json.buffers[ 0 ].uri ).then( r=>r.arrayBuffer() );
+                }
+                
+                return new Gltf2( json, bin );
+            
+            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            case '.glb':
+                const tuple = await parseGLB( res );
+                return ( tuple )? new Gltf2( tuple[0], tuple[1] ) : null;
         }
 
-        return new Gltf2( json, bin );
+        return null;
     }
 
     //#endregion ///////////////////////////////////////////////////////////////////////

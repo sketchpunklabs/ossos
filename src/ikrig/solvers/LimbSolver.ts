@@ -19,6 +19,8 @@ function lawcos_sss( aLen: number, bLen: number, cLen: number ): number{
 }
 
 class LimbSolver extends SwingTwistBase{
+    bendDir : number = 1;   // Switching to Negative will flip the rotation arc
+    invertBend(): this{ this.bendDir = -this.bendDir; return this; }
 
     resolve( chain: IKChain, pose: Pose, debug?:any ): void{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -39,7 +41,7 @@ class LimbSolver extends SwingTwistBase{
 		// FIRST BONE
 		rad	= lawcos_sss( alen, clen, blen );                   // Get the Angle between First Bone and Target.
 
-        QuatUtil.pmulAxisAngle( rot, ST.orthoDir, -rad, rot );  // Use the Axis X to rotate by Radian Angle
+        QuatUtil.pmulAxisAngle( rot, ST.orthoDir, -rad * this.bendDir, rot );  // Use the Axis X to rotate by Radian Angle
         quat.copy( prot, rot );                                 // Save For Next Bone as Starting Point.
         QuatUtil.pmulInvert( rot, rot, pt.rot );                // To Local
 
@@ -52,7 +54,7 @@ class LimbSolver extends SwingTwistBase{
         rad	= Math.PI - lawcos_sss( alen, blen, clen );
 
         quat.mul( rot, prot, b1.bind.rot );                     // Get the Bind WS Rotation for this bone
-        QuatUtil.pmulAxisAngle( rot, ST.orthoDir, rad, rot );   // Rotation that needs to be applied to bone.
+        QuatUtil.pmulAxisAngle( rot, ST.orthoDir, rad * this.bendDir, rot );   // Rotation that needs to be applied to bone.
         QuatUtil.pmulInvert( rot, rot, prot );                  // To Local Space
 
         pose.setLocalRot( b1.idx, rot );                        // Save to Pose

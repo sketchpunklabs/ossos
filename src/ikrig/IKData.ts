@@ -10,6 +10,12 @@ export  class DirScale{
         vec3.copy( this.effectorDir, v.effectorDir );
         vec3.copy( this.poleDir, v.poleDir );
     }
+
+    clone(): DirScale{
+        const c = new DirScale();
+        c.copy( this );
+        return c;
+    }
 }
 
 export class Dir{

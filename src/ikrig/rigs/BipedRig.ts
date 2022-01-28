@@ -1,8 +1,8 @@
 //#region IMPORTS
 import type { vec3 }                    from 'gl-matrix';
 import type Armature                    from '../../armature/Armature';
+import type Pose                        from '../../armature/Pose';
 import BoneMap, { BoneChain, BoneInfo } from '../../armature/BoneMap';
-import Pose                             from '../../armature/Pose';
 
 import HipSolver                        from '../solvers/HipSolver';
 import LimbSolver                       from '../solvers/LimbSolver';
@@ -135,8 +135,8 @@ class BipedRig extends IKRig{
 
     /** Setup Chain Data & Sets Alt Directions */
     bindPose( pose: Pose ): this{
-        super.bindPose( pose );
-        this._setAltDirection( pose );
+        super.bindPose( pose );         // Copy the Local Space Transform of starting Pose to All Chained Bones
+        this._setAltDirection( pose );  // Set Alt Direction from starting pose
         return this;
     }
 

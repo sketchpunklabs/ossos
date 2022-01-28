@@ -40,7 +40,7 @@ class UtilArm{
         }
 
         // Bind
-        arm.bind( SkinMTX, 0.07 );
+        arm.bind( SkinMTX, defaultBoneLen );
 
         // Save Offsets if available
         arm.offset.set( skin.rotation, skin.position, skin.scale );
