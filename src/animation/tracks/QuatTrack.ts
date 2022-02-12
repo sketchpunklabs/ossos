@@ -3,10 +3,10 @@ import type { ITrack, fnInterp, Lerp }  from './types';
 import type { FrameInfo }               from '../Animator';
 import type Pose                        from '../../armature/Pose'
 
-import { ELerp }                    from './types'
-import TypePool                     from '../TypePool';
-import { quat }                     from 'gl-matrix'
-import QuatUtil                     from '../../maths/QuatUtil';
+import { ELerp }                        from './types'
+import TypePool                         from '../TypePool';
+import { quat }                         from 'gl-matrix'
+import QuatUtil                         from '../../maths/QuatUtil';
 //#endregion
 
 

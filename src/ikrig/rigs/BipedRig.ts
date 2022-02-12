@@ -37,13 +37,13 @@ class BipedRig extends IKRig{
     //#endregion
 
     /** Try to find all the bones for each particular chains */
-    autoRig( arm: Armature ): Boolean{
+    autoRig( arm: Armature ): boolean{
         const map           = new BoneMap( arm );   // Standard Bone Map, Easier to find bones using common names.
         let   isComplete    = true;                 // Are All the Parts of the AutoRigging found?
         let b               : BoneInfo | BoneChain | undefined;
         let bi              : BoneInfo;
         let n               : string;
-        let names           : string[] = [];
+        const names         : string[] = [];
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // VERY IMPORTANT : The order of the chains should not change in this
@@ -65,9 +65,10 @@ class BipedRig extends IKRig{
         ];
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self : { [k:string] : any } = this; // TypeScript doesn't like "this[ n ] = this.add", using this type lets me get away with it.
 
-        for( let itm of chains ){
+        for( const itm of chains ){
             n               = itm.n;    // Name of Chain
             names.length    = 0;        // Reset Bone Name Array
 
@@ -118,6 +119,7 @@ class BipedRig extends IKRig{
     }
 
     /** Use Solver Configuration for Fullbody IK */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     useSolversForFBIK( pose ?: Pose ): this{
         // this.hip?.setSolver( new HipSolver().initData( pose, this.hip ) );
         // this.head?.setSolver( new SwingTwistSolver().initData( pose, this.head ) );

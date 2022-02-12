@@ -208,11 +208,18 @@ class Pose{
     updateBoneLengths( defaultBoneLen=0 ): this{
         const bCnt = this.bones.length;
         let b: Bone, p: Bone;
+        let i: number;
         
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Reset all lengths to zero if default length isn't zero
+        if( defaultBoneLen != 0 ){
+            for( b of this.bones ) b.len = 0;
+        }
+
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Compute Bone Length from Children to Parent Bones
         // Leaf bones don't have children, so no way to determine this length
-        for( let i=bCnt-1; i >= 0; i-- ){
+        for( i=bCnt-1; i >= 0; i-- ){
             //-------------------------------
             b = this.bones[ i ];
             if( b.pidx == -1 ) continue;  // No Parent to compute its length.
@@ -226,7 +233,7 @@ class Pose{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Set a default size for Leaf bones
         if( defaultBoneLen != 0 ){
-            for( let i=0; i < bCnt; i++ ){
+            for( i=0; i < bCnt; i++ ){
                 b = this.bones[ i ];
                 if( b.len == 0 ) b.len = defaultBoneLen;
             }

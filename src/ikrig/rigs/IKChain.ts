@@ -34,9 +34,11 @@ class IKLink{
 
 class IKChain{
     //#region MAIN
-    links   : IKLink[]    = [];
+    links   : IKLink[]  = [];
     solver  : any       = null;
+    /** How many bones in the chain */
     count   : number    = 0;
+    /** Total Length of the Chain */
     length  : number    = 0;
 
     constructor( bName?: string[], arm ?:Armature ){

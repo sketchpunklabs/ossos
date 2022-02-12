@@ -9,8 +9,6 @@ export const ELerp = {
     Cubic   : 2,
 } as const;
 
-
-
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 export interface ITrack{
     name            : string;

@@ -18,14 +18,6 @@ import BoneViewMesh                 from './_lib/BoneViewMesh.js';
 import {
     LimbSolver,
     ZSolver,
-    ArcSolver,
-    ArcSinSolver,
-    PistonSolver,
-    SpringSolver,
-    TrapezoidSolver,
-    FabrikSolver,
-    CatenarySolver,
-    NaturalCCDSolver,
 }                                   from '../../src/ikrig/solvers/index'
 //#endregion
 
@@ -33,7 +25,6 @@ import {
 let App;
 let Debug   = {};
 let Ref     = {};
-
 
 function onRender( dt=0, et=0 ){
     Ref.cycle.tick( dt );
@@ -52,26 +43,13 @@ window.addEventListener( "load", async _=>{
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Ref.volGeo = sdfVolumeGeo();
-    console.log( Ref.volGeo );
-    //Ref.volGeo = new THREE.BoxGeometry( 2, 2, 2 );
-    //const mesh  = new THREE.Mesh( geo, new THREE.MeshPhongMaterial( {color:0x00ffff} ) );
-    //App.add( mesh );
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Ref.cycle   = new Cycle( 3 );
     Ref.motion  = new LegMotion();
-    Ref.chains  = [
-        //new ChainSolver( [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ], [0,1.5, 5.5], new NaturalCCDSolver().useArcSqrFactor( 0.05, 0.2, false ).setTries( 30 ).inWorldSpace() ),
-        //new ChainSolver( [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ], [0,1.5, 4.5], new CatenarySolver() ),
-        //new ChainSolver( [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ], [0,1.5, 3.5], new FabrikSolver().inWorldSpace() ),
-        //new ChainSolver( [ 0.40,0.75,0.40], [0,1.5,2.5], new TrapezoidSolver().invertBend() ),    
-        //new ChainSolver( [ 0.25, 0.25, 0.25, 0.25, 0.25, 0.25 ], [0,1.5, 1], new ArcSolver() ),
-        
+    Ref.chains  = [   
         new ChainSolver( [0.75,0.75], [0,1.5,-1.2], new LimbSolver() ),
         new ChainSolver( [0.4,0.7,0.4], [0,1.5,1.2], new ZSolver() ),
-        //new ChainSolver( [ 0.26, 0.26, 0.26, 0.26, 0.26, 0.26 ], [0,1.5, -3.5], new SpringSolver() ),
-        //new ChainSolver( [ 0.19, 0.19, 0.19, 0.19, 0.19, 0.19, 0.19, 0.19 ], [0,1.5, -4.5], new ArcSinSolver() ),
-        //new ChainSolver( [ 0.5, 0.5, 0.5 ], [0,1.5, -5.5], new PistonSolver() ),
     ];
 
     for( let c of Ref.chains ) App.add( c.boneView );   // Add Bone Views to Scene
@@ -316,72 +294,6 @@ function sdfMaterial( color='cyan' ){
             gl_Position     = projectionMatrix * viewMatrix * wpos;
         }`,
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        fragmentShaderx: `#version 300 es
-        precision mediump float;
-        
-        out vec4 out_color;
-
-        //-------------------------
-
-        uniform vec3 camera_pos;
-        in vec3 frag_wpos;
-
-        //-------------------------
-        const int TRIES     = 30;
-        float sdf_sphere( vec3 p, vec3 c, float r ){ return distance( p, c ) - r; }
-
-        //-------------------------
-        
-        const float MIN_DIST = 0.001;
-        
-        float sdf( vec3 p ){        
-            return sdf_sphere( p, vec3(0,.5,.0), .5 );
-        }
-
-        bool ray_march( vec3 p, vec3 dir, out vec3 hit_pos ){
-            float d;
-            for (int i = 0; i < TRIES; i++){
-                d = sdf( p );
-                if( d < MIN_DIST ){
-                    hit_pos = p;
-                    return true;
-                }
-                p += dir * d;
-            }
-            return false;
-        }
-
-        vec3 calcNormal2( vec3 p ) // for function f(p)
-        {
-            const float h = 0.0001; // replace by an appropriate value
-            const vec2 k = vec2(1,-1);
-            return normalize( k.xyy*sdf( p + k.xyy*h ) + 
-                            k.yyx*sdf( p + k.yyx*h ) + 
-                            k.yxy*sdf( p + k.yxy*h ) + 
-                            k.xxx*sdf( p + k.xxx*h ) );
-        }
-
-        void main( void ){
-            vec3 cam = camera_pos;
-            vec3 ray = normalize( frag_wpos - cam );
-
-            out_color = vec4( 0.0,0.0,0.0,0.2 );
-            vec3 hit_pos;
-            
-            if( ray_march( cam, ray, hit_pos ) ) {
-                out_color = vec4( 1.0, 0.0, 0.0, 1.0 );
-
-                vec3 norm = calcNormal2( hit_pos );
-
-                vec3 to_light = normalize( vec3( 0.0, 0.5, 0.5 ) - frag_wpos );
-                float dot = clamp( dot( norm, to_light ), 0.0, 1.0 );
-
-                out_color.rgb *= dot;
-            }
-        }`,
-
-
         fragmentShader	: `#version 300 es
         precision mediump float;
         
@@ -560,6 +472,7 @@ function sdfMaterial( color='cyan' ){
     // mat.extensions = { derivatives : true };
     return mat;
 }
+
 //#endregion
 
 </script>

@@ -3,10 +3,10 @@ import type { ITrack, fnInterp, Lerp }  from './types';
 import type { FrameInfo }               from '../Animator';
 import type Pose                        from '../../armature/Pose'
 
-import { ELerp }                    from './types'
-import TypePool                     from '../TypePool';
-import { vec3 }                     from 'gl-matrix'
-import { Vec3Util }                 from '../../maths';
+import { ELerp }                        from './types'
+import TypePool                         from '../TypePool';
+import { vec3 }                         from 'gl-matrix'
+import { Vec3Util }                     from '../../maths';
 //#endregion
 
 //#regeion ELERP FUNCTIONS
@@ -17,10 +17,6 @@ function vec3_step( track: ITrack, fi: FrameInfo, out: vec3 ) : vec3{
 function vec3_linear( track: ITrack, fi: FrameInfo, out: vec3 ) : vec3{
     const v0 = TypePool.vec3();
     const v1 = TypePool.vec3();
-
-    //v0.fromBuf( track.values, fi.k0 * 3 );
-    //v1.fromBuf( track.values, fi.k1 * 3 );
-    //out.fromLerp( v0, v1, fi.t );
 
     Vec3Util.fromBuf( v0, track.values, fi.k0 * 3 );
     Vec3Util.fromBuf( v1, track.values, fi.k1 * 3 );

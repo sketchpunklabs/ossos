@@ -27,7 +27,7 @@ class CurveSample{
 
     add( pnt: vec3 ){
         if( this._sampleCnt > 0 ){
-            let inc = Vec3Util.len( pnt, this._aryPos[ this._sampleCnt-1 ] );
+            const inc = Vec3Util.len( pnt, this._aryPos[ this._sampleCnt-1 ] );
             this._totalLen += inc;                  // Total Length
             this._aryLen.push( this._totalLen );    // Current Total Length at this point
             this._aryInc.push( inc );               // Length between Current+Previous Point
