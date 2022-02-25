@@ -1,0 +1,10 @@
+html, body{ margin: 0px; padding:0px; width:100%; height:100%; }
+body {
+    margin: 0;
+    background-color: #000;
+    color: #fff;
+    font-family: monospace;
+    font-size: 12px;
+    overscroll-behavior: none;
+}
+canvas{ display: block; width:100%; height:100%; }
