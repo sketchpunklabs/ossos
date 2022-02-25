@@ -33,7 +33,7 @@ window.addEventListener( "load", async _=>{
     App.onRender = onRender;
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    const gltf  = await Gltf2.fetch( '../_res/anim/Walking.gltf' );
+    const gltf  = await Gltf2.fetch( '../_res/anim/Hiphop.gltf' );
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // ARMATURE + POSE
@@ -48,6 +48,9 @@ window.addEventListener( "load", async _=>{
     boneView.material.uniforms.dirScl.value  = 1;   // ... So make the bones bigger to offset that massive downscaling.
 
     App.add( boneView );                            // Add to Scene for rendering
+
+    pose.updateWorld();
+    boneView.updateFromPose( pose );
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // SETUP ANIMATION
