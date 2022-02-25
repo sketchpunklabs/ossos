@@ -112,22 +112,20 @@ class Pose{
     rotWorld( bone: number|string, deg:number, axis='x' ): this{
         const bIdx = ( typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
         if( bIdx != undefined ){
+            const ax: vec3  = ( axis == 'y')? [0,1,0] : ( axis == 'z' )? [0,0,1] : [1,0,0];
             const b: Bone   = this.bones[ bIdx ];                           // Get Bone
             const p: quat   = this.getWorldRotation( b.pidx, [0,0,0,1] );   // Get Bone's Parent WorldSpace Rotation
             const q: quat   = quat.mul( [0,0,0,1], p, b.local.rot );        // Get Bone's Worldspace Rotation
             const rad       = deg * Math.PI / 180;                          // Degrees to Radians
+            const rot       = quat.setAxisAngle( [0,0,0,1], ax, rad );      // Create Axis Rotation
 
-            switch( axis ){                                                 // Apply Axis Rotation
-                case 'y' : quat.rotateY( q, q, rad ); break;
-                case 'z' : quat.rotateZ( q, q, rad ); break;
-                default  : quat.rotateX( q, q, rad ); break;
-            }
-
+            quat.mul( q, rot, q );                                          // Apply Axis Rotation
             QuatUtil.pmulInvert( b.local.rot, q, p );                       // To Local Space Conversion
         }else console.warn( 'Bone not found, ', bone );
         return this;
     }
 
+    /** Add Offset movement to local space position */
     moveLocal( bone: number|string, offset:vec3 ): this{
         const bIdx = ( typeof bone === 'string' )? this.arm.names.get( bone ) : bone;        
         //if( bIdx != undefined ) this.bones[ bIdx ].local.pos.add( offset );

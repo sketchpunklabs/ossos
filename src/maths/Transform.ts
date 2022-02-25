@@ -46,6 +46,12 @@ class Transform{
     setPos( v: vec3 ): this{ vec3.copy( this.pos, v ); return this; }
     setRot( v: quat ): this{ quat.copy( this.rot, v ); return this; }
     setScl( v: vec3 ): this{ vec3.copy( this.scl, v ); return this; }
+    setUniformScale( v: number ) : this{
+        this.scl[0] = v;
+        this.scl[1] = v;
+        this.scl[2] = v;
+        return this;
+    }
 
     clone() : Transform{ return new Transform( this ); }
 

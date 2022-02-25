@@ -235,8 +235,9 @@ class Gltf2{
             // update their parentIndex to match this current joint.
             if( node?.children?.length ){
                 for( j=0; j < node.children.length; j++ ){
-                    bi = jMap.get( node.children[ j ] );    // Joint Node Children Index, get their mapped joint index.
-                    skin.joints[ bi ].parentIndex = i;      // With Child Joint Index, Save this Index as its parent.
+                    bi = jMap.get( node.children[ j ] );                        // Joint Node Children Index, get their mapped joint index.
+                    if( bi != undefined ) skin.joints[ bi ].parentIndex = i;    // With Child Joint Index, Save this Index as its parent.
+                    else console.log( 'BI', bi, node );
                 }
             }
         }
