@@ -18,6 +18,11 @@ export default class BoneViewMesh extends BABYLON.Mesh{
         this.material = BoneViewMaterial( app );    // Use custom shader for rendering bones.
     }
 
+    setBoneScale( meshScl=0.02, dirScl=1.0 ){
+        this.material.setFloat( 'meshScl', meshScl );
+        this.material.setFloat( 'dirScl', dirScl );
+    }
+
     updateFromPose( pose ){
         const rot = this.boneRot;
         const pos = this.bonePos;

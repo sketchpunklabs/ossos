@@ -1,8 +1,6 @@
 import * as BABYLON from 'babylonjs';
 import * as MATERIAL from 'babylonjs-materials';
 
-
-
 // #region STARTUP
 const mod_path = import.meta.url.substring( 0, import.meta.url.lastIndexOf("/") + 1 );
 const css_path = mod_path + "Starter.css";
@@ -20,12 +18,11 @@ const css_path = mod_path + "Starter.css";
 // https://github.com/BabylonJS/Babylon.js/tree/master/materialsLibrary/src/grid
 // https://github.com/BabylonJS/Babylon.js/tree/master/dist/materialsLibrary
 
-
 // Boiler Plate Starter for Babylon JS
 class Starter{
     // #region MAIN
     scene			= null;
-    engine		= null;
+    engine		    = null;
     canvas 			= null;
     camera			= null;
 
@@ -37,7 +34,7 @@ class Starter{
 
     constructor(){
         this.initCore();
-        this.initScene();
+        this.initEnv();
         this.initUtil();
     }
 
@@ -59,12 +56,12 @@ class Starter{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     }
 
-    initScene(){
+    initEnv(){
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        const light     = new BABYLON.HemisphericLight( 'MainLight', new BABYLON.Vector3(1, 1, 0) );
+        const light = new BABYLON.HemisphericLight( 'MainLight', new BABYLON.Vector3(1, 1, 0) );
         
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        const matGround = new MATERIAL.GridMaterial( "groundMaterial", this.scene );
+        const matGround                 = new MATERIAL.GridMaterial( "groundMaterial", this.scene );
         matGround.majorUnitFrequency    = 5;
         matGround.minorUnitVisibility   = 0.1;
         matGround.gridRatio             = 0.2;
@@ -83,6 +80,10 @@ class Starter{
     }
 
     render(){
+        if( this.onRender ){
+            const dt = this.engine.getDeltaTime() * 0.001;
+            this.onRender( dt );
+        }
         this.scene.render();
     }
     // #endregion ////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { BABYLON }     from './_lib/Starter.js';
+import { UtilGltf2, Gltf2 }     from './_lib/UtilGltf2.js';
+import Util                     from './_lib/Util.js';
+
+import SkinMTXMaterial              from './_lib/SkinMTXMaterial.js'
+import BoneViewMesh                 from './_lib/BoneViewMesh.js'
+import { Armature, Bone, SkinMTX }  from '../../src/armature/index';
+import { Clip, Animator }           from '../../src/animation/index';
+//#endregion
+
+//#region MAIN
+let App;
+let Debug   = {};
+let Ref     = {};
+
+function onRender( dt=0, et=0 ){
+    if( !Ref.animator ) return;
+
+    Ref.animator
+        .update( dt )
+        .applyPose( Ref.pose );
+
+    Ref.pose.updateWorld( true );
+    Ref.boneView.updateFromPose( Ref.pose );
+}
+
+window.addEventListener( "load", async _=>{
+    App = new Starter();
+    App.setCamera( 0, 20, 4, [0,0.8,0] );
+    App.onRender = onRender;
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const gltf  = await Gltf2.fetch( '../_res/anim/Hiphop.gltf' );
+    
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // ARMATURE + POSE
+    const arm   = armature_from_gltf( gltf );   // Create an Armature from a GLTF Skeleton
+    const pose  = arm.newPose();                // Lets Start a Pose
+    pose.updateWorld();
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // VIEW BONES
+    const boneView = new BoneViewMesh( App, arm );       // 3JS Example of making a BoneView from Armature Data
+    
+    // Mixamo Skeletons comes with an offset transform which causes the bones to scale badly
+    // ... So make the bones bigger to offset that massive downscaling.
+    boneView.setBoneScale( 2.0, 1 );
+    boneView.updateFromPose( pose );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // SETUP ANIMATION
+    const glAnim    = gltf.getAnimation();
+    const clip      = Clip.fromGLTF2( glAnim );
+    const animator  = new Animator();
+    animator.inPlace = true;
+    animator.setClip( clip );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // SAVE Vars
+    Ref.animator = animator;
+    Ref.pose     = pose;
+    Ref.boneView = boneView;
+});
+//#endregion
+
+//#region FUNCTIONS
+
+function armature_from_gltf( gltf, defaultBoneLen = 0.07 ){
+    const arm  = new Armature();
+    const skin = gltf.getSkin();
+
+    for( let j of skin.joints ){
+        arm.addBone( j.name, j.parentIndex, j.rotation, j.position, j.scale );
+    }
+
+    // Create Bind Pose
+    arm.bind( SkinMTX, defaultBoneLen );
+
+    // Armature has a Transform on itself sometimes
+    // Apply it at the Offset Transform gets preapplied to the root
+    arm.offset.set( skin.rotation, skin.position, skin.scale );
+
+    return arm;
+}
+
+//#endregion
+
+
+</script>
+</body></html>

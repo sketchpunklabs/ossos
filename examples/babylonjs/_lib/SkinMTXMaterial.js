@@ -30,6 +30,12 @@ export default function SkinMTXMaterial( app, diffuse, poseBuffer=null ){
     // Meshes from GTLF have triangles CCW winding, but need to
     // set to CW on the shader to render correctly. A babylonJS thing?
     mat.sideOrientation = BABYLON.Material.ClockWiseSideOrientation;
+
+    mat.updateFromArmature = ( arm )=>{
+        buf.set( arm.getSkinOffsets()[0] );
+        ubo.updateArray( 'pose', buf );
+        ubo.update();
+    };
     return mat;
 }
 
