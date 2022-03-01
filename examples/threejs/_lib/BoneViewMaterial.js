@@ -18,7 +18,7 @@ function BoneViewMaterial( color='white', useDepthTest=true ){
         in vec3 position;   // Vertex Position
         in vec2 inst;       // Instanced Data : Bone Index, Bone Length
 
-        const int MAXBONE = 90;
+        const int MAXBONE = 100;
         uniform vec4 boneRot[ MAXBONE ];
         uniform vec3 bonePos[ MAXBONE ];
         uniform vec3 boneScl[ MAXBONE ];

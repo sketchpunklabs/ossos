@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { BABYLON } from './_lib/Starter.js';
+import ShapePointsMesh      from './_lib/ShapePointsMesh.js';
+import DynLineMesh          from './_lib/DynLineMesh.js';
+//#endregion
+
+//#region MAIN
+let App;
+let Debug   = {};
+let Ref     = {};
+
+window.addEventListener( "load", async _=>{
+    App = new Starter();
+    App.setCamera( 0, 20, 4, [0,0.8,0] );
+
+    Debug.pnt = new ShapePointsMesh( App, 20 );
+    Debug.pnt.add( [1,0,0], 0xffff00, 5, 1);
+    Debug.pnt.add( [1,0.5,0], 0x00ffff, 5, 2);
+    Debug.pnt.add( [1,1.0,0], 0xffffff, 5, 3);
+    Debug.pnt.add( [1,1.5,0], 0xffffff, 5, 4);
+    Debug.pnt.add( [1.5,0,0], 0xffffff, 5, 5);
+    Debug.pnt.add( [1.5,0.5,0], 0xffffff, 5, 6);
+    Debug.pnt.add( [1.5,1.0,0], 0xffffff, 5, 7);
+    Debug.pnt.add( [1.5,1.5,0], 0xffffff, 5, 8);
+    Debug.pnt.add( [2.0,0,0], 0xffffff, 5, 9);
+    Debug.pnt.add( [2.0,0.5,0], 0xffffff, 5, 10);
+    Debug.pnt.add( [2.0,1.0,0], 0xffffff, 5, 11);
+
+    Debug.ln = new DynLineMesh( App );
+    Debug.ln.add( [0,0,0], [0,1,0], 0xffff00 );
+    Debug.ln.add( [0,1,0], [-1,1,0], 0xffff00, 0x00ffff, true );
+    Debug.ln.add( [-1,0,0], [-1,1,0], 0x00ffff );
+
+});
+//#endregion
+
+</script>
+</body></html>

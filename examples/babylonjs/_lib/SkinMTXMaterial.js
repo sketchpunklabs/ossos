@@ -1,6 +1,8 @@
 import * as BABYLON from 'babylonjs';
 
-export default function SkinMTXMaterial( app, diffuse, poseBuffer=null ){
+export default function SkinMTXMaterial( app, base='#00ffff', poseBuffer=null ){
+    const isTex    = ( base instanceof BABYLON.Texture );
+
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Setup a TypeArray the full size of what the shader can handle
     const matSize = 16;                         // Float Count of Mat4
@@ -19,13 +21,16 @@ export default function SkinMTXMaterial( app, diffuse, poseBuffer=null ){
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Shader
     const mat = new BABYLON.ShaderMaterial( "shader", app.scene, 
-        { vertexSource: VERT_SRC, fragmentSource: FRAG_SRC },
+        { vertexSource: VERT_SRC, fragmentSource: (!isTex)? FRAG_SRC : FRAG_TEX_SRC },
         { attributes        : [ 'position', 'normal', 'uv', 'matricesIndices', 'matricesWeights' ],
-          uniforms          : [ 'world', 'view', 'projection' ],
+          uniforms          : [ 'world', 'view', 'projection', 'texBase', 'color' ],
           uniformBuffers    : [ 'skin' ] }
     );
 
     mat.setUniformBuffer( 'skin', ubo );
+
+    if( !isTex ) mat.setColor3( 'color', BABYLON.Color3.FromHexString( base ) );
+    else         mat.setTexture( 'texBase', base );
 
     // Meshes from GTLF have triangles CCW winding, but need to
     // set to CW on the shader to render correctly. A babylonJS thing?
@@ -148,8 +153,21 @@ void main(void) {
     //vec3 norm   = normalize( cross( dFdx(frag_wpos), dFdy(frag_wpos) ) ); // Low Poly Normals
     vec3 norm     = normalize( frag_norm ); // Model's Normals            
     float diffuse = computePointLights( light_pos, norm ) + 0.15;
-    glFragColor   = vec4( vec3( 0.0, 1.0, 1.0 ) * diffuse, 1.0 );
+    glFragColor   = vec4( color * diffuse, 1.0 );
 
     // glFragColor = vec4( frag_norm, 1.0 );
+}`;
+
+
+const FRAG_TEX_SRC = `
+////////////////////////////////////////////////////////////////////////
+
+in      vec2        frag_uv;
+uniform sampler2D   texBase;
+
+////////////////////////////////////////////////////////////////////////
+
+void main(void) {
+    glFragColor = texture( texBase, frag_uv );
 }`;
 //#endregion

@@ -23,9 +23,9 @@ class UtilArm{
         return boneView;
     }
 
-    static skinMtxMesh( gltf, arm, base='cyan' ){
+    static skinMtxMesh( gltf, arm, base='cyan', meshName=null ){
         const mat = SkinMTXMaterial( base, arm.getSkinOffsets()[0] ); // 3JS Example of Matrix Skinning GLSL Code
-        return UtilGltf2.loadMesh( gltf, null, mat );                   // Pull Skinned Mesh from GLTF
+        return UtilGltf2.loadMesh( gltf, meshName, mat );             // Pull Skinned Mesh from GLTF
     }
 
     static clipFromGltf( gltf ){ return Clip.fromGLTF2( gltf.getAnimation() ); }

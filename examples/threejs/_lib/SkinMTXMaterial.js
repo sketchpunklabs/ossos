@@ -31,7 +31,7 @@ in vec2 uv;         // Vertex Texcoord
 in vec4 skinWeight; // Bone Weights
 in vec4 skinIndex;  // Bone Indices
 
-#define MAXBONES 90             // Arrays can not be dynamic, so must set a size
+#define MAXBONES 100             // Arrays can not be dynamic, so must set a size
 uniform mat4 pose[ MAXBONES ];
 
 uniform mat4 modelMatrix;       // Matrices should be filled in by THREE.JS Automatically.
@@ -126,7 +126,7 @@ float computePointLights( vec3[LITCNT] lights, vec3 norm ){
 void main(){
     //vec3 norm   = normalize( cross( dFdx(frag_wpos), dFdy(frag_wpos) ) ); // Low Poly Normals
     vec3 norm     = normalize( frag_norm ); // Model's Normals            
-    float diffuse = computePointLights( light_pos, norm );
+    float diffuse = computePointLights( light_pos, norm ) + 0.15;
     out_color     = vec4( color * diffuse, 1.0 );
 
     //out_color.rgb = vec3( 1.0, 0.0, 0.0 );

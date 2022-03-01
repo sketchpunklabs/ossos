@@ -1,0 +1,373 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { BABYLON } from './_lib/Starter.js';
+import ShapePointsMesh      from './_lib/ShapePointsMesh.js';
+import DynLineMesh          from './_lib/DynLineMesh.js';
+import { Gltf2 }            from './_lib/UtilGltf2.js';
+import UtilArm              from './_lib/UtilArm.js';
+
+import Transform            from '../../src/maths/Transform';
+import { vec3 }             from 'gl-matrix'
+
+import { Animator }         from '../../src/animation/index';
+import { BipedRig }         from '../../src/ikrig/index';
+import BipedIKPose          from '../../src/ikrig/animation/BipedIKPose';
+import BoneSpring           from '../../src/bonespring/index';
+//#endregion
+
+//#region MAIN
+let App;
+let Debug   = {};
+let Ref     = {};
+
+function onRender( dt=0, et=0 ){
+    if( Ref.animator ) Ref.animator.tick( dt );
+}
+
+window.addEventListener( "load", async _=>{
+    App = new Starter();
+    App.setCamera( 0, 20, 4, [0,0.8,0] );
+    App.onRender = onRender;
+
+    Debug.pnt   = new ShapePointsMesh( App, 20 );
+    Debug.ln    = new DynLineMesh( App, 50 );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.rigs = [];
+    const aryLoader = [
+        new MixamoIKAnimatorRig().load( '../_res/anim/Walking.gltf' ).then( rig=>{
+            Ref.animator = rig;
+
+            rig.onTick = ( rigAnim, dt )=>{
+                for( let r of Ref.rigs ) r.applyIKPose( rigAnim.ikPose, dt );
+            }
+        }),
+
+        new NabbaRig().load( {boneView:true, mesh:true} ).then( rig=>{
+            rig.mesh.position.x = 1;
+            rig.boneView.position.x = 2;
+            Ref.rigs.push( rig );
+        }),
+        
+        new TinaRig().load( {boneView:true, mesh:true, tex:true, springs:true} ).then( rig=>{
+            rig.mesh.position.x = -1;
+            rig.boneView.position.x = -2;
+            Ref.rigs.push( rig );
+        }),
+    ];
+
+    await Promise.all( aryLoader );
+});
+//#endregion
+
+
+//#region IK VISUALIZER
+
+const V0 = vec3.create();
+const V1 = vec3.create();
+const T0 = new Transform();
+
+class IKPoseVisualize{
+
+    static show( rig, pose, ikpose ){
+        Debug.pnt.reset();
+        Debug.ln.reset();
+
+        this.limb( rig.legL, pose, ikpose.legL );
+        this.limb( rig.legR, pose, ikpose.legR );
+        this.limb( rig.armR, pose, ikpose.armR );
+        this.limb( rig.armL, pose, ikpose.armL );
+
+        this.swingTwist( rig.footL, pose, ikpose.footL );
+        this.swingTwist( rig.footR, pose, ikpose.footR );
+        this.swingTwist( rig.handR, pose, ikpose.handR );
+        this.swingTwist( rig.handL, pose, ikpose.handL );
+        this.swingTwist( rig.head, pose, ikpose.head );
+
+        this.swingTwistEnds( rig.spine, pose, ikpose.spine );     
+        
+        this.hip( rig.hip, pose, ikpose.hip );
+    }
+
+    static limb( chain, pose, ik ){
+        const p0 = chain.getStartPosition( pose );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Effector
+        vec3.scaleAndAdd( V0, p0, ik.effectorDir, ik.lenScale * chain.length );
+
+        Debug.pnt.add( p0, 0x00ff00, 1.3 );
+        Debug.pnt.add( V0, 0x00ffff, 1.3 );
+        Debug.ln.add( p0, V0, 0x00ff00, 0x00ffff, true );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Pole
+        vec3.scaleAndAdd( V0, p0, ik.poleDir, 0.2 );
+        Debug.ln.add( p0, V0, 0x00ff00 );
+    }
+
+    static swingTwist( chain, pose, ik ){
+        const p0 = chain.getStartPosition( pose );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Effector
+        vec3.scaleAndAdd( V0, p0, ik.effectorDir, 0.2 );
+        Debug.ln.add( p0, V0, 0x00ffff );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Pole
+        vec3.scaleAndAdd( V0, p0, ik.poleDir, 0.2 );
+        Debug.ln.add( p0, V0, 0x00ff00 );
+    }
+
+    static swingTwistEnds( chain, pose, ik ){
+        const p0 = chain.getStartPosition( pose );
+        const p1 = chain.getLastPosition( pose );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        vec3.scaleAndAdd( V0, p0, ik.startEffectorDir, 0.12 );  // Effector
+        Debug.ln.add( p0, V0, 0x00ffff );
+
+        vec3.scaleAndAdd( V0, p0, ik.startPoleDir, 0.12 );      // Pole
+        Debug.ln.add( p0, V0, 0x00ff00 );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        vec3.scaleAndAdd( V0, p1, ik.endEffectorDir, 0.12 ); // Effector
+        Debug.ln.add( p1, V0, 0x00ffff );
+
+        vec3.scaleAndAdd( V0, p1, ik.endPoleDir, 0.12 );      // Pole
+        Debug.ln.add( p1, V0, 0x00ff00 );
+    }
+
+    static hip( chain, pose, ik ){
+        const lnk   = chain.first();
+        const b     = pose.bones[ lnk.idx ];
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Position Offset
+        if( b.pidx == -1 )   T0.fromMul( pose.offset, lnk.bind );                     // Use Offset if there is no parent
+        else                 pose.getWorldTransform( lnk.pidx, T0 ).mul( lnk.bind );  // Compute Parent's WorldSpace transform, then add local bind pose to it.
+
+        vec3.scaleAndAdd( V0, T0.pos, ik.pos, ik.bindHeight / T0.pos[ 1 ]  );
+
+        Debug.pnt.add( T0.pos, 0x00ff00, 0.5 );           // Bind Position
+        Debug.pnt.add( b.world.pos, 0x00ffff, 0.5 );      // Pose Position
+        Debug.pnt.add( V0, 0x000000, 0.3 );               // Scaled Offset plus Bind Position
+        Debug.ln.add( T0.pos, V0, 0x00ff00, 0x000000 );   // Original to Animated Position
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // IK Direction
+        vec3.scaleAndAdd( V1, V0, ik.effectorDir, 0.1 );
+        Debug.ln.add( V0, V1, 0x00ffff );
+
+        vec3.scaleAndAdd( V1, V0, ik.poleDir, 0.1 );
+        Debug.ln.add( V0, V1, 0x00ff00 );
+    }
+
+}
+
+//#endregion
+
+
+//#region ANIMATOR RIG
+
+class MixamoIKAnimatorRig{
+    //#region MAIN
+    animator    = new Animator();
+    ikPose      = new BipedIKPose();
+    arm         = null;
+    rig         = null;
+    boneView    = null;
+    pose        = null;
+
+    onTick      = null;
+    constructor(){}
+    //#endregion 
+
+    async load( url ){
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const gltf  = await Gltf2.fetch( url );
+        const clip  = UtilArm.clipFromGltf( gltf );
+
+        this.animator.setClip( clip );
+        this.animator.inPlace = true;
+        
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.arm    = UtilArm.armFromGltf( gltf, 0.07 );
+        this.pose   = this.arm.newPose();
+        this.pose
+            .updateWorld()              // Mixamo Stuff has an Offset Transform, Compute Proper WS Transforms...
+            .updateBoneLengths( 0.01 ); // Then use it to get the correct bone lengths for use in IK
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.rig = new BipedRig();
+        if( !this.rig.autoRig( this.arm ) ) console.log( 'AutoRig was Incomplete' );
+        
+        this.rig
+            .bindPose( this.pose )                  // Setup Chains & Alt Directions, Pose should be a TPose of the character
+            .updateBoneLengths( this.pose )         // Apply BoneLengths to Rig since they're different from ARM.
+            .useSolversForRetarget( this.pose );    // Setup Solvers
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.boneView = UtilArm.newBoneView( App, this.arm, this.pose, 2, 1 );
+
+        return this;
+    }
+
+    tick( dt ){
+        this.animator
+            .update( dt )                                           // Move Animation Forward
+            .applyPose( this.pose );                                // Apply Animation local space transform to Pose
+
+        this.pose.updateWorld();                                    // Update the Pose's WorldSpace Transforms
+        this.boneView.updateFromPose( this.pose );                  // Update Source's Bone View Rendering
+
+        this.ikPose.computeFromRigPose( this.rig, this.pose );      // Compute IK Pose Data from Animation Pose
+        IKPoseVisualize.show( this.rig, this.pose, this.ikPose );   // Visualize IK Data Over Src Bone View
+
+        if( this.onTick ) this.onTick( this, dt );
+    }
+}
+
+//#endregion
+
+
+//#region CHARACTER RIGS
+
+class CharacterRig{
+    //#region MAIN
+    arm         = null;
+    rig         = null;
+    mesh        = null;
+    boneView    = null;
+    pose        = null;
+    springs     = null;
+    constructor(){}
+    //#endregion 
+
+    //#region ABSTRACT METHODS
+    async load(){ console.warn( 'CharacterRig.load not implemented' ); return this }
+    //#endregion
+
+    //#region LOADERS
+    _parseArm( gltf, loadTPose=false ){ 
+        this.arm    = UtilArm.armFromGltf( gltf );
+        this.pose   = this.arm.newPose();
+
+        if( loadTPose ){
+            this.pose.fromGLTF2( gltf.getPose() );
+            this.arm.updateSkinFromPose( this.pose );
+        }
+
+        this.pose.updateWorld();
+        return this;
+    }
+
+    _autoRig(){
+        this.rig = new BipedRig();
+        if( ! this.rig.autoRig( this.arm ) ) console.log( 'AutoRigging Incomplete' );
+
+        this.rig.bindPose( this.pose );               // Late Binding of TPose for the chains: Rigs only work with TPoses
+        this.rig.useSolversForRetarget( this.pose );  // Use Default Solvers for known chains, Should Happen After Bind
+        
+        return this;
+    }
+
+    _skinnedMesh( gltf, base='#00ffff' ){
+        this.mesh = UtilArm.skinMtxMesh( App, gltf, this.arm, base );
+        return this;
+    }
+
+    _boneView( gltf ){
+        this.boneView = UtilArm.newBoneView( App, this.arm ); 
+        this.boneView.updateFromPose( this.pose );
+        return this;
+    }
+    
+    _texture( url, flipY=false ){
+        return new Promise( (resolve, reject)=>{
+            const tex = new BABYLON.Texture( 
+                url, App.scene, false, flipY, null,
+                ()=>resolve( tex ),
+                (msg)=>reject( msg ),
+            );
+        });
+    }    
+    //#endregion
+
+    applyIKPose( ikPose, dt ){
+        ikPose.applyToRig( this.rig );              // Set IK Data to Solvers on the Rig
+        this.rig.resolveToPose( this.pose );        // Execute Solvers & Store Local Space results to Pose
+
+        this.pose.updateWorld();                    // Update the pose's WorldSpace transform
+
+        if( this.springs ){
+            this.springs.updatePose( dt, this.pose, true ); // Apply Springs to Pose
+        }
+
+        this.arm.updateSkinFromPose( this.pose );           // Update Armature Skinning for Mesh Rendering
+        this.mesh.material.updateFromArmature( this.arm );  // Material Uses a UBO to store the skinned data, so hacky way to update it
+
+        if( this.boneView ) this.boneView.updateFromPose( this.pose );  // Update BoneView with new Pose
+    }
+}
+
+class NabbaRig extends CharacterRig{
+    constructor(){ super(); }
+
+    async load( config=null ){
+        const gltf = await Gltf2.fetch( '../_res/models/nabba/nabba.gltf' );
+        this._parseArm( gltf, false )   // Create Armature
+            ._autoRig()                 // Auto BipedRig
+
+        if( config?.mesh != false ) this._skinnedMesh( gltf );
+        if( config?.boneView )      this._boneView();
+        return this;
+    }
+}
+
+class TinaRig extends CharacterRig{
+    constructor(){ super(); }
+
+    async load( config=null ){
+        const url  = '../_res/models/tina/';
+        const gltf = await Gltf2.fetch( url + 'tina.gltf' );
+        this._parseArm( gltf, true )        // Create Armature
+            ._autoRig()                     // Auto BipedRig
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if( config?.mesh != false ){
+            let base = '#00ffff';
+            if( config.tex ) base = await this._texture( url + 'initialShadingGroup_albedo.jpg' );
+            this._skinnedMesh( gltf, base );
+        }
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if( config.springs ){
+            this.springs = new BoneSpring( this.arm );        
+            this.springs
+                .addRotChain( 'braidr', ["hair.L.002","hair.L.004","hair.L.003","hair.L.005"], 3, 0.8 )
+                .addRotChain( 'braidl', ["hair.R.002","hair.R.004","hair.R.003","hair.R.005"], 3, 0.8 )
+                .addPosChain( "boot1", [ "breast.L" ], 3, 0.2 )
+                .addPosChain( "boot2", [ "breast.R" ], 3, 0.2 )
+            ;
+
+            this.springs.setRestPose( this.pose ); // Set the resting pose of the springs
+        }
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if( config?.boneView ) this._boneView();
+
+        return this;
+    }
+}
+
+//#endregion
+
+
+</script>
+</body></html>
