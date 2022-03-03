@@ -6,8 +6,9 @@
 [![Ko-Fi](https://img.shields.io/badge/Ko_Fi-donate-orange?style=flat-square&logo=youtube)](https://ko-fi.com/sketchpunk)
 [![Patreon](https://img.shields.io/badge/Patreon-donate-red?style=flat-square&logo=youtube)](https://www.patreon.com/sketchpunk)
 
+![screenshot](/_images/layout_keyboard.png?raw=true)
 
-### Character Animation Library ###
+## Character Animation Library ###
 This project is working toward a complete character skinning & animation library for the web. First most, this library is focused on being independent from any rendering engine with examples of how to use it in webgl based engines like threejs. The one big focus is recreating the IK Rig & IK Animations type system that was demoed several years ago from Ubisoft's GDC talk on IK Rigs. With many game engines like Unity and Unreal developing their own IK Rig like systems, this project helps fill the void for web based engines like threejs, babylon, etc. Hopefully with enough help we can create something just as good as the big boys, maybe even better since its free & open source.
 
 ### Setup ###
@@ -17,7 +18,9 @@ npm install
 npm run dev
 ```
 
-### Usage ###
+**[ NOTE ]** To be able to run the example, you'll need to go into /examples/_res/ and follow the instructions to clone the resource repo. The files are quite large, so they are kept in a seperate repo to keep this project as light weight as possible.
+
+## Usage ###
 
 This example is the basic boiler plate example of how to pull mesh & skeletal data from a GLTF2 file then using a custom THREE.JS Material to render mesh that can be posed or animated.
 
@@ -51,50 +54,52 @@ App.add( mesh );
 * Bone Springs ( Rotation & Translation )
 * Basic Animator based on Tracks
 * Basic Animation Retargeting for similar skeletal meshes
-* IK Rigs - Basic Biped
+* IK Rigs
+  * Biped ( Human )
+  * Quadruped *( Prototype Phase )*
 * IK Animation Retargeting using IK Rigs
-* IK Solvers - Aim/SwingTwist, SwingTwistEnds, Limb
+* IK Solvers
+  * Aim / SwingTwist
+  * SwingTwist - Ends
+  * SwingTwist - Chain
+  * Limb
+  * Arc
+  * ArcSin
+  * Fabrik
+  * Natural CCD
+  * Piston
+  * Spring 
+  * Trapezoid
+  * ZSolver
+  * Catenary / Rope
 * GLTF2 Asset Parsing for cherry picking what you need to load.
+* A few examples using BabylonJS for rendering
 * Several examples using ThreeJS for rendering
   * Some extra fun examples like converting animations to Data Textures
   * Running Full Skinned animation on the GPU with GLSL Example
-  * Using Instancing & Data Texture to animate a collection of randomly placed & rotated meshes.
+  * Using Instancing & Data Texture to animate a collection of randomly placed & rotated meshes
+* Ready Player Me Example : Parsing, TPose Generation & Auto IK Rigging
+* Bone Slots : A way to programmically attach assets to bones
+* IK Animation Additives
+
 
 ---
 ## Future Plans ##
 - [x] Rewrite IK Rigs
 - [x] Port over starting IK Solvers ( Aim / SwingTwist, Limb, SwingTwistEnds )
 - [x] Rewrite IK Animation Retargeting
-- [ ] Port over extra single pass IK Solvers ( Z, Piston, Arc, ArcSin, Trapezoid, Spring )
-- [ ] Create an implementation of FABIK
-- [ ] Create solver based on Catenary Curve
+- [x] Port over extra single pass IK Solvers ( Z, Piston, Arc, ArcSin, Trapezoid, Spring )
+- [x] Create an implementation of FABIK
+- [x] Create solver based on Catenary Curve
 - [ ] Port over Trianglution Solver ( Alternative to CCD )
-- [ ] Port over Natural CCD ( Extended version of CCD )
+- [x] Port over Natural CCD ( Extended version of CCD )
 - [x] Complete FullBody IK Prototype
 - [ ] Revisit FullBody IK, Make it mores stable & user friendly
 - [ ] Figure out how to implement VRIK
-- [ ] Bone Slots / Attachments
+- [x] Bone Slots / Attachments
 - [ ] Actions or State Machine based Animator
-- [ ] Build Examples in other Rendering Engines like BabylonJS
+- [x] Build Examples in other Rendering Engines like BabylonJS
 - [ ] Remake Auto Skinning ( Need WebGPU compute shaders for this )
 - [ ] Bone Constraints
 - [ ] Procedural Animation ProtoTyping
 - [ ] Far Future - Create & Share animations with a Web Editor Tool
-
----
-## Nice To Have ##
-There are some things I've been wanting for my prototyping for awhile. Here's a list of things if people want to donate Or create for the project for a negotiable sum.
-
-* `Project Character ( Ossos-Chan? )`
-  * **Purpose** : A nice character to prototype with for everyone. Can also end up being the project mascot. Being female with some features like hair, cat ears & tail is something that will be used for working with bone springs. If the parts are detachable then it can work into the Slots/Attachments future prototype feature.
-  * **Thoughs** :
-    * Would like a female with detachable cat ears & tail
-    * Prefer stylized designs ( Really digging the Art Direction of Arcane )
-    * Just a base mesh, does not need to be skinned or textured
-
-* `Collection of Mobility Animations`
-  * **Purpose** : Less data overall if not baked which gives me a chance to experiment with different interpolations for animation beyond just linear / cubic. Would be a nice thing to have for the community to use as a starting point for their projects.
-  * **Thoughs** :
-      * Something that looks nice & blends well together, doesn't look choppy
-      * Walk, Run, Idle, Crawl, Jump. Maybe Flying & Swimming
-      * Prefer not to be baked

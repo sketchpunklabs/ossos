@@ -1,6 +1,6 @@
 {
     "name"          : "ossos",
-    "version"       : "0.0.2",
+    "version"       : "0.0.3",
     "author"        : "Pedro Sousa ( Vor @ SketchPunk Labs )",
     "description"   : "Character Animation System",
     "keywords"      : [ "animation", "skeleton", "inverse kinematrics", "armature", "ikrig" ],
