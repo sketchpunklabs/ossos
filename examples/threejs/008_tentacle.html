@@ -18,6 +18,8 @@ import FabrikSolver                 from '../../src/ikrig/solvers/FabrikSolver';
 
 import { vec3, quat }               from 'gl-matrix';
 
+import { PropGroup }                from '../_lib/propui/index.js';
+
 //#endregion
 
 //#region MAIN
@@ -47,9 +49,27 @@ window.addEventListener( "load", async _=>{
     Ref.tent.apply( Ref.ik.getPos(), Ref.ik.getFwd() );
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    buildUI();
     App.render();
 });
 //#endregion
+
+function buildUI(){
+    const fnBtn = ( txt, fn )=>{
+        const btn = document.createElement( 'button' );
+        btn.innerText = txt;
+        btn.addEventListener( 'click', fn );
+        return btn;
+    };
+
+    const grp = new PropGroup();
+    grp.fixedTopRight().setWidth( 150 ).setHeading( 'Gizmo Control' );
+    document.body.appendChild( grp );
+
+    grp.appendChild( fnBtn( 'Translate [ t ]', ()=>Ref.ik.useTranslate().attachAxis() ) );
+    grp.appendChild( fnBtn( 'Rotate [ r ]', ()=>Ref.ik.useRotate().attachAxis() ) );
+    grp.appendChild( fnBtn( 'Hide [ s ]', ()=>Ref.ik.gizmo.detach() ) );
+}
 
 function onIKMove(){
     Ref.tent.apply( Ref.ik.getPos(), Ref.ik.getFwd() );
@@ -73,11 +93,11 @@ class IKTargets{
 
         window.addEventListener( 'keypress', e=>{
             switch( e.key ){
-                case 'r': this.useRotate(); this.gizmo.attach( this.axis ); break;
-                case 't': this.useTranslate(); this.gizmo.attach( this.axis ); break;
+                case 'r': this.useRotate().attachAxis(); break;
+                case 't': this.useTranslate().attachAxis(); break;
                 case 's':
                     if( this.gizmo.object ) this.gizmo.detach();
-                    else                    this.gizmo.attach( this.axis );
+                    else                    this.gizmo.attachAxis()
                     break;
             }
         });
@@ -89,8 +109,10 @@ class IKTargets{
     getFwd(){ return vec3.transformQuat( [0,0,0], [0,0,1], this.axis.quaternion.toArray() ); }
     getUp(){ return vec3.transformQuat( [0,0,0], [0,1,0], this.axis.quaternion.toArray() ); }
 
-    useTranslate(){ this.gizmo.setMode( 'translate' ); }
-    useRotate(){ this.gizmo.setMode( 'rotate' ); }
+    useTranslate(){ this.gizmo.setMode( 'translate' ); return this; }
+    useRotate(){ this.gizmo.setMode( 'rotate' ); return this; }
+
+    attachAxis(){ this.gizmo.attach( this.axis ); return this }
 
     onGizmoDragChange( e ){
         this.app.orbit.enabled = !e.value;

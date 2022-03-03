@@ -1,0 +1,160 @@
+/* #region GLOBAL */
+:root{
+    --prop-bg-0     : #2C3539;
+    --prop-bg-1     : #454C52;
+    --prop-bg-2     : #4E5457;
+    --prop-font     : monospace;
+    --prop-radius-0 : 7px;
+    --prop-radius-1 : 4px;
+
+    --prop-color-0  : #879198;
+    --prop-color-1  : #D9D9D9;
+    --prop-color-2  : #FEFDFF;
+}
+/* #endregion */
+
+
+/* #region CONTAINERS //////////////////////////// */
+
+/* #region PROP PANEL */
+prop-panel{
+    background-color    : var(--prop-bg-0); 
+    color               : #fefefe; 
+    font-family         : var(--prop-font);
+    border-radius       : var(--prop-radius-0);
+}
+prop-panel::part(content){ padding:6px 6px; }
+/* #endregion */
+
+
+/* #region PROP BUTTON POP */
+prop-button-pop {
+    width   : 30px;
+    height  : 30px;
+}
+
+prop-button-pop::part(panel){
+    background-color    : var(--prop-bg-0);
+    opacity             : 0;
+    bottom              : 70%;
+    right               : 70%;
+    transform           : scale( 0.0 );
+    transform-origin    : bottom right;
+    border-radius       : 4px;
+    box-shadow          : 0px 0px 4px 2px rgba(0, 0, 0, 0.4);
+    transition          : all 0.3s ease-in-out;
+    min-width           :100px;
+    min-height          :20px;
+}
+prop-button-pop.open::part(panel){
+    opacity             : 1;
+    transform           : scale( 1.0 );
+}
+
+prop-button-pop::part(btnOuter){
+    border:none;
+    border-radius:50%;
+    padding:4px;
+    box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 1.0); /* Extra OuterRing Hidden */
+
+    background-color: white; /* OuterRing Color */
+    transition-property: background-color, box-shadow;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-in-out;
+}
+prop-button-pop.open::part(btnOuter){
+    background-color    : #00000000; 
+    box-shadow          : 0px 0px 0px 4px #FFFFFFcc;
+}
+
+prop-button-pop::part(btnInner){
+    border-radius:50%;
+    padding:4px;
+    background-color: #505050;
+}
+
+prop-button-pop.open::part(btnInner){ background-color:#d0d0d0; }
+
+prop-button-pop::part(ico){
+    width   : 25px;
+    height  : 25px;
+    fill    : white;
+}
+
+prop-button-pop.open::part(ico){ fill: black; }
+/* #endregion */
+
+
+/* #region PROP GROUP */
+prop-group{
+    background-color    : var(--prop-bg-0); 
+    color               : var(--prop-color-0); 
+    font-family         : var(--prop-font);
+    border-radius       : var(--prop-radius-0);
+    box-shadow          : 0px 0px 4px 2px rgba(0, 0, 0, 0.3);
+}
+
+prop-group::part(header){ 
+    height          : 24px; 
+    padding         : 0px 10px 0px 6px; 
+    border-bottom   : 1px dotted transparent; 
+    transition      : all 0.3s ease-in;
+}
+prop-group.open::part(header){ border-bottom:1px dotted var(--prop-bg-1); }
+
+prop-group::part(headerLbl){ 
+    font-weight     : 900; 
+    font-size       : 1em; 
+    color           : var(--prop-color-0); 
+    text-transform  : uppercase; 
+    letter-spacing  : 0.1em;  
+} 
+
+prop-group::part(headerBtn){ background  : transparent; border : none; }
+
+prop-group::part(ico){
+    top         : -2px;
+    position    : relative;
+    fill        : var(--prop-color-1);
+    transform   : rotate( 90deg );
+    transition  : all 0.3s ease-in;
+}
+prop-group.open::part(ico){ transform: rotate( 0deg ); }
+
+prop-group::part(content){ padding:6px 6px; }
+/* #endregion */
+
+/* #endregion //////////////////////////////////// */
+
+
+/* #region INPUT //////////////////////////////// */
+
+/* #region PROP INPUT */
+prop-input{ border-radius:var(--prop-radius-1); font-family:var(--prop-font); background-color: var(--prop-bg-1); }
+
+prop-input::part(label) { color: var(--prop-color-0); padding: 2px 6px; border-radius: 3px 0px 0px 3px; cursor:pointer; }
+prop-input::part(input) { color: var(--prop-color-0); background-color:transparent; border:0px; border-radius: 0px 3px 3px 0px; padding:0px 5px 0px 0px; text-align:right; }
+
+prop-input:focus-within{ background-color: var(--prop-bg-2); }
+prop-input:focus-within::part(label){ color: var(--prop-color-1); }
+prop-input:focus-within::part(input){ color: var(--prop-color-1); }
+/* #endregion */
+
+/* #region PROP SELECT */
+prop-select{
+    border-radius       : var(--prop-radius-1); 
+    background-color    : var(--prop-bg-1); 
+    color               : var(--prop-color-0);
+    fill                : var(--prop-color-0);
+    font-family         : var(--prop-font); 
+    padding             : 2px 6px;
+}
+
+prop-select:hover{
+    background-color    : var(--prop-bg-2); 
+    color               : var(--prop-color-1);
+    fill                : var(--prop-color-1);
+}
+/* #endregion */
+
+/* #endregion //////////////////////////////////// */
