@@ -1,0 +1,110 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { THREE }   from '../threejs/_lib/Starter.js';
+import Proto                from './lib/Proto.js';
+
+import {
+    PropGroup, PropSelect
+}                           from '../_lib/propui/index.js';
+
+import TRexRig              from './rigs/TRex.js';
+import IKRig                from './rigs/IKRig.js';
+import LigerZeroRig         from './rigs/LigerZeroRig.js';
+import TinaRig              from './rigs/TinaRig.js';
+import ToruRig              from './rigs/ToruRig.js';
+import RoninRig             from './rigs/Ronin.js';
+//#endregion
+
+//#region MAIN
+let App;
+let Speed = 1.0;
+
+function onRender( dt, et ){ Proto.tick( dt*Speed ); }
+
+window.addEventListener( "load", async _=>{
+    App = new Starter( { webgl2:true, grid:true } );
+    App.setCamera( 45, 20, 6.5, [0,0.8,0] );
+    App.onRender = onRender;
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Proto.initDebug( App, true, true );
+    Proto.initKeyboardClip();
+    Proto.initIKVisualizer();
+    Proto.initMixamo( App );
+    
+    new TRexRig()
+        .loadAsync( { meshPos:[-2,0,0] } )
+        .then( rig=>{
+            rig.toScene( App );
+            Proto.rigs.set( 'TRex', rig );
+        });
+
+    new LigerZeroRig()
+        .loadAsync( { meshPos:[0,0,2] } )
+        .then( rig=>{
+            rig.toScene( App );
+            Proto.rigs.set( 'Liger', rig );
+        });
+
+    new IKRig()
+        .loadAsync( { meshPos:[2,0,0] } )
+        .then( rig=>{
+            rig.toScene( App );
+            Proto.rigs.set( 'IKRig', rig );
+        });
+
+    new TinaRig()
+        .loadAsync( { meshPos:[2,0,0] } )
+        .then( rig=>{
+            rig.toScene( App );
+            Proto.rigs.set( 'Tina', rig );
+        });
+
+    new ToruRig()
+        .loadAsync( { meshPos:[3,0,0] } )
+        .then( rig=>{
+            rig.toScene( App );
+            Proto.rigs.set( 'Toru', rig );
+        });
+
+    new RoninRig()
+        .loadAsync( { meshPos:[0,0,-3]} )
+        .then( rig=>{
+            rig.toScene( App );
+            Proto.rigs.set( 'Ronin', rig );
+        });
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    buildUI();
+    App.render();
+});
+//#endregion
+
+function buildUI(){
+    const grp = new PropGroup();
+    grp.fixedTopRight().setWidth( 200 ).setHeading( 'Animations' );
+    document.body.appendChild( grp );
+
+    const sel = new PropSelect();
+    sel.isInt = true;
+    sel.fromFlatArray([
+        'Walking',  0,
+        'Catwalk',  1,
+        'Ready',    2,
+        'Running',  3,
+        'Standing', 4,
+        'Rumba',    5,
+        'Hiphop',   6,
+    ])
+    .setIndex( 0 )
+    .onChange( e=>Proto.mixamo.useClip( e.detail.text ) );
+
+    grp.appendChild( sel );
+}
+
+</script>
+</body></html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { THREE }           from '../threejs/_lib/Starter.js';
+import ShapePointsMesh              from '../threejs/_lib/ShapePointsMesh.js';
+//import DynLineMesh                  from '../threejs/_lib/DynLineMesh.js';
+import { Gltf2 }                    from '../threejs/_lib/UtilGltf2.js';
+import UtilArm                      from '../threejs/_lib/UtilArm.js';
+import Util3js                      from '../threejs/_lib/Util.js';
+//import { vec3 }                     from 'gl-matrix'
+//import Transform                    from '../../src/maths/Transform';
+
+import { IKChain }                  from '../../src/ikrig/rigs/IKChain';
+
+//import { Animator }                 from '../../src/animation/index';
+//import { BipedRig }                 from '../../src/ikrig/index';
+//import BipedIKPose                  from '../../src/ikrig/animation/BipedIKPose';
+import BoneSpring                   from '../../src/bonespring/index';
+
+import {
+    //LimbSolver,
+    //ZSolver,
+    //ArcSolver,
+    //ArcSinSolver,
+    //PistonSolver,
+    //SpringSolver,
+    //TrapezoidSolver,
+    //FabrikSolver,
+    CatenarySolver,
+    //NaturalCCDSolver,
+}                                   from '../../src/ikrig/solvers/index'
+//#endregion
+
+//#region MAIN
+let App;
+let Debug   = {};
+let Ref     = {};
+
+function onRender( dt, et ){
+    if( Ref.rig ){
+        const x  = Math.sin( et * 3.0 );
+        const pos = [ x*0.1, 0.1, -0.25 ];
+        Debug.pnt.reset().add( pos, 0x00ffff, 0.7 );
+
+        Ref.rig.update( dt, pos, [0,1,0], true );
+        Ref.rig2.update( dt, pos, [0,1,0], false );
+    }
+}
+
+window.addEventListener( "load", async _=>{
+    App = new Starter( { webgl2:true, grid:true } );
+    App.setCamera( 180, 20, 1.5, [0,0.1,0] );
+    App.onRender = onRender;
+
+    App.add( ( Debug.pnt = new ShapePointsMesh() ) );
+    //App.add( ( Debug.ln  = new DynLineMesh() ) );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    new GineRig().load( {boneView:true, mesh:true, tex:true } ).then( rig=>{
+        const rig2 = rig.clone();
+        const rig3 = rig.clone();
+
+        //------------------------------------
+        if( rig.mesh ){
+            rig.mesh.position.x = -0.5;
+            App.add( rig.mesh );
+        }
+
+        if( rig.boneView ){
+            rig.boneView.position.x = -0.5;
+            App.add( rig.boneView );
+        }
+        test( rig );
+        Ref.rig = rig;
+
+        //------------------------------------
+        Ref.rig2 = rig2;
+        if( rig2.boneView ){
+            //rig2.boneView.position.x = 0.5;
+            App.add( rig2.boneView );
+        }
+
+        if( rig2.mesh ){
+            //rig2.mesh.position.x = 0.5;
+            App.add( rig2.mesh );
+        }
+
+        //------------------------------------
+        Ref.rig3 = rig3;
+        if( rig3.boneView ){
+            rig3.boneView.position.x = 0.5;
+            App.add( rig3.boneView );
+        }
+
+        if( rig3.mesh ){
+            rig3.mesh.position.x = 0.5;
+            App.add( rig3.mesh );
+        }
+    }),
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.render();
+});
+//#endregion
+
+function test( rig ){
+    const chain = rig.tail;
+    const pose  = rig.pose;
+
+    // for( let lnk of chain.links ){
+    //     let b = pose.bones[ lnk.idx ];
+    //     Debug.pnt.add( b.world.pos, 0xffff00, 0.2 );
+    // }
+    const pos = [ 0, 0.1, -0.25 ];
+    Debug.pnt.add( pos, 0x00ffff, 0.5 );
+
+    rig.update( 0.01, pos );
+}
+
+//#region CHARACTER RIGS
+
+class CharacterRig{
+    //#region MAIN
+    arm         = null;
+    rig         = null;
+    mesh        = null;
+    boneView    = null;
+    pose        = null;
+    springs     = null;
+    constructor(){}
+    //#endregion 
+
+    //#region ABSTRACT METHODS
+    async load(){ console.warn( 'CharacterRig.load not implemented' ); return this }
+    //#endregion
+
+    //#region LOADERS
+    _parseArm( gltf, loadTPose=false ){ 
+        this.arm    = UtilArm.armFromGltf( gltf );
+        this.pose   = this.arm.newPose();
+
+        if( loadTPose ){
+            this.pose.fromGLTF2( gltf.getPose() );
+            this.arm.updateSkinFromPose( this.pose );
+        }
+
+        this.pose.updateWorld();
+        return this;
+    }
+
+    _autoRig(){
+        this.rig = new BipedRig();
+        if( ! this.rig.autoRig( this.arm ) ) console.log( 'AutoRigging Incomplete' );
+
+        this.rig.bindPose( this.pose );               // Late Binding of TPose for the chains: Rigs only work with TPoses
+        this.rig.useSolversForRetarget( this.pose );  // Use Default Solvers for known chains, Should Happen After Bind
+        
+        return this;
+    }
+
+    _skinnedMesh( gltf, base='cyan' ){
+        this.mesh = UtilArm.skinMtxMesh( gltf, this.arm, base );
+        return this;
+    }
+
+    _boneView( meshScl=0.02, dirScl=2 ){
+        this.boneView = UtilArm.newBoneView( this.arm, null, meshScl, dirScl ); 
+        this.boneView.updateFromPose( this.pose );
+        return this;
+    }
+    //#endregion
+
+    clone( obj=null ){
+        const char  = obj || new CharacterRig();
+        char.arm    = this.arm.clone();
+        
+        if( this.pose ){
+            char.pose = this.pose.clone();
+            char.pose.arm = char.arm;
+        }
+
+        if( this.boneView ){
+            const meshScl   = this.boneView.material.uniforms.meshScl.value;
+            const dirScl    = this.boneView.material.uniforms.dirScl.value;
+            char.boneView   = UtilArm.newBoneView( char.arm, null, meshScl, dirScl ); 
+            char.boneView.updateFromPose( char.pose );
+        }
+
+        if( this.mesh ){
+            char.mesh = this.mesh.clone();
+            const mat = char.mesh.material.clone();
+
+            // Cloned mesh will share the same material, need to clone
+            // that seperatly so be able to apply skinning data for individual meshes
+            mat.uniforms.pose.value = char.arm.getSkinOffsets()[ 0 ];
+
+            // Cloning Material causes the texture to be black, so grab ref of original texture.
+            mat.uniforms.texBase.value = char.mesh.material.uniforms.texBase.value; 
+            char.mesh.material = mat;
+        }
+
+        return char;
+    }
+
+    update( dt ){
+        if( this.boneView ) this.boneView.updateFromPose( this.pose );
+        if( this.mesh )     this.arm.updateSkinFromPose( this.pose );
+    }
+
+    applyIKPose( ikPose, dt ){
+        ikPose.applyToRig( this.rig );              // Set IK Data to Solvers on the Rig
+        this.rig.resolveToPose( this.pose );        // Execute Solvers & Store Local Space results to Pose
+
+        this.pose.updateWorld();                    // Update the pose's WorldSpace transform
+
+        if( this.springs ){
+            this.springs.updatePose( dt, this.pose, true ); // Apply Springs to Pose
+        }
+
+        this.arm.updateSkinFromPose( this.pose );   // Update Armature Skinning for Mesh Rendering
+
+        if( this.boneView ) this.boneView.updateFromPose( this.pose );  // Update BoneView with new Pose
+    }
+}
+
+class GineRig extends CharacterRig{
+    constructor(){ super(); }
+
+    async load( config=null ){
+        const url  = '../_res/models/gine/';
+        const gltf = await Gltf2.fetch( url + 'gine.gltf' );
+        this._parseArm( gltf )        // Create Armature
+            //._autoRig()                     // Auto BipedRig
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if( config?.mesh != false ){
+            let base = 'cyan'
+            if( config.tex ) base = await Util3js.loadTexture( url + 'gine_texture_baseColor.jpg' );
+
+            this._skinnedMesh( gltf, base );
+        }
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if( config?.boneView ) this._boneView( 0.01, 1 );
+        
+        this.extraChains();
+        return this;
+    }
+
+    extraChains(){
+        const tail = [ 'tailbone_01','tailbone_02','tailbone_03','tailbone_04','tailbone_05' ]; //
+
+        this.tail = new IKChain( tail, this.arm )
+            .setSolver( new CatenarySolver() )
+            .bindAltDirections( this.pose, [0,0,-1], [0,1,0] );
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.springs = new BoneSpring( this.arm );
+        this.springs.addRotChain( 'tail', tail, 1.5, 0.5 );
+        this.springs.setRestPose( this.pose, true, Debug );
+    }
+
+    clone(){
+        const c = super.clone( new GineRig() );
+        c.extraChains();
+        return c;
+    }
+
+    update( dt, pos, poleDir=[0,1,0], useSprings=true ){
+        this.tail.solver.setTargetPos( pos, poleDir ); //, poleDir
+        this.tail.resolveToPose( this.pose, Debug );
+        this.pose.updateWorld();
+
+        if( useSprings ){
+            this.springs.setRestPose( this.pose, false );
+            this.springs.updatePose( dt, this.pose, true, Debug );
+        }
+
+        super.update( dt );
+    }
+
+}
+
+//#endregion
+
+</script>
+</body></html>

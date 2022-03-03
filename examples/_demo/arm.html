@@ -1,0 +1,152 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { THREE }           from '../threejs/_lib/Starter.js';
+import ShapePointsMesh              from '../threejs/_lib/ShapePointsMesh.js';
+//import DynLineMesh                  from '../threejs/_lib/DynLineMesh.js';
+import { Gltf2 }                    from '../threejs/_lib/UtilGltf2.js';
+import UtilArm                      from '../threejs/_lib/UtilArm.js';
+import Util3js                      from '../threejs/_lib/Util.js';
+import { vec3, quat }                     from 'gl-matrix'
+
+import Cycle                        from '../_lib/Cycle.js';
+
+//#endregion
+
+//#region MAIN
+let App;
+let Debug   = {};
+let Ref     = {};
+
+function onRender( dt, et ){
+    Ref.cycle.tick( dt );
+
+    bend( Ref.t0, Ref.cycle.asSin01( Math.PI * 0.25 ) );
+    bend( Ref.f0, Ref.cycle.asSin01() );
+    bend( Ref.f1, Ref.cycle.asSin01( Math.PI * -0.25 ) );
+    bend( Ref.f2, Ref.cycle.asSin01( Math.PI * -0.50 ) );
+    bend( Ref.f3, Ref.cycle.asSin01( Math.PI * -0.75 ) );
+
+    bend2( Ref.wrist, 30 * -Ref.cycle.asSin(), [1,0,0] );
+    bend2( Ref.forearm, 75 * Ref.cycle.asSin01(), [1,0,0] );
+    bend2( Ref.upperarm, -45 * Ref.cycle.asSin01(), [1,0,0] );
+
+    Ref.pose.updateWorld();
+    Ref.arm.updateSkinFromPose( Ref.pose );
+}
+
+window.addEventListener( "load", async _=>{
+    App = new Starter( { webgl2:true, grid:true } );
+    App.setCamera( 0, 40, 10, [0,0.1,0] );
+    App.onRender = onRender;
+
+    //App.add( ( Debug.pnt = new ShapePointsMesh() ) );
+    //App.add( ( Debug.ln  = new DynLineMesh() ) );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const gltf = await Gltf2.fetch( '../_res/models/rivot_arm/rivot_arm.gltf' );
+    const arm  = UtilArm.armFromGltf( gltf );
+    const mesh = UtilArm.skinMtxMesh( gltf, arm );
+    mesh.position.x = 4;
+    mesh.position.y = 1;
+
+    //const boneView = UtilArm.newBoneView( arm ); 
+    //boneView.updateFromPose( arm );
+
+    App.add( mesh );
+    //App.add( boneView );
+
+    Ref.arm     = arm;
+    Ref.pose    = arm.newPose();
+
+    Ref.cycle = new Cycle( 3 );
+    Ref.q     = [0,0,0,0];
+    setup();
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.render();
+});
+//#endregion
+
+function setup(){
+    const f0 = [ 'INDEX_1_R', 'INDEX_2_R', 'INDEX_3_R' ];
+    const f1 = [ 'MIDDLE_1_R', 'MIDDLE_2_R', 'MIDDLE_3_R' ];
+    const f2 = [ 'RING_1_R', 'RING_2_R', 'RING_3_R' ];
+    const f3 = [ 'PINKIE_1_R', 'PINKIE_2_R', 'PINKIE_3_R' ];
+    const t0 = [ 'THUMB_2_R', 'THUMB_3_R', 'THUMB_4_R' ];
+
+    Ref.f0 = chain( f0 );
+    Ref.f1 = chain( f1 );
+    Ref.f2 = chain( f2 );
+    Ref.f3 = chain( f3 );
+    Ref.t0 = chain( t0 );
+
+    Ref.wrist       = Ref.arm.getBone( 'WRIST_R' );
+    Ref.forearm     = Ref.arm.getBone( 'FOREARM_R' );
+    Ref.upperarm    = Ref.arm.getBone( 'ARM_R' );
+}
+
+function chain( ary ){
+    const chain = [];
+    for( let i of ary ) chain.push( Ref.arm.getBone( i ) );
+    return chain;
+}
+
+function bend( chain, t ){
+    quat.setAxisAngle( Ref.q, [1,0,0], -60 * Math.PI / 180 * t );
+
+    let p;
+    for( let b of chain ){
+        p = Ref.pose.bones[ b.idx ];
+        quat.mul( p.local.rot, b.local.rot, Ref.q );
+    }
+}
+
+function bend2( b, ang, axis ){
+    quat.setAxisAngle( Ref.q, axis, ang * Math.PI / 180 );
+    let p = Ref.pose.bones[ b.idx ];
+    quat.mul( p.local.rot, b.local.rot, Ref.q );
+}
+
+
+
+
+
+/*
+
+0: {"ARM_R" => 0}
+1: {"FOREARM_R" => 1}
+2: {"WRIST_R" => 2}
+3: {"HAND_1_R" => 3}
+4: {"HAND_1_2_R" => 4}
+5: {"INDEX_1_R" => 5}
+6: {"INDEX_2_R" => 6}
+7: {"INDEX_3_R" => 7}
+8: {"HAND_2_R" => 8}
+9: {"HAND_2_2_R" => 9}
+10: {"MIDDLE_1_R" => 10}
+11: {"MIDDLE_2_R" => 11}
+12: {"MIDDLE_3_R" => 12}
+13: {"HAND_3_R" => 13}
+14: {"HAND_3_2_R" => 14}
+15: {"RING_1_R" => 15}
+16: {"RING_2_R" => 16}
+17: {"RING_3_R" => 17}
+18: {"HAND_4_R" => 18}
+19: {"HAND_4_2_R" => 19}
+20: {"PINKIE_1_R" => 20}
+21: {"PINKIE_2_R" => 21}
+22: {"PINKIE_3_R" => 22}
+23: {"THUMB_1_R" => 23}
+24: {"THUMB_2_R" => 24}
+25: {"THUMB_3_R" => 25}
+26: {"THUMB_4_R" => 26}
+
+*/
+
+
+</script>
+</body></html>

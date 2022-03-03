@@ -1,0 +1,268 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { THREE }   from '../threejs/_lib/Starter.js';
+import Proto                from './lib/Proto.js';
+
+import ShapePointsMesh      from '../threejs/_lib/ShapePointsMesh.js';
+import DynLineMesh          from '../threejs/_lib/DynLineMesh.js';
+
+import Gltf2                from '../../src/parsers/gltf2/index'
+
+//#endregion
+
+//#region MAIN
+let App, Debug = {};
+
+window.addEventListener( "load", async _=>{
+    App = new Starter( { webgl2:true, grid:true } );
+    App.setCamera( 0, 20, 3.5, [0,0.8,0] );
+
+    App.add( ( Debug.pnt = new ShapePointsMesh() ) );
+    App.add( ( Debug.ln  = new DynLineMesh() ) );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    Gltf2.fetch( '../_res/models/readyplayerme.glb' ).then( gltf=>{
+        const rpm = ReadyPlayerMe.parse( gltf );
+        App.add( rpm.mesh );
+        App.add( rpm.boneView );
+        rpm.mesh.position.x = -1.0;
+        rpm.boneView.position.x = 1.0;
+    });
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.render();
+});
+//#endregion
+
+import SkinMTXMaterial          from '../threejs/_lib/SkinMTXMaterial.js';
+import BoneViewMesh             from '../threejs/_lib/BoneViewMesh.js';
+import { Armature, SkinMTX }    from '../../src/armature/index';
+import { vec3, quat }           from 'gl-matrix';
+import QuatUtil                 from '../../src/maths/QuatUtil';
+import Transform                from '../../src/maths/Transform';
+
+class ReadyPlayerMe{
+    static parse( gltf ){
+        const rtn       = {};
+        rtn.arm         = this.armatureFromJson( gltf );
+        rtn.pose        = rtn.arm.newPose();
+        rtn.mesh        = this.parseMeshNodes( gltf, rtn.arm );
+        rtn.boneView    = new BoneViewMesh( rtn.arm );
+
+
+        this.genTPose( rtn );
+        rtn.pose.updateWorld();
+        rtn.arm.updateSkinFromPose( rtn.pose );
+        rtn.boneView.updateFromPose( rtn.pose );
+
+        return rtn;
+    }
+
+    /** Convert all Mesh Nodes to Renderable 3JS Meshes */
+    static parseMeshNodes( gltf, arm ){
+        const aryNodes      = gltf.json.nodes.filter( i=>( i.skin !== undefined && i.mesh !== undefined ) );
+        const skinOffsets   = arm.getSkinOffsets()[0];
+        const grp           = new THREE.Group();
+        const texMap        = new Map();
+        let n;
+        let p;
+        let m;
+        let g;
+        let gl_m;     // GLTF Material
+        let mesh;
+        let mat;
+        let tex;
+        let texId;
+
+        const fnTex = ( idx )=>{
+            const gl_tex = gltf.getTexture( idx );  // Parse Texture Data + Blob
+            const tex    = new THREE.Texture();     // Start a 3JS Texture
+            const img    = new Image();             // Start image to put into 3js texture
+
+            tex.name     = gl_tex.name;
+            tex.flipY    = false; 
+
+            img.name     = gl_tex.name; 
+            img.src      = URL.createObjectURL( gl_tex.blob ); // Have image Load Blob
+            img.onload   = ()=>{
+                tex.image       = img;  // Update Texture when Image is ready
+                tex.needsUpdate = true;
+            }
+
+            texMap.set( idx, tex );     // Save to map, other mesh can reuse textures.
+            return tex;
+        };
+
+        // Each mesh item should only have a single primitive, if its always true
+        // we can skip looping over the array & just grab the first item.
+        for( n of aryNodes ){
+            //------------------------------------------
+            m           = gltf.getMesh( n.mesh );                   // Get Mesh Primitives
+            p           = m.primitives[ 0 ];                        // Just Grab the First Primitive
+            
+            gl_m        = gltf.getMaterial( p.materialIdx );
+            texId       = gl_m.baseColorTexture.index;
+            tex         = ( texMap.has( texId ) )? texMap.get( texId ) : fnTex( texId );
+            
+            //------------------------------------------
+            g           = this.primitive2Geo( p );                  // Create 3JS BufferGeometry
+            g.name      = 'geo_' + m.name;                          // ... name it for shitz
+            
+            //------------------------------------------
+            mat         = SkinMTXMaterial( tex, skinOffsets );      // new THREE.MeshPhongMaterial( {color:0x00ffff } );
+            mesh        = new THREE.Mesh( g, mat );                 // Create a 3JS mesh
+            mesh.name   = m.name;                                   // ... name it
+            
+            //------------------------------------------
+            grp.add( mesh );                                        // Group all Primitives together, Forms 1 Character
+        }
+
+        return grp;
+    }
+
+    /** Convert GLTF Primitives to 3JS BufferGeometry */
+    static primitive2Geo( prim ){
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute( 'position', new THREE.BufferAttribute( prim.position.data, prim.position.componentLen ) );
+
+        if( prim.indices )    geo.setIndex( new THREE.BufferAttribute( prim.indices.data, 1 ) );
+        if( prim.normal )     geo.setAttribute( 'normal', new THREE.BufferAttribute( prim.normal.data, prim.normal.componentLen ) );
+        if( prim.texcoord_0 ) geo.setAttribute( 'uv', new THREE.BufferAttribute( prim.texcoord_0.data, prim.texcoord_0.componentLen ) );
+
+        if( prim.joints_0 && prim.weights_0 ){
+            geo.setAttribute( 'skinWeight', new THREE.BufferAttribute( prim.weights_0.data, prim.weights_0.componentLen ) );
+            geo.setAttribute( 'skinIndex',  new THREE.BufferAttribute( prim.joints_0.data, prim.joints_0.componentLen ) );
+        }
+        return geo;
+    }
+
+    /** Parse out the Skin Data & Create an Armature Object out of it */
+    static armatureFromJson( gltf, defaultBoneLen = 0.07 ){
+        const skin = gltf.getSkin();
+        const arm  = new Armature();
+        
+        // Create Armature
+        for( let j of skin.joints ){
+            arm.addBone( j.name, j.parentIndex, j.rotation, j.position, j.scale );
+        }
+
+        // Bind
+        arm.bind( SkinMTX, defaultBoneLen );
+
+        // Save Offsets if available
+        arm.offset.set( skin.rotation, skin.position, skin.scale );
+        return arm;
+    }
+
+    static genTPose( o ){
+        const pose = o.pose;
+
+        const altLFoot = this.getAltDir( pose, 'LeftFoot', [0,0,1], [0,1,0] );
+        const altRFoot = this.getAltDir( pose, 'LeftFoot', [0,0,1], [0,1,0] );
+
+        this.alignAxis( pose, 'LeftArm',        [1,0,0], [0,1,0] );
+        this.alignAxis( pose, 'LeftForeArm',    [1,0,0], [0,1,0] );
+        this.alignAxis( pose, 'LeftHand',       [1,0,0], [0,1,0] );
+        this.rotStack(  pose, 'LeftHand',       [ [0,0,1,15] ] );
+
+        this.alignAxis( pose, 'RightArm',        [-1,0,0], [0,1,0] );
+        this.alignAxis( pose, 'RightForeArm',    [-1,0,0], [0,1,0] );
+        this.alignAxis( pose, 'RightHand',       [-1,0,0], [0,1,0] );
+        this.rotStack(  pose, 'RightHand',       [ [0,0,1,-15] ] );
+
+        this.alignAxis( pose, 'LeftUpLeg',      [0,-1,0], [0,1,0] );
+        this.alignAxis( pose, 'LeftLeg',        [0,-1,0], [0,1,0] );
+        this.swingTwist( pose, 'LeftFoot', altLFoot, [ [0,0,1], [0,1,0] ] );
+
+        this.alignAxis( pose, 'RightUpLeg',      [0,-1,0], [0,1,0] );
+        this.alignAxis( pose, 'RightLeg',        [0,-1,0], [0,1,0] );
+        this.swingTwist( pose, 'RightFoot', altRFoot, [ [0,0,1], [0,1,0] ] );
+    }
+
+    static alignAxis( pose, bName, targetDir, tailDir, debug ){
+        const b         = pose.get( bName );
+        const pRot      = pose.getWorldRotation( b.pidx, [0,0,0,0] );
+        const cRot      = [0,0,0,0];
+        const rot       = [0,0,0,0];
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        quat.mul( cRot, pRot, b.local.rot );            // Get Bind Rotation in World Space
+        vec3.transformQuat( tailDir, tailDir, cRot );   // Get Bone's Tail Direction
+        quat.rotationTo( rot, tailDir, targetDir );     // Create swing rotation from Tail to Target
+        quat.mul( cRot, rot, cRot );                    // Apply Swing Rotation
+        
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        QuatUtil.pmulInvert( rot, cRot, pRot );         // To LocalSpace
+        pose.setLocalRot( b.idx, rot );                 // Save back to bone
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if( debug ){
+            const tran = pose.getWorldTransform( b.idx );
+            Debug.ln.add( tran.pos, vec3.add([0,0,0], tran.pos, tailDir ), 0x00ff00 );
+            Debug.ln.add( tran.pos, vec3.add([0,0,0], tran.pos, targetDir ), 0x00ffff );
+        }
+    }
+
+    static getAltDir( pose, bName, fwdDir, upDir ){
+        const b        = pose.get( bName );
+        const rot      = pose.getWorldRotation( b.idx, [0,0,0,0] );
+        quat.invert( rot, rot ); // Invert rotation to get Alter Axis Direction
+        return [
+            vec3.transformQuat( [0,0,0], fwdDir, rot ),
+            vec3.transformQuat( [0,0,0], upDir, rot ),
+        ];
+    }
+
+    static swingTwist( pose, bName, altDir, tarDir ){
+        let b       = pose.get( bName );
+        let pRot    = pose.getWorldRotation( b.pidx, [0,0,0,1] );
+        let rot     = quat.mul( [0,0,0,0], pRot, b.local.rot );
+        let q       = [0,0,0,0];
+        let dir     = [0,0,0];
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // SWING
+        vec3.transformQuat( dir, altDir[0], rot );  // Get Alt from current WS Rot
+        quat.rotationTo( q, dir, tarDir[0] );       // Swing from one dir to another
+        quat.mul( rot, q, rot );                    // Apply
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // TWIST
+        vec3.transformQuat( dir, altDir[1], rot );  // Get Alt from the swing rot
+        quat.rotationTo( q, dir, tarDir[1] );       // Twist from one dir to another
+        quat.mul( rot, q, rot );                    // Apply
+        
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        QuatUtil.pmulInvert( q, rot, pRot );        // Banish THEE to LOCAL EFFing SPACE !
+        pose.setLocalRot( b.idx, q );               // Save back to bone
+    }
+
+    static rotStack( pose, bName, aryAry ){
+        let b       = pose.get( bName );
+        let pRot    = pose.getWorldRotation( b.pidx, [0,0,0,1] );
+        let rot     = quat.mul( [0,0,0,0], pRot, b.local.rot );
+        let axis    = [0,0,0,0];
+        let i;
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Apply the Stack of Axis Angle Rotations onto
+        // The Bones World Space Rotation
+        for( i of aryAry ){
+            quat.setAxisAngle( axis, i, i[3] * Math.PI / 180 );
+            quat.mul( rot, axis, rot );
+        }
+
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        QuatUtil.pmulInvert( rot, rot, pRot );  // To LocalSpace
+        pose.setLocalRot( b.idx, rot );         // Save back to bone
+    }
+
+}
+
+</script>
+</body></html>
