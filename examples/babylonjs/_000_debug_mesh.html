@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title></title></head><body>
+<script type="module">
+
+//#region IMPORTS
+import Starter, { BABYLON }         from './_lib/Starter.js';
+import { UtilGltf2, Gltf2 }         from './_lib/UtilGltf2.js';
+import UtilArm                      from './_lib/UtilArm.js';
+import BoneViewMesh                 from './_lib/BoneViewMesh.js'
+import { Armature, SkinMTX }        from '../../src/armature/index';
+//#endregion
+
+//#region MAIN
+let App;
+let Debug   = {};
+let Ref     = {};
+
+window.addEventListener( "load", async _=>{
+    App = new Starter();
+    App.setCamera( 0, 20, 4, [0,0.8,0] );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //const gltf  = await Gltf2.fetch( '../_res/models/nabba/nabba.gltf' );
+    const gltf  = await Gltf2.fetch( '../_res/models/ybot/yb.gltf' );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // RENDER MESH PLAINLY - NO SKINNING
+    const mesh = UtilGltf2.loadMesh( gltf, null, null );
+    mesh.showBoundingBox = true;
+    mesh.material = new BABYLON.StandardMaterial("myMaterial");
+
+    // Meshes from GTLF have triangles CCW winding, but need to
+    // set to CW on the shader to render correctly. A babylonJS thing?
+    mesh.material.sideOrientation = BABYLON.Material.ClockWiseSideOrientation;
+
+    // See Mesh's transform
+    console.log( 'quat', mesh.rotationQuaternion ); // expect null
+    console.log( 'rot', mesh.rotation );            // expect 0,0,0
+    console.log( 'pos', mesh.position );            // expect 0,0,0
+    console.log( 'scl', mesh.scaling );             // expect 1,1,1
+
+    mesh.position.z = -1;
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const arm    = UtilArm.armFromGltf( gltf );
+    //this.boneView = UtilArm.newBoneView( App, arm, null, .02, 1 ); // Render for small skeletons
+    this.boneView = UtilArm.newBoneView( App, arm, null, 2, 1 );     // Render for giant skeletons
+});
+//#endregion
+
+</script>
+</body></html>
