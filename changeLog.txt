@@ -8,7 +8,6 @@ New
   - ArcSinSolver
   - PistonSolver
   - SpringSolver
-  - SwingTwistChainSolver
   - TrapezoidSolver
   - ZSolver
   - FabrikSolver
