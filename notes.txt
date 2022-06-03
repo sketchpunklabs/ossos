@@ -1,0 +1,3 @@
+https://montreal.ubisoft.com/en/introducing-learned-motion-matching/
+https://theorangeduck.com/page/inertialization-transition-cost
+interesting information on blending animations using damped springs

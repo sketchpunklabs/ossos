@@ -8,6 +8,7 @@ import Starter, { THREE }           from './_lib/Starter.js';
 import ShapePointsMesh              from './_lib/ShapePointsMesh.js';
 import DynLineMesh                  from './_lib/DynLineMesh.js';
 import { Gltf2 }                    from './_lib/UtilGltf2.js';
+import { UtilBvh, Bvh }             from './_lib/UtilBvh.js';
 import UtilArm                      from './_lib/UtilArm.js';
 import Util3js                      from './_lib/Util.js';
 import { vec3 }                     from 'gl-matrix'
@@ -39,7 +40,7 @@ window.addEventListener( "load", async _=>{
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Ref.rigs = [];
     const aryLoader = [
-        new MixamoIKAnimatorRig().load( '../_res/anim/Walking.gltf' ).then( rig=>{
+        new MixamoIKAnimatorRig().load( '../_res/anim/dataset-1_walk_giant_001.bvh' ).then( rig=>{
             App.add( rig.boneView );
             Ref.animator = rig;
 
@@ -67,6 +68,7 @@ window.addEventListener( "load", async _=>{
 
     await Promise.all( aryLoader );
 
+    onRender( 0.01, 0.1 );
   
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     App.render();
@@ -186,6 +188,7 @@ class IKPoseVisualize{
 
 class MixamoIKAnimatorRig{
     //#region MAIN
+    inPlace     = true;
     animator    = new Animator();
     ikPose      = new BipedIKPose();
     arm         = null;
@@ -199,32 +202,51 @@ class MixamoIKAnimatorRig{
 
     async load( url ){
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        const gltf  = await Gltf2.fetch( url );
-        const clip  = UtilArm.clipFromGltf( gltf );
+        const bvh = await Bvh.fetch( url );
+        bvh.ignoreRoot = true;
 
+        const clip = UtilBvh.getClip( bvh );
         this.animator.setClip( clip );
-        this.animator.inPlace = true;
-        this.animator.inPlaceScale[ 1 ] = 0;
+
+        if( this.inPlace ){
+            this.animator.inPlace           = true;
+            this.animator.inPlaceScale[ 2 ] = 0;
+            
+            this.ikPose.inPlace             = true;
+            this.ikPose.inPlaceScale[2]     = 0;
+        }
         
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        this.arm    = UtilArm.armFromGltf( gltf, 0.07 );
+        this.arm    = UtilBvh.getArmature( bvh, 0.03 );
+        this.arm.updateBoneDirections();
+        this.arm.offset.setScl( [0.01,0.01,0.01] );  // Apply Scale since armature is really large
+
         this.pose   = this.arm.newPose();
         this.pose
-            .updateWorld()              // Mixamo Stuff has an Offset Transform, Compute Proper WS Transforms...
-            .updateBoneLengths( 0.01 ); // Then use it to get the correct bone lengths for use in IK
+            .updateWorld()              
+            .updateBoneLengths( 0.01 );
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         this.rig = new BipedRig();
         if( !this.rig.autoRig( this.arm ) ) console.log( 'AutoRig was Incomplete' );
-        
+        console.log( this.rig );
         this.rig
             .bindPose( this.pose )                  // Setup Chains & Alt Directions, Pose should be a TPose of the character
             .updateBoneLengths( this.pose )         // Apply BoneLengths to Rig since they're different from ARM.
             .useSolversForRetarget( this.pose );    // Setup Solvers
 
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        this.boneView = UtilArm.newBoneView( this.arm, this.pose, 2, 1 );
+        // Change the Alt Pole Directions for a few chains
+        this.rig.legR.bindAltDirections( this.pose, null, [0,0,-1] );
+        this.rig.armR.bindAltDirections( this.pose, null, [0,0, 1] );
+        this.rig.footL.bindAltDirections( this.pose, [1,0,0], [0, 0, 1] );
+        this.rig.footR.bindAltDirections( this.pose, [-1,0,0], [0,0,-1] );
+        this.rig.head.bindAltDirections( this.pose, [0,1,0], [1,0,0] );
+        this.rig.handR.bindAltDirections( this.pose, null, [0,0,1] );
+        this.rig.spine.bindAltDirections( this.pose, [1,0,0], [0,1,0] );
+        this.rig.hip.bindAltDirections( this.pose, [0,0,1], [1,0,0] );
 
+        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.boneView = UtilBvh.getBoneView( this.pose, 0.05 );
         return this;
     }
 
@@ -236,7 +258,7 @@ class MixamoIKAnimatorRig{
         this.pose.updateWorld();                                    // Update the Pose's WorldSpace Transforms
         this.boneView.updateFromPose( this.pose );                  // Update Source's Bone View Rendering
 
-        this.ikPose.computeFromRigPose( this.rig, this.pose );      // Compute IK Pose Data from Animation Pose
+        this.ikPose.computeFromRigPose( this.rig, this.pose, debug );      // Compute IK Pose Data from Animation Pose
         IKPoseVisualize.show( this.rig, this.pose, this.ikPose );   // Visualize IK Data Over Src Bone View
 
         if( this.onTick ) this.onTick( this, dt );

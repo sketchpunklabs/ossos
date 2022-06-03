@@ -6,7 +6,7 @@ class Bone{
     idx     : number;           // Bone Index
     pidx    : number;           // Index to Parent Bone if not root. -1 means no parent
     len     : number;           // Length of the Bone
-
+    dir     : vec3 = [0,1,0];   // Direction the bone points with no rotation
     local   = new Transform();  // Local Transform of Resting Pose
     world   = new Transform();  // World Transform of Resting Pose
 
@@ -26,10 +26,11 @@ class Bone{
 
     clone(): Bone{
         const b = new Bone( this.name, this.idx, this.len );
-        
+
         b.pidx = this.pidx;
         b.local.copy( this.local );
         b.world.copy( this.world );
+        vec3.copy( b.dir, this.dir );
         return b;
     }
 }
