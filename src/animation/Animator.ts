@@ -22,10 +22,12 @@ class FrameInfo{
 /** Basic Animator for Armature */
 class Animator{
     //#region MAIN
-    frameInfo   : Array< FrameInfo > = [];  // Clips can have multiple TimeStamps, So need to compute Frame Data for each
-    clock       : number             = 0;   // Running Animation Clock
+    frameInfo    : Array< FrameInfo > = [];  // Clips can have multiple TimeStamps, So need to compute Frame Data for each
+    clock        : number             = 0;   // Running Animation Clock
     clip        !: Clip;                    // Animation to Run
-    inPlace     = false;                    // Lock the forward movement of the animation when applied to pose
+    inPlace      = false;                    // Lock the forward movement of the animation when applied to pose
+    inPlaceScale = [1,1,1];
+
     //constructor(){}
     //#endregion
 
@@ -52,12 +54,10 @@ class Animator{
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if( this.inPlace ){
-            // TODO: Y only because Maximo Animations have ZUp, Need to do a better version of inplace setting
-            // Also come up with a better way then just "inPlace" property.
-
-            // Maybe InPlace Scale, so [1,0,1] will zero out Y
             const bPos = pose.bones[ 0 ].local.pos;
-            bPos[ 1 ] = 0; 
+            bPos[ 0 ] *= this.inPlaceScale[ 0 ];
+            bPos[ 1 ] *= this.inPlaceScale[ 1 ];
+            bPos[ 2 ] *= this.inPlaceScale[ 2 ];
         }
 
         return this;

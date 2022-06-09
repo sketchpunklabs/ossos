@@ -19,7 +19,7 @@ class BoneViewMesh extends THREE.Mesh{
         mat.uniforms.boneScl.value = new Float32Array( 3 * bCnt );
         mat.side = THREE.DoubleSide;
 
-        const geo       = new THREE.InstancedBufferGeometry();
+        const geo = new THREE.InstancedBufferGeometry();
         geo.setIndex( new THREE.BufferAttribute( new Uint16Array(shape.indices), 1 ) );
         geo.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array(shape.vertices), 3 ) );
         geo.setAttribute( 'inst', new THREE.InstancedBufferAttribute( inst, 2 ) );

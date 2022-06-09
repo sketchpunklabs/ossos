@@ -50,7 +50,7 @@ class ArcSolver extends SwingTwistBase{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // If Distance to the end effector is at or over the chain length,
         // Just Apply SwingTwist to Root Bone.
-        let len_scl = eff_len / chain.length;   // Normalize IK Length from Chain Length
+        const len_scl = eff_len / chain.length;   // Normalize IK Length from Chain Length
         if( len_scl >= 0.999 ){
             QuatUtil.pmulInvert( rot, rot, pt.rot );        // To Local
             pose.setLocalRot( chain.links[ 0 ].idx, rot );  // Save

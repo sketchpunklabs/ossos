@@ -21,6 +21,9 @@ class BipedIKPose{
     footL   = new IKData.Dir();
     footR   = new IKData.Dir();
 
+    inPlace      = false;
+    inPlaceScale = [1,1,1];
+
     constructor(){}
     //#endregion
 
@@ -39,6 +42,12 @@ class BipedIKPose{
         r.head?.solver.ikDataFromPose( r.head, pose, this.head );
         r.spine?.solver.ikDataFromPose( r.spine, pose, this.spine );
         r.hip?.solver.ikDataFromPose( r.hip, pose, this.hip );
+
+        if( this.inPlace && r.hip ){
+            this.hip.pos[ 0 ] *= this.inPlaceScale[ 0 ];
+            this.hip.pos[ 1 ] *= this.inPlaceScale[ 1 ];
+            this.hip.pos[ 2 ] *= this.inPlaceScale[ 2 ];
+        }
     }
 
     applyToRig( r: BipedRig ): void{

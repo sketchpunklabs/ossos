@@ -99,7 +99,7 @@ class Armature{
             //-------------------------------
             // Parent Bone, Compute its length based on its position and the current bone.
             p       = this.bones[ b.pidx ];                   
-            p.len   = Vec3Util.len( p.world.pos, b.world.pos ); // Compromise
+            p.len   = Vec3Util.len( p.world.pos, b.world.pos );
         }
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -108,6 +108,26 @@ class Armature{
                 b = this.bones[ i ];
                 if( b.len == 0 ) b.len = defaultBoneLen;
             }
+        }
+
+        return this;
+    }
+
+    updateBoneDirections(): this{
+        const bCnt = this.bones.length;
+        let b: Bone;
+        let p: Bone;
+
+        for( let i=bCnt-1; i >= 0; i-- ){
+            //-------------------------------
+            b = this.bones[ i ];
+            if( b.pidx == -1 ) continue;  // No Parent to compute its direction.
+
+            //-------------------------------
+            // Parent Bone, Compute its direction based on its position and the current bone.
+            p = this.bones[ b.pidx ];                   
+            vec3.sub( p.dir, b.world.pos, p.world.pos );
+            vec3.normalize( p.dir, p.dir );
         }
 
         return this;

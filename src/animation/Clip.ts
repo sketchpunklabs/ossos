@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 //#region IMPORTS
 import type Accessor    from '../parsers/gltf2/Accessor'
 import type { Track }   from '../parsers/gltf2/Animation';
@@ -75,6 +76,32 @@ class Clip{
         return clip;
     }
     
+    static fromBvh( anim: any, posInOnly ?: Array<number> ) : Clip{
+        const clip      = new Clip();
+        clip.duration   = anim.duration;
+        clip.frameCount = anim.frameCount;
+        clip.timeStamps.push( new Float32Array( anim.timestamp ) );
+
+        let track    : ITrack;          // Animator Track        
+        for( let i=0; i < anim.joints.length; i++ ){
+            if( !posInOnly || posInOnly.indexOf( i ) != -1 ){
+                track = new Vec3Track();
+                track.timeStampIndex = 0;
+                track.boneIndex      = anim.joints[ i ].pos.jointIndex;
+                track.values         = new Float32Array( anim.joints[ i ].pos.keyframes );
+                clip.tracks.push( track );
+            }
+
+            track = new QuatTrack();
+            track.timeStampIndex = 0;
+            track.boneIndex      = anim.joints[ i ].pos.jointIndex;
+            track.values         = new Float32Array( anim.joints[ i ].rot.keyframes );
+            clip.tracks.push( track );
+        }
+
+        return clip;
+    }
+
     //#endregion
 }
 
