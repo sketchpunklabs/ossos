@@ -30,7 +30,7 @@ class BoneParse{
     }
 }
 
-const reLeft    = new RegExp( "\\.l|left|_l", "i" );
+const reLeft    = new RegExp( "\\.l|left|(?<!_r)_l", "i" ); // Don't match patterns like _R_LowerLeg, etc
 const reRight   = new RegExp( "\\.r|right|_r", "i" );
 const Parsers   = [
     new BoneParse( "thigh",     true, "thigh|up.*leg", "twist" ), //upleg | upperleg
