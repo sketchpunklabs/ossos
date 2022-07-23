@@ -17,6 +17,8 @@ This project is working toward a complete character skinning & animation library
 ### Setup ###
 
 ```
+git clone --depth=1 https://github.com/sketchpunklabs/ossos
+cd ossos
 npm install
 npm run dev
 ```
