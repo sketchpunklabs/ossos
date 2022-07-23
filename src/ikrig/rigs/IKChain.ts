@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 //#region IMPORTS
 import type { Armature, Bone, Pose }    from '../../armature/index';
 import { Transform }                    from '../../maths';
@@ -105,11 +107,20 @@ class IKChain{
     //#region GETTERS
     first() : IKLink{ return this.links[ 0 ]; }
     last()  : IKLink{ return this.links[ this.count-1 ]; }
+
+    findByBoneIdx( idx: number ): number{
+        let i=0;
+        for( const lnk of this.links ){
+            if( lnk.idx == idx ) return i;
+            i++; 
+        }
+        return -1;
+    }
     //#endregion
 
     //#region GET POSITIONS
     getEndPositions( pose: Pose ): Array< vec3 >{
-        let rtn: Array< vec3 > = [];
+        const rtn: Array< vec3 > = [];
 
         if( this.count != 0 ) rtn.push( Vec3Util.toArray( pose.bones[ this.links[ 0 ].idx ].world.pos ) as vec3 );
 

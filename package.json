@@ -31,14 +31,15 @@
         "lint"          : "eslint . --ext .ts"
     },
 
-    "dependencies": {
+    "peerDependencies": {
         "gl-matrix"     : "^3.4.3"
     },
 
     "devDependencies": {
         "typescript"    : "^4.5.2",
         "vite"          : "^2.6.14",
-        "three"         : "^0.135.0",
+        "three"         : "^0.138.3",
+        "manipulator3d" : "^0.0.8",
         
         "babylonjs"             : "^5.0.0-beta.9",
         "babylonjs-materials"   : "^5.0.0-beta.9",

@@ -1,3 +1,177 @@
 https://montreal.ubisoft.com/en/introducing-learned-motion-matching/
 https://theorangeduck.com/page/inertialization-transition-cost
 interesting information on blending animations using damped springs
+
+
+//https://en.wikipedia.org/wiki/Semi-implicit_Euler_method
+https://www.youtube.com/watch?v=KPoeNZZ6H4s
+Second Order Dynamics, Way to control springs
+
+class SecondOrderDynamics{
+    xp = 0; // Previous Input
+    y = 0; // State Vars
+    yd = 0;
+    k1, k2, k3; // Dynamic constants
+
+    // freq, 
+    // resp: damp like value on how accel begins, 0 takes time to accel from rest
+    // if resp 0 < r <= 1, it responds right away 
+    // if resp > 1, overshoots before settling
+    // if resp < 0, will undershoot at the start
+    // Freq < 10 else it goes to infinity
+    constructor( freq, damp, resp, initV ){
+        k1 = damp / ( PI * freq );
+        k2 = 1 / ( ( 2 * PI * freq ) * ( 2 * PI * Freq ) );
+        k3 = resp * damp / ( 2 * PI * freq );
+        xp = initV;
+        y  = initV;
+        yd = 0;
+    }
+
+    // t can be delta time i think
+    update( t, x, xd=null ){
+        if( xd == null ){ // Estimate velocity
+            xd = ( x - xp ) / T;
+            xp = x;
+        }
+
+        y = y + T * yd; // Itergrate position by velocity
+        yd = yd * T * ( x + k3 *xd  - y - k1 * yd ) / k2; // intergrate velocity by acceleration
+        
+        return y;
+    }
+}
+
+
+class SecondOrderDynamics2{
+    xp = 0; // Previous Input
+    y = 0; // State Vars
+    yd = 0;
+    k1, k2, k3; // Dynamic constants
+    T_crit: // critical stable timestamp
+
+    // freq, 
+    // resp: damp like value on how accel begins, 0 takes time to accel from rest
+    // if resp 0 < r <= 1, it responds right away 
+    // if resp > 1, overshoots before settling
+    // if resp < 0, will undershoot at the start
+    // Freq < 10 else it goes to infinity
+    constructor( freq, damp, resp, initV ){
+        k1 = damp / ( PI * freq );
+        k2 = 1 / ( ( 2 * PI * freq ) * ( 2 * PI * Freq ) );
+        k3 = resp * damp / ( 2 * PI * freq );
+
+        T_crit = 0.8 * ( Sqrt( 4 * k2 + k1 * k1 ) - k1 ); // Mul by .8 to be safe
+
+        xp = initV;
+        y  = initV;
+        yd = 0;
+    }
+
+    // t can be delta time i think
+    update( t, x, xd=null ){
+        if( xd == null ){ // Estimate velocity
+            xd = ( x - xp ) / T;
+            xp = x;
+        }
+
+        iterations = ceil( T / T_crit ); // Take extra iterations if t > tcrit
+        T = T / iterations; // Each iteration now has a samller time step
+
+        for( i=0; i < iterations; i++ )
+            y = y + T * yd; // Itergrate position by velocity
+            yd = yd * T * ( x + k3 *xd  - y - k1 * yd ) / k2; // intergrate velocity by acceleration
+        }
+        
+        return y;
+    }
+}
+
+class SecondOrderDynamics{
+    xp = 0; // Previous Input
+    y = 0; // State Vars
+    yd = 0;
+    k1, k2, k3; // Dynamic constants
+
+    // freq, 
+    // resp: damp like value on how accel begins, 0 takes time to accel from rest
+    // if resp 0 < r <= 1, it responds right away 
+    // if resp > 1, overshoots before settling
+    // if resp < 0, will undershoot at the start
+    // Freq < 10 else it goes to infinity
+    constructor( freq, damp, resp, initV ){
+        k1 = damp / ( PI * freq );
+        k2 = 1 / ( ( 2 * PI * freq ) * ( 2 * PI * Freq ) );
+        k3 = resp * damp / ( 2 * PI * freq );
+        xp = initV;
+        y  = initV;
+        yd = 0;
+    }
+
+    // t can be delta time i think
+    update( t, x, xd=null ){
+        if( xd == null ){ // Estimate velocity
+            xd = ( x - xp ) / T;
+            xp = x;
+        }
+        k2_stable = Max( k2, T*T/2 + T *k1/2, T *k1 ); // Calmp k2 to guarantee stability without jitter
+        y = y + T * yd; // Itergrate position by velocity
+        yd = yd * T * ( x + k3 *xd  - y - k1 * yd ) / k2_stable; // intergrate velocity by acceleration
+        
+        return y;
+    }
+}
+
+
+class SecondOrderDynamicsExtra{
+    xp = 0; // Previous Input
+    y = 0; // State Vars
+    yd = 0;
+    k1, k2, k3; // Dynamic constants
+    _w, _z, _d;
+
+    // freq, 
+    // resp: damp like value on how accel begins, 0 takes time to accel from rest
+    // if resp 0 < r <= 1, it responds right away 
+    // if resp > 1, overshoots before settling
+    // if resp < 0, will undershoot at the start
+    // Freq < 10 else it goes to infinity
+    constructor( freq, damp, resp, initV ){
+        _w * 2 * PI * freq;
+        _z = damp;
+        _d = _w * sqrt( abs( z * z -1 ))
+
+        k1 = damp / ( PI * freq );
+        k2 = 1 / ( ( 2 * PI * freq ) * ( 2 * PI * Freq ) );
+        k3 = resp * damp / ( 2 * PI * freq );
+        xp = initV;
+        y  = initV;
+        yd = 0;
+    }
+
+    // t can be delta time i think
+    update( t, x, xd=null ){
+        if( xd == null ){ // Estimate velocity
+            xd = ( x - xp ) / T;
+            xp = x;
+        }
+        
+        k1_stable, k2_stable;
+        if( _w * T < _z ){
+            k1_stable = k1;
+            k2_stable = Max( k2, T*T/2 + T *k1/2, T *k1 ); // Calmp k2 to guarantee stability without jitter
+        }else{
+            t1 = Exp( -_z * _w * T );
+            alpha = 2 * t1 * (( _z <= 1)? Cos( T*_d ) : Cosh( T *_d ));
+            beta  = t1 * t1;
+            t2 = T / ( 1 + beta - alpha );
+            k1_stable = ( 1-beta ) * t2;
+            k2_stable = T * t2;
+        }
+        
+        y = y + T * yd; // Itergrate position by velocity
+        yd = yd * T * ( x + k3 *xd  - y - k1_stable * yd ) / k2_stable; // intergrate velocity by acceleration
+        
+        return y;
+    }
+}
