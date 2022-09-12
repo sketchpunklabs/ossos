@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 //#region IMPORTS
 import type { Armature, Bone, Pose }    from '../../armature/index';
 import { Transform }                    from '../../maths';
@@ -105,11 +107,20 @@ class IKChain{
     //#region GETTERS
     first() : IKLink{ return this.links[ 0 ]; }
     last()  : IKLink{ return this.links[ this.count-1 ]; }
+
+    findByBoneIdx( idx: number ): number{
+        let i=0;
+        for( const lnk of this.links ){
+            if( lnk.idx == idx ) return i;
+            i++; 
+        }
+        return -1;
+    }
     //#endregion
 
     //#region GET POSITIONS
     getEndPositions( pose: Pose ): Array< vec3 >{
-        let rtn: Array< vec3 > = [];
+        const rtn: Array< vec3 > = [];
 
         if( this.count != 0 ) rtn.push( Vec3Util.toArray( pose.bones[ this.links[ 0 ].idx ].world.pos ) as vec3 );
 
@@ -171,18 +182,13 @@ class IKChain{
 
     getTailPosition( pose: Pose, ignoreScale=false ): vec3{
         const b = pose.bones[ this.links[ this.count - 1 ].idx ];
-        const v = vec3.fromValues( 0, b.len, 0 );
+        const v = vec3.scale( [0,0,0], b.dir, b.len );
 
         if( !ignoreScale ) return Vec3Util.toArray( b.world.transformVec3( v ) ) as vec3;
 
         vec3.transformQuat( v, v, b.world.rot );
         vec3.add( v, v, b.world.pos );
         return Vec3Util.toArray( v ) as vec3;
-
-        // return v
-        //     .transformQuat( b.world.rot )
-        //     .add( b.world.pos )
-        //     .toArray();
     }
     //#endregion
 
@@ -200,19 +206,23 @@ class IKChain{
         return [ eff, pol ];
     }
 
-    bindAltDirections( pose: Pose, effectorDir: vec3, poleDir: vec3 ): this{
-        let l: IKLink;
-        let v   = vec3.create(); //new Vec3();
-        let inv = quat.create(); //new Quat();
+    bindAltDirections( pose: Pose, effectorDir?: vec3, poleDir?: vec3 ): this{
+        let l     : IKLink;
+        const v   = vec3.create();
+        const inv = quat.create();
         
         for( l of this.links ){
             quat.invert( inv, pose.bones[ l.idx ].world.rot );
 
-            vec3.transformQuat( v, effectorDir, inv );
-            vec3.copy( l.effectorDir, v );
+            if( effectorDir ){
+                vec3.transformQuat( v, effectorDir, inv );
+                vec3.copy( l.effectorDir, v );
+            }
 
-            vec3.transformQuat( v, poleDir, inv );
-            vec3.copy( l.poleDir, v );
+            if( poleDir ){
+                vec3.transformQuat( v, poleDir, inv );
+                vec3.copy( l.poleDir, v );
+            }
         }
 
         return this;

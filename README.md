@@ -12,6 +12,8 @@
 <img align="right" width="160" src="/_images/Epic_MegaGrants_Recipient_logo.png?raw=true">
 This project is working toward a complete character skinning & animation library for the web. First most, this library is focused on being independent from any rendering engine with examples of how to use it in webgl based engines like threejs. The one big focus is recreating the IK Rig & IK Animations type system that was demoed several years ago from Ubisoft's GDC talk on IK Rigs. With many game engines like Unity and Unreal developing their own IK Rig like systems, this project helps fill the void for web based engines like threejs, babylon, etc. Hopefully with enough help we can create something just as good as the big boys, maybe even better since its free & open source.
 
+<br><img align='center' src="https://media-exp1.licdn.com/dms/image/C4D22AQEAyhN1Srt_2g/feedshare-shrink_2048_1536/0/1646282533489?e=2147483647&v=beta&t=6ajBcu44vaRavbj3df4kI4towfkjHJUqnKywxqP8WiE" />
+
 ### Setup ###
 
 ```

@@ -1,9 +1,11 @@
 //#region IMPORTS
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable no-case-declarations */
 import parseGLB                                 from './Glb'; 
 import Accessor                                 from './Accessor';
 import { Mesh, Primitive }                      from './Mesh';
 import { Skin, SkinJoint }                      from './Skin';
-import { Animation, Track, ETransform, ELerp }  from './Animation';
+import { Animation, Track }                     from './Animation';
 import { Texture }                              from './Texture';
 import { Pose }                                 from './Pose';
 //#endregion
@@ -360,18 +362,16 @@ class Gltf2{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         const json = this.json;
         let js  : any | null    = null;
-        let idx : number | null = null;
 
         switch( typeof id ){
             case "string" : {
                 const tup = this.getAnimationByName( id );
                 if( tup !== null ){
                     js  = tup[ 0 ]; // Object Reference
-                    idx = tup[ 1 ]; // Object Index
                 }
             break; }
-            case "number" : if( id < json.animations.length ){ js = json.animations[ id ]; idx = id; } break;
-            default       : js = json.animations[ 0 ]; idx = 0; break;
+            case "number" : if( id < json.animations.length ){ js = json.animations[ id ]; } break;
+            default       : js = json.animations[ 0 ]; break;
         }
 
         if( js == null ){ console.warn( "No Animation Found", id ); return null; }
@@ -389,7 +389,7 @@ class Gltf2{
             // Search every skin's joints for the node index
             // if found, the index is the joint index that
             // can be used for skinning.
-            for( let skin of this.json.skins ){
+            for( const skin of this.json.skins ){
                 jIdx = skin.joints.indexOf( nIdx );
                 if( jIdx != -1 && jIdx != undefined ){
                     NJMap.set( nIdx, jIdx );  // Map the indices
@@ -468,17 +468,15 @@ class Gltf2{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         const json = this.json;
         let js  : any | null    = null;
-        let idx : number | null = null;
 
         switch( typeof id ){
             case "string" : {
                 const tup = this.getPoseByName( id );
                 if( tup !== null ){
                     js  = tup[ 0 ]; // Object Reference
-                    idx = tup[ 1 ]; // Object Index
                 }
             break; }
-            default       : js = json.poses[ 0 ]; idx = 0; break;
+            default       : js = json.poses[ 0 ]; break;
         }
 
         if( js == null ){ console.warn( "No Pose Found", id ); return null; }
