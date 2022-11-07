@@ -3,6 +3,9 @@ https://theorangeduck.com/page/inertialization-transition-cost
 interesting information on blending animations using damped springs
 
 
+https://rapier.rs/docs/user_guides/rust/joints
+
+
 //https://en.wikipedia.org/wiki/Semi-implicit_Euler_method
 https://www.youtube.com/watch?v=KPoeNZZ6H4s
 Second Order Dynamics, Way to control springs
