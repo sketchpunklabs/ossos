@@ -1,7 +1,7 @@
 //#region IMPORTS
 import { Animator, Clip, Retarget }                         from './animation/index';
 
-import { Armature, Bone, Pose, SkinMTX, SkinDQ, SkinDQT }   from './armature/index';
+import { Armature, Bone, Pose, SkinMTX, SkinDQ, SkinDQT, SkinRTS }   from './armature/index';
 import type { ISkin, TTextureInfo }                         from './armature/index';
 
 import BoneSpring                                           from './bonespring/index';
@@ -24,7 +24,7 @@ import {
 //#region EXPORTS
 export {
     Animator, Clip, Retarget,
-    Armature, Bone, Pose, SkinMTX, SkinDQ, SkinDQT,
+    Armature, Bone, Pose, SkinMTX, SkinDQ, SkinDQT, SkinRTS,
     BoneSpring,
     Maths, Transform, DualQuatUtil, Mat4Util, QuatUtil, Vec3Util, Vec4Util,
     Gltf2, Accessor,
