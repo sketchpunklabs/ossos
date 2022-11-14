@@ -7,11 +7,12 @@
 import Starter, { THREE }           from './_lib/Starter.js';
 import { UtilGltf2, Gltf2 }         from './_lib/UtilGltf2.js';
 
-import { Armature, Bone, SkinDQT, SkinRTS }  from '../../src/armature/index';
+import { Armature, Bone, SkinRTS }  from '../../src/armature/index';
 
 import BoneViewMesh                 from './_lib/BoneViewMesh.js';
-import SkinDQTMaterial              from './_lib/SkinDQTMaterial.js';
 import SkinRTSMaterial              from './_lib/SkinRTSMaterial.js';
+import SkinRTS_MTXMaterial          from './_lib/SkinRTS_MTXMaterial.js';
+
 //#endregion
 
 //#region MAIN
@@ -45,6 +46,7 @@ window.addEventListener( "load", async _=>{
     //const mat   = new THREE.MeshPhongMaterial( {color:'cyan' } );
     const offsets   = arm.getSkinOffsets();
     const mat       = SkinRTSMaterial( 'cyan', offsets[0], offsets[1], offsets[2] );
+    //const mat       = SkinRTS_MTXMaterial( 'cyan', offsets[0], offsets[1], offsets[2] );
     const mesh      = UtilGltf2.loadMesh( gltf, null, mat );                // Pull Skinned Mesh from GLTF
     App.add( mesh );                                                        // Add it to scene for rendering.
 });

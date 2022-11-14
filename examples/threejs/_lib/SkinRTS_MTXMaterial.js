@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-function SkinRTSMaterial( color='cyan', poseqBuffer=null, posepBuffer=null, posesBuffer=null ){
+export default function SkinRTS_MTXMaterial( color='cyan', poseqBuffer=null, posepBuffer=null, posesBuffer=null ){
     let mat = new THREE.RawShaderMaterial({
         //side     : THREE.DoubleSide,
         uniforms : {
@@ -75,148 +75,46 @@ function SkinRTSMaterial( color='cyan', poseqBuffer=null, posepBuffer=null, pose
           }
 
 
-        // Only compute the Dual part of the Dual Quaternion 
-        vec4 dualfromQuatTran( vec4 q, vec3 t ){
-            float ax = t.x * 0.5, ay = t.y * 0.5, az = t.z * 0.5,
-                  bx = q.x,       by = q.y,       bz = q.z,       bw = q.w;
-            return vec4( 
-                ax * bw + ay * bz - az * by,
-                ay * bw + az * bx - ax * bz,
-                az * bw + ax * by - ay * bx,
-               -ax * bx - ay * by - az * bz
-            );
-        }
-
-        // Using a Quaternion and Dual then Convert the Dual back into a Position
-        vec3 dualToPos( vec4 q, vec4 t ){
-            float ax =  t.x, ay =  t.y, az =  t.z, aw = t.w,
-                  bx = -q.x, by = -q.y, bz = -q.z, bw = q.w;
-
-            return vec3(
-                ( ax * bw + aw * bx + ay * bz - az * by ) * 2.0,
-                ( ay * bw + aw * by + az * bx - ax * bz ) * 2.0,
-                ( az * bw + aw * bz + ax * by - ay * bx ) * 2.0
-            );
-        }
-
         // Quat * Vec3 - Rotates Vec3
         vec3 q_mul_vec( vec4 q, vec3 v ){
             //return v + cross( 2.0 * q.xyz, cross( q.xyz, v) + q.w * v );  // Either Seems to Work, not sure which is the correct way to handle transformation
             return v + 2.0 * cross( q.xyz, cross( q.xyz, v ) + q.w * v );
         } 
 
-        void getBoneTransform( vec4 idx, vec4 wgt, out vec4 rot, out vec3 pos, out vec3 scl ){
-            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // NORMALIZE BONE WEIGHTS
-            // If the Geometery already has this done to the Weights Data, then there is
-            // no Need for it here. For example with Blender, you need to explicitly go into bone
-            // weights and run a function to normalize all weights, but most people dont realize to do that.
-            // If not normalized, you will see artificts in transforming the vertices... sometimes VERY SCARY deformations
+        mat4 getBoneMatrix( vec4 idx, vec4 wgt ){
+            /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            NORMALIZE BONE WEIGHT VECTOR - INCASE MODEL WASN'T PREPARED LIKE THAT
+            If Weights are not normalized, Merging the Bone Offsets will create artifacts */
             int a = int( idx.x ),
                 b = int( idx.y ),
                 c = int( idx.z ),
                 d = int( idx.w );
+            
             wgt *= 1.0 / ( wgt.x + wgt.y + wgt.z + wgt.w );
-
-            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // Scale is stored in the 3rd row of the matrix
-            scl = poses[ a ] * wgt.x +  
-                  poses[ b ] * wgt.y +
-                  poses[ c ] * wgt.z +
-                  poses[ d ] * wgt.w;
-
+        
             //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // WEIGHT QUATERNION
-    
-            vec4 qa = poseq[ a ];
-            vec4 qb = poseq[ b ];
-            vec4 qc = poseq[ c ];
-            vec4 qd = poseq[ d ];
-
-            // Neightborhood all of the weights correctly
-            /*
-            if( dot( qa, qb ) < 0.0 ) wgt.y *= -1.0;
-	        if( dot( qa, qc ) < 0.0 ) wgt.z *= -1.0;
-        	if( dot( qa, qd ) < 0.0 ) wgt.w *= -1.0;
-            */
-            
-            // Antipodality correction
-            /* 
-            if( dot( qa, qb ) < 0.0 ) qb *= -1.0;
-            if( dot( qa, qc ) < 0.0 ) qc *= -1.0;
-            if( dot( qa, qd ) < 0.0 ) qd *= -1.0;
-            */
-
-            rot = qa * wgt.x +  
-                  qb * wgt.y +
-                  qc * wgt.z +
-                  qd * wgt.w;
-
-            rot = normalize( rot );
-
-            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // POSITION WEIGHTING -- No Working
-            pos = posep[ a ] * wgt.x +  
-                  posep[ b ] * wgt.y +
-                  posep[ c ] * wgt.z +
-                  posep[ d ] * wgt.w;
-
-            // vec4 ppos = vec4( posep[ a ], 1.0 ) * wgt.x +  
-            //             vec4( posep[ b ], 1.0 ) * wgt.y +
-            //             vec4( posep[ c ], 1.0 ) * wgt.z +
-            //             vec4( posep[ d ], 1.0 ) * wgt.w;
-            // //pos = ppos.xyz;
-            // pos = ppos.xyz / ppos.w;
-
-            // rot = normalize( rot );
-
-            //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // POSITION WEIGHTING THAT WORKS
-            // Using the Quat of the transfrom to turn Position into the Dual 
-            // Part of a Dual Quaternion. Applying weight to it, then using
-            // the weighted Quaternion as its other half to convert it back
-            // into position is the secret to getting this to work right.
-            // Honestly, I didn't expect this to work... Im shocked
-            // vec4 pa = dualfromQuatTran( qa, posep[ a ] ); 
-            // vec4 pb = dualfromQuatTran( qb, posep[ b ] );
-            // vec4 pc = dualfromQuatTran( qc, posep[ c ] );
-            // vec4 pd = dualfromQuatTran( qd, posep[ d ] );
-
-            // float norm = 1.0 / length( rot );
-            // vec4 dual  = pa * wgt.x +  
-            //              pb * wgt.y +
-            //              pc * wgt.z +
-            //              pd * wgt.w;
-
-            // dual *= norm; // NORMALIZE OUR DUAL AND QUAT
-            
-            // // rot   = normalize( rot ); // both works, save a SQRT & div by * norm 
-            // rot  *= norm;
-            
-            // pos   = dualToPos( rot, dual ); // Convert to Position
+            // MERGE THE BONE OFFSETS BASED ON WEIGHT
+            mat4 bone_wgt =
+                fromRotationTranslationScale( poseq[a], posep[a], poses[a] ) * wgt.x +  
+                fromRotationTranslationScale( poseq[b], posep[b], poses[b] ) * wgt.y +
+                fromRotationTranslationScale( poseq[c], posep[c], poses[c] ) * wgt.z +
+                fromRotationTranslationScale( poseq[d], posep[d], poses[d] ) * wgt.w;
+        
+            return bone_wgt;
         }
+
         ////////////////////////////////////////////////////////////////////////
 
         void main() {
             //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // Compute the Bone's Weighted Transform 
-            vec4 tRot;
-            vec3 tPos;
-            vec3 tScl;
-            
-            getBoneTransform( skinIndex, skinWeight, tRot, tPos, tScl );
-            vec3 bpos = q_mul_vec( tRot, position * tScl ) + tPos;
-
-            // // Try converting weighted transform to a matrix, NO work, same deformation
-            // mat4 m4Bone = fromRotationTranslationScale( tRot, tPos, tScl );
-            // vec3 bpos = ( m4Bone * vec4( position, 1.0 ) ).xyz;
+            mat4 mbMatrix = getBoneMatrix( skinIndex, skinWeight );
+            vec3 bpos = ( mbMatrix * vec4( position, 1.0 ) ).xyz;
 
             //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             vec4 wpos       = modelMatrix * vec4( bpos, 1.0 );
             frag_wpos       = wpos.xyz;                                        // Save WorldSpace Position for Fragment Shader
 
-            frag_norm       = mat3( transpose( inverse( modelMatrix ) ) ) * 
-                              q_mul_vec( tRot, normal );
+            frag_norm       = mat3( transpose( inverse( modelMatrix ) ) ) * normal; //* q_mul_vec( tRot, normal );
 
             //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             gl_Position     = projectionMatrix * viewMatrix * wpos; 
@@ -276,5 +174,3 @@ function SkinRTSMaterial( color='cyan', poseqBuffer=null, posepBuffer=null, pose
 
     return mat;
 }
-
-export default SkinRTSMaterial;
