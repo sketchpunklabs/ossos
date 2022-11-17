@@ -10,6 +10,9 @@ https://rapier.rs/docs/user_guides/rust/joints
 https://www.youtube.com/watch?v=KPoeNZZ6H4s
 Second Order Dynamics, Way to control springs
 
+INTERESTING Springs from a long time ago
+https://gist.github.com/sketchpunk/3568150a04b973430dfe8fd29bf470c8
+
 class SecondOrderDynamics{
     xp = 0; // Previous Input
     y = 0; // State Vars
