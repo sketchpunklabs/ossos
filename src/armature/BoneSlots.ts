@@ -104,8 +104,11 @@ class BoneSlots{
             
             //+++++++++++++++++++++++++++++++++++++++++++++++++
             b = pose.bones[ slot.boneIdx ];                         // Get Slot's Bone
-            //quat.mul( offsetRot, slot.invBindRot, b.world.rot );    // Compute Offset Rotation from Bind Pose Rotation
+            //quat.mul( offsetRot, slot.invBindRot, b.world.rot );  // Compute Offset Rotation from Bind Pose Rotation
             quat.mul( offsetRot, b.world.rot, slot.invBindRot );    // Compute Offset Rotation from Bind Pose Rotation
+
+            // TODO, OffsetRot might be wrong but changing it now will break some demos
+            // The issue is that ideally need worldspace rotation, dont remember what invBlindRot is ment to do
 
             // Loop all the objects in the slot
             for( si of slot.items ){
@@ -133,7 +136,7 @@ class BoneSlots{
 
                 //-------------------------------------
                 // APPLY
-                this.onAttachmentUpdate( si.obj, rot, pos, scl );
+                this.onAttachmentUpdate( si.obj, rot, pos, scl, b.world.rot );
             }
         }
 

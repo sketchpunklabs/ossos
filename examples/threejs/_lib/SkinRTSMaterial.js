@@ -152,6 +152,9 @@ function SkinRTSMaterial( color='cyan', poseqBuffer=null, posepBuffer=null, pose
                   qc * wgt.z +
                   qd * wgt.w;
 
+            // vec4 oldRot = rot;
+            // float rotLen = length( rot );
+
             rot = normalize( rot );
 
             //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -160,6 +163,20 @@ function SkinRTSMaterial( color='cyan', poseqBuffer=null, posepBuffer=null, pose
                   posep[ b ] * wgt.y +
                   posep[ c ] * wgt.z +
                   posep[ d ] * wgt.w;
+
+            // pos = pos / ( wgt.x + wgt.y + wgt.z + wgt.w );
+            // pos = pos / ( wgt.x*wgt.x + wgt.y*wgt.y + wgt.z*wgt.z + wgt.w*wgt.w );
+
+
+            
+            // vec4 dual = dualfromQuatTran( oldRot, pos );
+            // dual = dual / length( oldRot );
+            // pos = dualToPos( rot, dual );
+            // pos = posep[ a ] * wgt.x;
+            // pos = mix( pos, posep[ b ], wgt.y );
+            // pos = mix( pos, posep[ c ], wgt.z );
+            // pos = mix( pos, posep[ d ], wgt.w );
+
 
             // vec4 ppos = vec4( posep[ a ], 1.0 ) * wgt.x +  
             //             vec4( posep[ b ], 1.0 ) * wgt.y +
