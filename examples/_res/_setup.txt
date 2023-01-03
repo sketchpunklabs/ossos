@@ -1,4 +1,0 @@
-All testing Resources currently at
-https://github.com/sketchpunk/res
-
-Clone the repo into this folder for examples for function correctly.

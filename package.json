@@ -1,53 +1,54 @@
 {
-    "name"          : "ossos",
-    "version"       : "0.0.3",
-    "author"        : "Pedro Sousa ( Vor @ SketchPunk Labs )",
-    "description"   : "Character Animation System",
-    "keywords"      : [ "animation", "skeleton", "inverse kinematrics", "armature", "ikrig" ],
-    "license"       : "MIT",
-
-    "homepage"      : "https://github.com/sketchpunklabs/ossos#readme",
-    "repository"    : { "type": "git", "url": "git+https://github.com/sketchpunklabs/ossos.git" },
-    "bugs"          : { "url": "https://github.com/sketchpunklabs/ossos/issues" },
-
-    "files"         : [ "dist" ],
-    "main"          : "./dist/ossos.cjs.js",
-    "module"        : "./dist/ossos.es.js",
-    "types"         : "./dist/ossos.d.ts",
+    "name": "ossos",
+    "version": "0.0.4",
+    "author": "Pedro Sousa ( Vor @ SketchPunk Labs )",
+    "description": "Character Animation System",
+    "keywords": [
+        "animation",
+        "skeleton",
+        "inverse kinematrics",
+        "armature",
+        "ikrig"
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/sketchpunklabs/ossos#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/sketchpunklabs/ossos.git"
+    },
+    "bugs": {
+        "url": "https://github.com/sketchpunklabs/ossos/issues"
+    },
+    "files": [
+        "dist"
+    ],
+    "main": "./dist/ossos.cjs.js",
+    "module": "./dist/ossos.es.js",
+    "types": "./dist/ossos.d.ts",
     "exports": {
         ".": {
-            "import"  : "./dist/ossos.es.js",
-            "require" : "./dist/ossos.cjs.js"
+            "import": "./dist/ossos.es.js",
+            "require": "./dist/ossos.cjs.js"
         }
     },
-
-    "scripts"       : {
-        "dev"           : "vite",
-        "build"         : "vite build",
-        "build:types"   : "tsc --declaration --noEmit false --emitDeclarationOnly --strict false --outDir ./dist",
-        "build:site"    : "vite build --mode site",
-        "pack"          : "npm pack",
-        "preview-site"  : "vite preview",
-        "lint"          : "eslint . --ext .ts"
+    "scripts": {
+        "dev": "vite --config vite.config.js",
+        "build": "vite build",
+        "build:types": "tsc --declaration --noEmit false --emitDeclarationOnly --strict false --outDir ./dist",
+        "build:site": "vite build --mode site",
+        "pack": "npm pack",
+        "preview-site": "vite preview",
+        "lint": "eslint . --ext .ts"
     },
-
-    "peerDependencies": {
-        "gl-matrix"     : "^3.4.3"
-    },
-
     "devDependencies": {
-        "vite"          : "^3.0.9",
-        "vite-plugin-list-directory-contents": "^1.0.1",
-        
-        "typescript"    : "^4.5.2",
-        "three"         : "^0.138.3",
-        "manipulator3d" : "^0.0.8",
-
-        "babylonjs"             : "^5.0.0-beta.9",
-        "babylonjs-materials"   : "^5.0.0-beta.9",
-
-        "eslint"                            : "^8.8.0",
-        "@typescript-eslint/eslint-plugin"  : "^5.10.1",
-        "@typescript-eslint/parser"         : "^5.10.1"
+        "typescript": "^4.9.3",
+        "vite": "^4.0.0",
+        "@typescript-eslint/eslint-plugin": "^5.48.0",
+        "@typescript-eslint/parser": "^5.48.0",
+        "eslint": "^8.31.0",
+        "three": "^0.148.0"
+    },
+    "peerDependencies": {
+        "gl-matrix": "^3.4.3"
     }
 }
