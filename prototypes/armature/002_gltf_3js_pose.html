@@ -1,0 +1,136 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import Util                 from '../_lib/misc/Util.js';
+import { Armature }         from '../../src/index';
+import { vec3, quat }       from 'gl-matrix';
+import Gltf2                from '../_lib/gltf2Parser.es.js';
+//#endregion
+
+//#region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 50, 30, 3, [ 0, 1, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create Skinned Mesh from GLTF Model
+    const gltf = await Gltf2.fetch( '/prototypes/_res/models/nabba/nabba.gltf' );
+    const char = gltfThreeSkinnedMesh( gltf, true );
+    char.mesh.position.z = -1.5;
+    App.scene.add( char.mesh, char.boneView );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Ossos Armature from GLTF's Skin Data
+    const arm  = gltfAmature( gltf );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Pose Armature
+    const xLocal = ( arm, bName, xDeg )=>{
+        const q  = quat.setAxisAngle( [], [1,0,0], xDeg * Math.PI / 180 );
+        const qb = arm.getBone( bName ).local.rot;
+        quat.mul( qb, q, qb );
+    };
+
+    xLocal( arm, 'Head', -45 );
+    xLocal( arm, 'Thigh_R', -45 );
+    xLocal( arm, 'Shin_R', -45 );
+    xLocal( arm, 'Foot_R', -45 );
+    xLocal( arm, 'Thigh_L', 45 );
+    xLocal( arm, 'Shin_L', -45 );
+    xLocal( arm, 'Foot_L', -45 );
+
+    arm.updateWorld();
+    Util.debugBones( arm.bones, Debug, 0.07, 1.3 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Apply Pose to 3JS Skeleton
+    for( const b of arm.bones ){
+        char.skel.bones[ b.index ].quaternion.fromArray( b.local.rot );
+    }
+
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // const skel = char.skel;
+    // skel.bones[ 5 ].rotation.x  += -45 * Math.PI / 180;
+    // skel.bones[ 44 ].rotation.x += 45 * Math.PI / 180;
+    // skel.bones[ 45 ].rotation.x += -45 * Math.PI / 180;
+    // skel.bones[ 46 ].rotation.x += -45 * Math.PI / 180;
+
+    // skel.bones[ 48 ].rotation.x += -45 * Math.PI / 180;
+    // skel.bones[ 49 ].rotation.x += -45 * Math.PI / 180;
+    // skel.bones[ 50 ].rotation.x += -45 * Math.PI / 180;
+
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+//#endregion
+
+function gltfAmature( gltf ){
+    const skin  = gltf.getSkin();
+    const arm   = new Armature();
+
+    let b;
+    for( const j of skin.joints ){
+        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) quat.copy( b.local.rot, j.rotation );
+        if( j.position ) vec3.copy( b.local.pos, j.position );
+        if( j.scale )    vec3.copy( b.local.scl, j.scale );
+    }
+
+    arm.bind( 0.1 );
+    return arm;
+}
+
+function gltfThreeSkinnedMesh( gltf, boneView=false ){
+    const out = {};
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Generate Skeleton
+    const skin  = gltf.getSkin();
+    const bones = new Array( skin.joints.length );
+    let b;
+    for( let j of skin.joints ){
+        b = new THREE.Bone();
+        if( j.name )                 b.name = j.name;
+        if( j.rotation )             b.quaternion.fromArray( j.rotation );
+        if( j.position )             b.position.fromArray( j.position );
+        if( j.scale )                b.scale.fromArray( j.scale );
+        if( j.parentIndex !== null ) bones[ j.parentIndex ].add( b );
+        bones[ j.index ] = b;
+    }
+
+    out.skel = new THREE.Skeleton( bones );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Skinned Mesh
+    const gMesh = gltf.getMesh();
+    const gPrim = gMesh.primitives[ 0 ];
+    const bGeo  = Util.geoBuffer(
+        gPrim.position.data,
+        gPrim.indices.data, 
+        gPrim.normal.data, 
+        gPrim.texcoord_0.data, 
+        gPrim.joints_0.data, 
+        gPrim.weights_0.data, 
+        gPrim.weights_0.componentLen,
+    );
+
+    out.mesh = new THREE.SkinnedMesh( bGeo, new THREE.MeshPhongMaterial() );
+    out.mesh.add( out.skel.bones[ 0 ] );
+    out.mesh.bind( out.skel );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if( boneView ) out.boneView = new THREE.SkeletonHelper( out.mesh );
+
+    return out;
+}   
+
+</script></body></html>
