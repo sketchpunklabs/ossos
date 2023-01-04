@@ -18,7 +18,7 @@ App
 */
 
 
-// #region SCENES
+// #region OPTIONS
 export function useDarkScene( tjs ){
     // Light
     const light = new THREE.DirectionalLight( 0xffffff, 0.8 );
@@ -34,6 +34,18 @@ export function useDarkScene( tjs ){
     tjs.renderer.setClearColor( 0x3a3a3a, 1 );
     return tjs;
 };
+
+export async function useVisualDebug( tjs ){
+    const ary = await Promise.all([
+        import( './meshes/DynLineMesh.js' ),
+        import( './meshes/ShapePointsMesh.js' ),
+    ]);
+
+    const o = {};
+    tjs.scene.add( ( o.ln  = new ary[ 0 ].default ) );
+    tjs.scene.add( ( o.pnt = new ary[ 1 ].default ) );
+    return o;
+}
 // #endregion
 
 // #region MAIN

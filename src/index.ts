@@ -1,4 +1,10 @@
+// #region ARMATURE
+import Armature     from './armature/Armature';
+import Bone         from './armature/Bone';
+export { Armature, Bone };
+// #endregion
 
-import Test from './Test';
-
-export { Test };
+// #region MATHS
+import { transform, Transform } from './maths/transform';
+export { transform, Transform };
+// #endregion
