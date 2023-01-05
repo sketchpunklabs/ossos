@@ -1,11 +1,15 @@
-import Bone, { BoneProps }  from './Bone';
-import { vec3 }             from 'gl-matrix';
-import { transform }        from '../maths/transform';
+// #region IMPORTS
+import type ISkeleton           from './ISkeleton';
+import Bone, { BoneProps }      from './Bone';
+import { vec3 }                 from 'gl-matrix';
+import { Transform, transform } from '../maths/transform';
+// #endregion
 
-export default class Armature{
+export default class Armature implements ISkeleton{
     // #region MAIN
     bones: Array< Bone >         = new Array();
     names: Map< string, number > = new Map();
+    offset                       = new Transform();
     // #endregion
 
     // #region MANAGE BONES
@@ -60,7 +64,7 @@ export default class Armature{
     updateWorld(): this{
         for( const b of this.bones ){
             if( b.pindex !== -1 ) transform.mul(  b.world, this.bones[ b.pindex ].world, b.local );
-            else                  transform.copy( b.world, b.local );
+            else                  transform.mul(  b.world, this.offset, b.local );
         }
 
         return this;

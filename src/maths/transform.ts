@@ -15,6 +15,24 @@ export class Transform{
     }
     // #endregion
 
+    // #region SETTERS
+    copy( a: Transform ): this{
+        this.pos[ 0 ] = a.pos[ 0 ];
+        this.pos[ 1 ] = a.pos[ 1 ];
+        this.pos[ 2 ] = a.pos[ 2 ];
+    
+        this.scl[ 0 ] = a.scl[ 0 ];
+        this.scl[ 1 ] = a.scl[ 1 ];
+        this.scl[ 2 ] = a.scl[ 2 ];
+    
+        this.rot[ 0 ] = a.rot[ 0 ];
+        this.rot[ 1 ] = a.rot[ 1 ];
+        this.rot[ 2 ] = a.rot[ 2 ];
+        this.rot[ 3 ] = a.rot[ 3 ];
+        return this;
+    }
+    // #endregion
+
     // #region OPS
 
     mul( t: Transform ): this{
@@ -60,7 +78,6 @@ export class Transform{
     }
 
     // #endregion
-
 };
 
 export class transform{

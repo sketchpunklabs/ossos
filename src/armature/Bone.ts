@@ -1,13 +1,13 @@
-import { Transform }    from '../maths/transform';
+import { Transform, transform }    from '../maths/transform';
 import { quat, vec3 }   from 'gl-matrix';
 
 export interface BoneProps{
     name    ?: string;
     parent  ?: Bone | number | string;
+    len     ?: number;
     pos     ?: vec3;
     rot     ?: quat;
     scl     ?: vec3;
-    len     ?: number;
 }
 
 export default class Bone{
@@ -34,6 +34,16 @@ export default class Bone{
     // #endregion
 
     // #region METHODS
+    clone(): Bone{
+        const b     = new Bone();
+        b.name      = this.name;
+        b.index     = this.index;
+        b.pindex    = this.pindex;
+        b.len       = this.len;
 
+        transform.copy( b.local, this.local );
+        transform.copy( b.world, this.world );
+        return b;
+    }
     // #endregion
 };

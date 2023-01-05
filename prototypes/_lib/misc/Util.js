@@ -9,7 +9,7 @@ export default class Util{
         for( let b of ary ){
             vec3.transformQuat( up, [0,1,0], b.world.rot );
             vec3.transformQuat( fwd, [0,0,1], b.world.rot );
-            vec3.scaleAndAdd( up, b.world.pos, up, b.len );
+            vec3.scaleAndAdd( up, b.world.pos, up, b.len * b.local.scl[1] );
             vec3.scaleAndAdd( fwd, b.world.pos, fwd, flen );
     
             debug.pnt.add( b.world.pos, 0x00ff00, pntSize, 1 );

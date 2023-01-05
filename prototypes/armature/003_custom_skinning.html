@@ -1,0 +1,173 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import Util                         from '../_lib/misc/Util.js';
+import { Armature, Pose,
+    MatrixSkin, DQTSkin, TranMatrixSkin, DualQuatSkin,
+} from '../../src/index';
+import { vec3, quat }               from 'gl-matrix';
+import Gltf2                        from '../_lib/gltf2Parser.es.js';
+
+import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
+import DQTSkinMaterial              from '../_lib/customSkinning/DQTSkinMaterial.js';
+import DualQuatSkinMaterial         from '../_lib/customSkinning/DualQuatSkinMaterial.js';
+//#endregion
+
+//#region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 50, 30, 3, [ 0, 1, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create Skinned Mesh from GLTF Model
+    const gltf = await Gltf2.fetch( '/prototypes/_res/models/nabba/nabba.gltf' );
+    const bGeo = gtlfGeoBuffer( gltf );
+    const arm  = gltfArmature( gltf );
+    
+    /**/
+    const skin = new MatrixSkin( arm );
+    // const skin = new TranMatrixSkin( arm );
+    const mat  = MatrixSkinMaterial( 'cyan', skin );
+    
+    
+    /*
+    const skin = new DQTSkin( arm );
+    const mat  = DQTSkinMaterial( 'cyan', skin );
+    */
+
+    /*
+    const skin = new DualQuatSkin( arm );
+    const mat  = DualQuatSkinMaterial( 'cyan', skin );
+    */
+
+    const mesh = new THREE.Mesh( bGeo, mat );
+
+    App.scene.add( mesh );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Pose Armature
+    const pose = new Pose( arm );
+    pose.offset.pos[2] = -0.5;
+
+    pose.rotWorld( 'Hips', 20 );
+    pose.moveLocal( 'Hips', [0,0.3,0] );
+    
+    pose.rotLocal( 'Spine1', -20 );
+    pose.rotLocal( 'Spine2', -20 );
+    pose.rotLocal( 'Spine3', -10 );
+    pose.rotLocal( 'Neck', 15 );
+    pose.rotLocal( 'Head', 20 );
+    pose.rotLocal( 'Head', 40, 'y' );
+
+    pose.rotLocal( 'Thigh_R', 80 );
+    pose.rotLocal( 'Thigh_R', 4, 'z' );
+    pose.rotLocal( 'Shin_R', -100 );
+    pose.rotLocal( 'Foot_R', -30 );
+
+    pose.rotLocal( 'Thigh_L', 30 );
+    pose.rotLocal( 'Shin_L', -20 );
+    pose.rotLocal( 'Foot_L', -40 );
+
+    pose.rotLocal( 'UpperArm_L', 30 );
+    pose.rotLocal( 'ForeArm_L', -40 );
+    pose.rotLocal( 'UpperArm_R', 30 );
+    pose.rotLocal( 'ForeArm_R', -40 );
+
+    pose.sclLocal( 'Head', 1.3 );
+    pose.sclLocal( 'Foot_L', 1.5 );
+    pose.sclLocal( 'Hand_R', 1.5 );
+
+    // Update the skin by processing the World Space Matrices
+    // with the BindPose matrices to create an offset that
+    // can then be used by a custom shader
+    skin.updateFromPose( pose );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Debug Armature Bones
+    pose.updateWorld();
+    Util.debugBones( pose.bones, Debug, 0.05, 0.8 );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+//#endregion
+
+function gltfArmature( gltf ){
+    const skin  = gltf.getSkin();
+    const arm   = new Armature();
+
+    let b;
+    for( const j of skin.joints ){
+        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) quat.copy( b.local.rot, j.rotation );
+        if( j.position ) vec3.copy( b.local.pos, j.position );
+        if( j.scale )    vec3.copy( b.local.scl, j.scale );
+    }
+
+    arm.bind( 0.1 );
+    return arm;
+}
+
+function gtlfGeoBuffer( gltf ){
+    const gMesh = gltf.getMesh();
+    const gPrim = gMesh.primitives[ 0 ];
+    const bGeo  = Util.geoBuffer(
+        gPrim.position.data,
+        gPrim.indices.data, 
+        gPrim.normal.data, 
+        gPrim.texcoord_0.data, 
+        gPrim.joints_0.data, 
+        gPrim.weights_0.data, 
+        gPrim.weights_0.componentLen,
+    );
+
+    return bGeo;
+}
+
+function gltfCustomSkinnedMesh( gltf, SkinObject, SkinMaterial ){
+    const out = {};
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Generate Skeleton
+    const skin  = gltf.getSkin();
+    out.arm     = new Armature();
+
+    let b;
+    for( const j of skin.joints ){
+        b = out.arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) quat.copy( b.local.rot, j.rotation );
+        if( j.position ) vec3.copy( b.local.pos, j.position );
+        if( j.scale )    vec3.copy( b.local.scl, j.scale );
+    }
+
+    out.arm.bind( 0.1 );
+
+    out.skin = new SkinObject( out.arm );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Skinned Mesh
+    const gMesh = gltf.getMesh();
+    const gPrim = gMesh.primitives[ 0 ];
+    const bGeo  = Util.geoBuffer(
+        gPrim.position.data,
+        gPrim.indices.data, 
+        gPrim.normal.data, 
+        gPrim.texcoord_0.data, 
+        gPrim.joints_0.data, 
+        gPrim.weights_0.data, 
+        gPrim.weights_0.componentLen,
+    );
+
+    const mat = new SkinMaterial( 'cyan', out.skin ); // new THREE.MeshPhongMaterial()
+    out.mesh  = new THREE.Mesh( bGeo, mat );
+    return out;
+}   
+
+</script></body></html>
