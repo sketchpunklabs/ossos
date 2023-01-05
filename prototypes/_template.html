@@ -2,10 +2,10 @@
 <style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
 <body><script type="module">
 //#region IMPORTS
-import useThreeWebGL2, { useDarkScene } from './lib/useThreeWebGL2.js';
-import facedCube            from './lib/meshes/facedCube.js';
-import ShapePointsMesh      from './lib/meshes/ShapePointsMesh.js';
-import DynLineMesh          from './lib/meshes/DynLineMesh.js';
+import useThreeWebGL2, { useDarkScene } from './_lib/useThreeWebGL2.js';
+import facedCube            from './_lib/meshes/facedCube.js';
+import ShapePointsMesh      from './_lib/meshes/ShapePointsMesh.js';
+import DynLineMesh          from './_lib/meshes/DynLineMesh.js';
 //#endregion
 
 //#region MAIN
@@ -14,15 +14,18 @@ let Debug = {};
 let Ref   = {};
 
 window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
     App.sphericalLook( 0, 20, 6 );
-
     App.scene.add( ( Debug.pnt = new ShapePointsMesh() ) );
     App.scene.add( ( Debug.ln  = new DynLineMesh() ) );
     App.scene.add( facedCube() );
 
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Debug.pnt.add( [0,1,0], 0x00ff00, 7, 6 );
     Debug.ln.add( [0,1,0], [0,2,0], 0x00ff00, 0x00ffff );
     
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     App.renderLoop();
 });
 //#endregion

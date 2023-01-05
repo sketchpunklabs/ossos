@@ -1,0 +1,116 @@
+const { RegisterClass } = require("babylonjs/Legacy/legacy")
+
+NOTES
+- Make sure armature can work as is but can be attached to something
+
+// ======================================================================
+
+Bone
+- local
+- world
+- index
+- pindex
+- len
+- name
+
+Armature 
+- bones : Array< bone >
+- names : Map< name, index >
+- offsetTransform
+
+Pose
+- bones
+- offsetTransform
+
+BoneSlot
+- items : Array<> = { obj, offsetTransform };
+
+SkinMatrix, SkinDualQ, SkinDQS, SkinTMatrix
+
+interface ISkeleton{
+    bones           : Bone[];
+    offsetTransform : TTransform
+}
+
+Chain
+- links : link[],
+- count : Number,
+
+Rig
+- chains : Map< name, Chain >
+
+CharacterRig
+- arm       : Armature
+- skin      : ISkin
+- rig       : BipedRig
+- springs   : Array<IBoneSpring>
+- slots     : Array<BoneSot>
+
+SpringMass
+SpringImplicitEuler
+SpringSemiImplicitEuler
+- setTarget
+- update( dt )
+- setProps()
+--- Mass, Tension, Damping
+--- Damping, DampTime, OscPerSec
+
+IKTarget
+.position
+.direction
+.distance
+
+- setPosition( vec3 )
+- setDirection( vec3, distance );
+- useWorldPosition( vec3 ) // Called from solver
+--- If position will compute Direction & Distance
+--- If Direction, will compute Position
+
+// ======================================================================
+
+const arm   = new Armature();
+const root  : Bone = arm.addBone( name, props:{ parent:[Bone / Number / Name], pos, rot, scl, len } );
+const spine : Bone = arm.addBone( name, { parent:root, pos:[0,1,0] } );
+
+const skin  = new SkinMatrix( arm ); // Auto generates BindPose, Not all Chars need Skinning
+
+const pose  = arm.newPose(); // or new Pose( arm );
+
+const slot  = new BoneSlot( BoneIndex, offsetTransform );
+slot.attach( obj3D, { offsetPos, offsetRot } );
+slot.attach( obj3D, { offsetPos, offsetRot } );
+
+const slots = new BoneSlots();
+slots.onAttachmentUpdate = ( obj, rot, pos, scl )=>{}
+
+const subArm = new SubArmature( arm, boneName ); // May need an Offset
+
+const arm   = new Armature();           // Add Bone heirarchy
+const skin  = new SkinMatrix( arm );    // For custom shaders
+const pose  = new Pose( arm );          // Working Space
+
+// Dont really need a rig for small IK Jobs, Just chains is enough
+const Rig   = new IKRig();
+rig.addChain( 'spine',   IKChain.fromJointed( arm, [ bone0, bone1, bone2 ] ) );
+
+// Not all chains are linear connected, some have in between bones that
+// add to the bone length but are used for other things. So the disjointed method
+// will compute bone lengths between the each joint
+rig.addChain( 'leftArm', IKChain.fromDisjointed( arm, [ bone6, bone8, bone10 ] ) );
+
+const target = new IKTarget();
+target.setPosition( [0,0,0] );
+// or target.setDirection( [0,1,0], 1.5 );
+
+const solver = new SolverStack( SwingTwistSolver, TwoBoneSolver );
+solver.updatePose( target, pose, rig.chain( 'leftArm' ) );
+
+const fabrik = new FabrikSolver();
+fabrik.updatePose( target, pose, rig.chain( 'spine' ) );
+
+skin.updateFromPose( pose.computeWorld() ); // Use in Ossos's Skinning Shaders
+// OR
+applyPoseOnThreejsSkeleton( skel, pose );   // Copy results into 3JS Skeleton
+
+
+git clone --branch ossos_next https://github.com/sketchpunklabs/ossos.git ossos_next

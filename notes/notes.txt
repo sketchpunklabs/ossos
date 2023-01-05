@@ -181,3 +181,6 @@ class SecondOrderDynamicsExtra{
         return y;
     }
 }
+
+
+git clone https://github.com/sketchpunklabs/ossos.git ossos_next

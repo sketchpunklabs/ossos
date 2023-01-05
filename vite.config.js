@@ -1,7 +1,8 @@
 import packageJson      from "./package.json";
 import path             from "path";
 import { defineConfig } from "vite";
-// import { directoryPlugin } from 'vite-plugin-list-directory-contents/dist/plugin.js';
+//import { directoryPlugin } from 'vite-plugin-list-directory-contents/dist/plugin.js';
+import { directoryPlugin } from 'vite-plugin-list-directory-contents';
 
 const fileName = {
     es   : `${packageJson.name}.mjs`,
@@ -15,10 +16,10 @@ export default defineConfig(({ command, mode, ssrBuild }) => {
             base      : './',
             // publicDir : path.join( __dirname, 'prototypes' ),
             plugins   : [
-                // directoryPlugin( {
-                //     baseDir     : __dirname,
-                //     filterList  : [ 'node_modules', '.git', '.github', '_store', '_images', 'dist', 'src', '.*' ],
-                // }),
+                directoryPlugin( {
+                    baseDir     : __dirname,
+                    filterList  : [ 'node_modules', '.git', '.github', '_store', '_images', 'dist', 'src', '.*' ],
+                }),
             ],
 
             server    : {

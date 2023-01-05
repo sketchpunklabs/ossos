@@ -1,0 +1,69 @@
+// Compute the Jacobian matrix for the robot arm
+function computeJacobian(theta1, theta2, theta3) {
+  // Define the lengths of the three links
+  var l1 = 1.0;
+  var l2 = 1.0;
+  var l3 = 1.0;
+  
+  // Compute the x, y, and z coordinates of the end effector
+  var x = l1 * Math.cos(theta1) + l2 * Math.cos(theta1 + theta2) + l3 * Math.cos(theta1 + theta2 + theta3);
+  var y = l1 * Math.sin(theta1) + l2 * Math.sin(theta1 + theta2) + l3 * Math.sin(theta1 + theta2 + theta3);
+  var z = l1 * Math.sin(theta1) + l2 * Math.sin(theta1 + theta2) + l3 * Math.sin(theta1 + theta2 + theta3);
+  
+  // Compute the Jacobian matrix
+  var jacobian = [[-l1 * Math.sin(theta1) - l2 * Math.sin(theta1 + theta2) - l3 * Math.sin(theta1 + theta2 + theta3), -l2 * Math.sin(theta1 + theta2) - l3 * Math.sin(theta1 + theta2 + theta3), -l3 * Math.sin(theta1 + theta2 + theta3)],
+                  [ l1 * Math.cos(theta1) + l2 * Math.cos(theta1 + theta2) + l3 * Math.cos(theta1 + theta2 + theta3),  l2 * Math.cos(theta1 + theta2) + l3 * Math.cos(theta1 + theta2 + theta3),  l3 * Math.cos(theta1 + theta2 + theta3)],
+                  [ 0, 0, 0]];
+  
+  return jacobian;
+}
+
+// Compute the Jacobian matrix for the robot arm
+function computeJacobian(theta1, theta2) {
+  // Define the lengths of the two links
+  var l1 = 1.0;
+  var l2 = 1.0;
+  
+  // Compute the x and y coordinates of the end effector
+  var x = l1 * Math.cos(theta1) + l2 * Math.cos(theta1 + theta2);
+  var y = l1 * Math.sin(theta1) + l2 * Math.sin(theta1 + theta2);
+  
+  // Compute the Jacobian matrix
+  var jacobian = [[-l1 * Math.sin(theta1) - l2 * Math.sin(theta1 + theta2), -l2 * Math.sin(theta1 + theta2)],
+                  [ l1 * Math.cos(theta1) + l2 * Math.cos(theta1 + theta2),  l2 * Math.cos(theta1 + theta2)]];
+  
+  return jacobian;
+}
+
+// Compute the joint angles for the robot arm using the Jacobian transpose method
+function computeJointAngles(xTarget, yTarget, theta1, theta2) {
+  // Define the maximum number of iterations and the tolerance
+  var maxIterations = 100;
+  var tolerance = 1e-6;
+  
+  // Compute the initial error
+  var error = Math.sqrt((x - xTarget) * (x - xTarget) + (y - yTarget) * (y - yTarget));
+  
+  // Iterate until the error is within the tolerance or the maximum number of iterations has been reached
+  for (var i = 0; i < maxIterations && error > tolerance; i++) {
+    // Compute the Jacobian matrix
+    var jacobian = computeJacobian(theta1, theta2);
+    
+    // Compute the transpose of the Jacobian matrix
+    var jacobianTranspose = [[jacobian[0][0], jacobian[1][0]],
+                             [jacobian[0][1], jacobian[1][1]]];
+    
+    // Compute the change in joint angles
+    var deltaTheta = math.multiply(jacobianTranspose, [[xTarget - x], [yTarget - y]]);
+    
+    // Update the joint angles
+    theta1 += deltaTheta[0][0];
+    theta2 += deltaTheta[1][0];
+    
+    // Recompute the end effector position
+    x = l1 * Math.cos(theta1) + l2 * Math.cos(theta1 + theta2);
+    y = l1 * Math.sin(theta1) + l2 * Math.sin(theta1 + theta2);
+    
+    // Recompute the error
+    error = Math.sqrt((x - xTarget) * (x - xTarget) + (y - yTarget) * (y - yTarget));
+  }
