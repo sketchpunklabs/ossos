@@ -83,6 +83,7 @@ export default class Armature implements ISkeleton{
             if( b.pindex !== -1 ){ 
                 p       = this.bones[ b.pindex ];
                 p.len   = vec3.dist( p.world.pos, b.world.pos );
+                if( p.len < 0.0001  ) p.len = 0;
             }
         }
 

@@ -19,13 +19,15 @@ App
 
 
 // #region OPTIONS
-export function useDarkScene( tjs ){
+export function useDarkScene( tjs, props={} ){
+    const pp = Object.assign( { ambient:0x404040 }, props );
+
     // Light
-    const light = new THREE.DirectionalLight( 0xffffff, 0.8 );
+    const light = new THREE.DirectionalLight( 0xffffff, 1.0 );
     light.position.set( 4, 10, 1 );
     tjs.scene.add( light );
     
-    tjs.scene.add( new THREE.AmbientLight( 0x404040 ) );
+    tjs.scene.add( new THREE.AmbientLight( pp.ambient ) );
     
     // Floor
     tjs.scene.add( new THREE.GridHelper( 20, 20, 0x0c610c, 0x444444 ) );

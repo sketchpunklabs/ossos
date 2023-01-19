@@ -3,11 +3,22 @@ import * as THREE from 'three';
 export default function MatrixSkinMaterial( val='cyan', skin ){
     const isTex    = ( val instanceof THREE.Texture );
     const uniforms = {
-        pose : { value: skin.offsetBuffer },
+        pose : { value: skin?.offsetBuffer },
     };
 
-    if( !isTex ) uniforms.color     = { type :'vec3', value:new THREE.Color( val ) };
-    else         uniforms.texBase   = { type :'sampler2D', value:val };
+    if( !isTex ){
+        let color;
+        switch( typeof val ){
+            case 'string':
+            case 'number': color = new THREE.Color( val ); break;
+            case 'object': if( Array.isArray( val ) ) color = new THREE.Color( val[0], val[1], val[2] ); break;
+            default: color = new THREE.Color( 'red' ); break;
+        }
+        
+        uniforms.color     = { type: 'vec3', value: color };
+    }else{
+        uniforms.texBase   = { type: 'sampler2D', value: val };
+    }
 
     const matConfig = {
         side            : THREE.DoubleSide,
@@ -18,6 +29,7 @@ export default function MatrixSkinMaterial( val='cyan', skin ){
 
     const mat       = new THREE.RawShaderMaterial( matConfig );
     mat.extensions  = { derivatives : true }; // If not using WebGL2.0 and Want to use dfdx or fwidth, Need to load extension
+
     return mat;
 }
 
@@ -97,7 +109,7 @@ uniform vec3 color;
 
 #define LITCNT 2
 const vec3[] light_pos = vec3[](
-    vec3( 0.0, 2.5, 1.0 ),
+    vec3( 0.0, 0.5, 1.0 ),
     vec3( -1.0, 0.0, 1.0 )
 );
 
@@ -123,10 +135,19 @@ float computePointLights( vec3[LITCNT] lights, vec3 norm ){
     return diffuse;
 }
 
+const vec3 sun_pos = vec3( 10.0, 10.0, 10.0 );
+float computeDirLight( vec3 lPos, vec3 norm ){
+    return max( dot( norm, normalize( lPos ) ), 0.0 );
+}
+
 void main(){
     //vec3 norm   = normalize( cross( dFdx(frag_wpos), dFdy(frag_wpos) ) ); // Low Poly Normals
     vec3 norm     = normalize( frag_norm ); // Model's Normals            
-    float diffuse = computePointLights( light_pos, norm ) + 0.15;
+    
+    float diffuse = 0.15; // ambient light
+    diffuse      += computePointLights( light_pos, norm );
+    diffuse      += computeDirLight( sun_pos, norm );
+
     out_color     = vec4( color * diffuse, 1.0 );
 
     //out_color.rgb = vec3( 1.0, 0.0, 0.0 );
