@@ -1,9 +1,10 @@
 // #region IMPORTS
-import * as THREE   from 'three';
-import { vec3, quat }       from 'gl-matrix';
-import { Armature }         from '../../../src/index';
-import Gltf2                from '../gltf2Parser.es.js';
-import MatrixSkinMaterial   from '../customSkinning/MatrixSkinMaterial.js';
+import * as THREE               from 'three';
+import { vec3, quat }           from 'gl-matrix';
+import { Armature }             from '../../../src/index';
+import Gltf2                    from '../gltf2Parser.es.js';
+import MatrixSkinMaterial       from '../customSkinning/MatrixSkinMaterial.js';
+import MatrixSkinPbrMaterial    from '../customSkinning/MatrixSkinPbrMaterial.js';
 // #endregion
 
 export { Gltf2 };
@@ -75,7 +76,7 @@ export class GltfUtil{
                         'cyan';
 
                     mat = ( skin )? 
-                        MatrixSkinMaterial( color, skin ) :
+                        MatrixSkinPbrMaterial( color, skin ) :
                         new THREE.MeshPhongMaterial( { color } );
 
                     matCache[ matId ] = mat;

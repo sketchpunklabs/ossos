@@ -7,11 +7,11 @@ import Util                         from '../_lib/misc/Util.js';
 import { TranMatrixSkin, Pose }     from '../../src/index';
 import { vec3, quat }               from 'gl-matrix';
 import { GltfUtil }                 from '../_lib/misc/GltfUtil.js';
-
 //#endregion
 
 //#region MAIN
 let App = useDarkScene( useThreeWebGL2(), { ambient:0xffffff } );
+let Ref = {};
 let Debug;
 
 window.addEventListener( 'load', async _=>{
@@ -34,14 +34,39 @@ window.addEventListener( 'load', async _=>{
     
     ikbot.updateSkin();
 
+    Ref.bot = ikbot;
+
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    App.renderLoop();
+    Ref.rLoop = App.RenderLoop( onPreRender ).start(); // App.renderLoop();
+    // let min = Infinity;
+    // let max = -Infinity;
+    // for( let i=0; i < 5000; i++ ){
+    //     //let n = noise( i * 0.01 + 0 );  // around 0.17 and 0.85
+    //     let n = noise2.simplex2( i * 0.1 + 373, 0 ); // -0.9 to 0.9
+    //     //let n = noise2.perlin2( i * 0.07 + 373, 0 ); // Max Range of -0.5 & 0.5;
+    //     min = Math.min( min, n );
+    //     max = Math.max( max, n );
+    //     // console.log( n );
+    // }
+    // console.log( min, max );
 });
 //#endregion
 
+function onPreRender( dt, et ){
+    let n0 = noise2.simplex2( et * 0.5, 0 );
+    let n1 = noise2.simplex2( et * 0.2 + 7, 0 );
+    let n3 = noise2.simplex2( et * 0.4 + 3, 0 ) * 0.5 + 0.5;
+    let n4 = noise2.simplex2( et * 0.2 + 11, 0 );
+    
+    Ref.bot.setLook( 40 * n0, 20 * n1 );
+    Ref.bot.setEyeLids( n3, n3 );
+    Ref.bot.setPosition( [0, 0.7 + 0.2 * n4, 0] );
 
-import QuatEx from '../../src/maths/QuatEx.ts';
-import noise  from '../_lib/perlin.js';
+    Ref.bot.updateSkin();
+}
+
+import QuatEx  from '../../src/maths/QuatEx.ts';
+import noise2  from '../_lib/perlin2.js';
 
 const MAX_EYELID_ANG = 30;
 const MAX_EYELID_RAD = MAX_EYELID_ANG * Math.PI / 180;
@@ -58,16 +83,22 @@ class MK01{
     }
     
     // #region CONTROLS
-    setPosition( p ){ this.pose.moveLocal( 'Root', p  ); return this; }
+    setPosition( p ){ this.pose.posLocal( 'Root', p  ); return this; }
     setEyeLids( up, dn ){
         const q = [0,0,0,1];
         let b;
+
+        // Clamp Range
+        up = Math.min( Math.max( up, 0 ), 1 );
+        dn = Math.min( Math.max( dn, 0 ), 1 );
         
+        // Top Eyelid
         b = this.arm.getBone( 'EyelidUp' );
         quat.setAxisAngle( q, [1,0,0], -MAX_EYELID_RAD * up );
         quat.mul( q, q, b.local.rot );
         this.pose.setLocalRot( 'EyelidUp', q );
 
+        // Bottom Eyelid
         b = this.arm.getBone( 'EyelidDn' );
         quat.setAxisAngle( q, [1,0,0], MAX_EYELID_RAD * dn );
         quat.mul( q, q, b.local.rot );

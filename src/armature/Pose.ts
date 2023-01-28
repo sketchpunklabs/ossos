@@ -164,6 +164,15 @@ export default class Pose implements ISkeleton{
         return this;
     }
 
+    posLocal( boneId: string | number, pos:vec3 ): this{
+        const bone = this.getBone( boneId );
+        
+        if( bone )  vec3.copy( bone.local.pos, pos );
+        else        console.warn( 'Pose.posLocal - bone not found, ', boneId );
+        
+        return this;
+    }
+
     sclLocal( boneId: string | number, v: number | vec3 ): this{
         const bone = this.getBone( boneId );
         

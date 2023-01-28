@@ -99,6 +99,19 @@ export default function useThreeWebGL2(){
         return self;
     };
 
+    const RenderLoop = ( fnPreRender=null, fnPostRender=null )=>{
+        let   reqId = 0;
+        const rLoop = {
+            stop        : ()=>{ window.cancelAnimationFrame( reqId ); return rLoop; },
+            start       : ()=>{ rLoop.onRender(); return rLoop; },
+            onRender    : ()=>{
+                render( fnPreRender, fnPostRender );
+                reqId = window.requestAnimationFrame( rLoop.onRender );
+            },
+        };
+        return rLoop;
+    };
+
     const sphericalLook = ( lon, lat, radius, target=null )=>{
         const phi 	= ( 90 - lat )  * Math.PI / 180;
         const theta = ( lon + 180 ) * Math.PI / 180;
@@ -138,6 +151,7 @@ export default function useThreeWebGL2(){
 
         render,
         renderLoop,
+        RenderLoop,
         sphericalLook,
         resize,
     };
