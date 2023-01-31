@@ -1,0 +1,41 @@
+https://github.com/Atiehmerikh/FABRIK_Full_Body/blob/master/fabrik_full_body/constraints.py
+https://allenchou.net/2018/05/game-math-swing-twist-interpolation-sterp/
+https://www.chadvernon.com/blog/swing-twist/
+https://gafferongames.com/post/spring_physics/
+
+https://learn.foundry.com/modo/content/help/pages/animation/modifiers/planar_ik.html
+
+https://www.desmos.com/calculator/csi40rsztl?lang=sv-SE
+http://www.nickyliu.com/2015/07/16/soft-ik/  BEST EXAMPLE
+https://github.com/Toolchefs/softIkSolver
+https://github.com/kattkieru/grim_IK
+
+https://www.alanzucconi.com/2020/09/14/inverse-kinematics-in-3d/  Interesting circle motion
+
+https://github.com/aprotyas/trac_ik alto to inverse jacobian methods
+https://github.com/gyojir/fullbody-ik-demo
+
+look IK
+ttps://github.com/DigitalRune/DigitalRune/blob/master/Source/DigitalRune.Animation/Character/IK/LookAtIKSolver.cs
+
+https://github.com/mosra/magnum/blob/master/src/Magnum/Math/Quaternion.h
+
+https://cesium.com/blog/2014/01/09/a-fast-algorithm-for-computing-slerp/
+https://github.com/CesiumGS/cesium/blob/master/Source/Core/Quaternion.js#L933
+
+Hacking Quaternions (from The Inner Product) lerp and fast norm
+http://www.cs.uky.edu/~cheng/cs633/quaternion.html
+
+https://github.com/vrm-c/UniVRM/blob/master/Assets/VRM/Runtime/SpringBone/VRMSpringBone.cs
+
+https://theorangeduck.com/page/spring-roll-call#damper
+https://theorangeduck.com/page/spring-roll-call?s=03#controllers
+
+With constraints & limits
+https://zalo.github.io/blog/inverse-kinematics/
+
+
+FABRICK WITH TARGET QUATERNION
+https://github.com/TheComet/ik/blob/master/ik/src/solver/FABRIK/solver_FABRIK.c
+
+https://theorangeduck.com/page/joint-limits

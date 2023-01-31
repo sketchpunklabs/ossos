@@ -1,3 +1,4 @@
+import { AxesHelper }        from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 
 export default function useTransformControl( tjs ){
@@ -19,6 +20,19 @@ export default function useTransformControl( tjs ){
 
         toTranslate : ()=>gizmo.setMode( 'translate' ),
         toRotate    : ()=>gizmo.setMode( 'rotate' ),
+
+        setPos      : p=>{
+            if( gizmo.object ) gizmo.object.position.fromArray( p );
+            return this;
+        },
+
+        useAxes     : ()=>{
+            const axes = new AxesHelper();
+            axes.scale.setScalar( 0.5 );
+            tjs.scene.add( axes );
+            gizmo.attach( axes );
+            return self;
+        },
     };
 
     const onDragChange = e=>{

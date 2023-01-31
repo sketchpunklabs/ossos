@@ -1,0 +1,280 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import useTransformControl  from '../_lib/useTransformControl.js';
+import facedCube            from '../_lib/meshes/facedCube.js';
+import Util                 from '../_lib/misc/Util.js';
+import { vec3, quat }       from 'gl-matrix';
+
+
+import { 
+    Armature, Bone,
+    IKTarget, IKChain, LookSolver,
+} from '../../src/index';
+
+import QuatEx from '../../src/maths/QuatEx.ts';
+import Vec3Ex from '../../src/maths/Vec3Ex.ts';
+import { transform, Transform } from '../../src/maths/transform.ts';
+//#endregion
+
+//#region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Debug;
+let Ref   = {
+    pos     : [2,1.4,2],
+    // gizmo   : useTransformControl( App ).useAxes(),
+    // target  : new IKTarget(),
+    // solver  : new LookSolver(),
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 45, 30, 6 );
+    Debug = await useVisualDebug( App );
+
+    // Ref.gizmo.setPos( Ref.pos );
+
+    App.scene.add( Ref.cube      = facedCube() );
+    App.scene.add( Ref.cubeClone = facedCube() );
+    App.scene.add( Ref.cubeSwing = facedCube() );
+    App.scene.add( Ref.cubeTwist = facedCube() );
+
+    // const q = QuatEx.fromEulerYXZ( [], 90, 90, 90 );
+    const q = [0,0,0,1];
+    quat.rotateY( q, q, 37 * Math.PI / 180 );
+    quat.rotateX( q, q, 77 * Math.PI / 180 );
+    quat.rotateZ( q, q, 90 * Math.PI / 180 );
+    // quat.rotateY( q, q, 45 * Math.PI / 180 );
+    // quat.rotateX( q, q, 90 * Math.PI / 180 );
+    // quat.rotateZ( q, q, 225 * Math.PI / 180 );
+    quat.normalize( q, q );
+
+    Ref.cube.quaternion.fromArray( q );
+
+    Ref.cubeClone.position.x = 2;
+    Ref.cubeSwing.position.x = 4;
+    Ref.cubeTwist.position.x = 6;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    //solver( Ref.cube, Ref.pos );
+    construct( Ref.cube );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+//#endregion
+
+// Ref.gizmo.onMove = p=>{
+    // vec3.copy( Ref.pos, p );
+    // solver( Ref.cube, Ref.pos );
+// }
+
+
+function construct( obj ){
+    const pos   = obj.position.toArray();
+    const rot   = obj.quaternion.toArray();
+    const xAxis = [0,0,0];
+    const yAxis = [0,0,0];
+    const zAxis = [0,0,0];
+
+    const fwd   = vec3.transformQuat( [], [0,0,1], rot );
+    const up    = vec3.transformQuat( [], [0,1,0], rot );
+    const dot   = vec3.dot( fwd, [0,1,0]);
+    console.log( vec3.dot( fwd, [0,1,0]) );
+
+    // Edge Cases When forward is either UP or DOWN
+    if( dot <= -0.9999 )     Vec3Ex.lookAxes( fwd, [0,0,1], xAxis, yAxis, zAxis );  // Pointing Down
+    else if( dot >= 0.9999 ) Vec3Ex.lookAxes( fwd, [0,0,-1], xAxis, yAxis, zAxis ); // Pointing Up
+    else                     Vec3Ex.lookAxes( fwd, [0,1,0], xAxis, yAxis, zAxis );
+
+    const twistSign = -Math.sign( vec3.dot( xAxis, up ) );
+    const twistRad  = vec3.angle( up, yAxis );
+
+    Debug.ln.add( pos, vec3.scaleAndAdd( [], pos, fwd, 2.0 ), 0xff0000 );
+    Debug.ln.add( pos, vec3.scaleAndAdd( [], pos, up, 2.0 ), 0x00ffff );
+    Debug.ln.add( pos, vec3.scaleAndAdd( [], pos, yAxis, 4.0 ), 0x00ffff );
+    Debug.ln.add( pos, vec3.scaleAndAdd( [], pos, xAxis, 4.0 ), 0xffff00 );
+    console.log( twistRad * 180 / Math.PI, twistSign );
+
+    const swing = quat.rotationTo( [0,0,0,1], [0,0,1], fwd );
+    vec3.transformQuat( up, [0,1,0], swing );
+    Debug.ln.add( [4,0,0], vec3.scaleAndAdd( [], [4,0,0], up, 2.0 ), 0x00ffff );
+    Debug.ln.add( [4,0,0], vec3.scaleAndAdd( [], [4,0,0], yAxis, 4.0 ), 0x00ffff );
+    Debug.ln.add( [4,0,0], vec3.scaleAndAdd( [], [4,0,0], zAxis, 2.0 ), 0xff0000 );
+
+    // Strip twist from Swing rotation
+    const twist = quat.rotationTo( [0,0,0,1], yAxis, up );
+    QuatEx.pmulInvert( swing, swing, twist );
+    Ref.cubeSwing.quaternion.fromArray( swing );
+
+    // Create Twist that'll append correctly to swing
+    quat.setAxisAngle( twist, fwd, twistRad * twistSign ); 
+    Ref.cubeClone.quaternion.fromArray( quat.mul( [], twist, swing ) );
+
+    // Create Visual Debug of twist angle in isolation
+    quat.setAxisAngle( twist, [0,0,1], twistRad * twistSign );
+    Ref.cubeTwist.quaternion.fromArray( twist );
+}
+
+function solver( obj, targetPos ){
+    const cTran = new Transform( obj.quaternion.toArray(), obj.position.toArray(), obj.scale.toArray() );
+    const fwd   = vec3.transformQuat( [], [0,0,1], cTran.rot );
+    const up    = vec3.transformQuat( [], [0,1,0], cTran.rot );
+    const tarDir = vec3.sub( [0,0,0], targetPos, cTran.pos );
+    vec3.normalize( tarDir, tarDir );
+
+    // const origTwist = [0,0,0,1];
+    // const origSwing = [0,0,0,1];
+    // const otAxis = vec3.transformQuat( [], [0,0,1], cTran.rot );
+    // decomposeSTAxis( cTran.rot, otAxis, origSwing, origTwist );
+    // const twistRad = QuatEx.getAngle( origTwist );
+    // console.log( origTwist, twistRad * 180 / Math.PI );
+
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, otAxis, 4 ), 0xffffff );
+
+    // const qq = quat.clone( cTran.rot );
+    // qq[0] = 0;
+    // qq[1] = 0;
+    // quat.normalize( qq, qq );
+
+    // quat.mul( qq, origTwist, origSwing );
+    // obj.quaternion.fromArray( qq );
+    
+    // // console.log( QuatEx.getAngle( qq ) * 180 / Math.PI );
+    // console.log( Math.asin( cTran.rot[2] ) * 2 * 180 / Math.PI );
+    // console.log( 'x', QuatEx.getEulerYZX( [], cTran.rot, true ) );
+    // return;
+
+    // decomposeSTAxis( cTran.rot, [1,0,0] );
+
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, tarDir, 4 ), 0xffffff );
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, fwd, 1.5 ), 0x00ff00 );
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, up, 1.5 ), 0x00ffff );
+
+    const rot = quat.rotationTo( [], fwd, tarDir );
+    // QuatEx.dotNegate( rot, rot, cTran.rot );
+    quat.mul( rot, rot, cTran.rot );
+    obj.quaternion.fromArray( rot );
+
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, vec3.transformQuat( [], [0,1,0], rot ), 1.5 ), 0xffff00 );
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, vec3.transformQuat( [], [0,0,1], rot ), 1.5 ), 0xffff00 );
+
+    const swing = [0,0,0,1];
+    const tAxis = vec3.transformQuat( [], [0,0,1], rot );
+    decomposeSTAxis( rot, tAxis, swing );
+
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, tAxis , 4.5 ), 0x00ff00 );
+
+    // quat.mul( swing, origTwist, swing );
+    // quat.mul( swing, swing, origTwist );
+    // const twist = quat.setAxisAngle( [0,0,0,1], tAxis, -45 * Math.PI / 180 );
+    // quat.mul( swing, twist, swing );
+
+    obj.quaternion.fromArray( swing );
+
+    // FAIL - TODO splitting swing & twist, apply rotation to swing then 
+    // reapply twist, see if it creates the correct up 
+
+    //  TODO split the final result, apply the original twist
+}
+
+// https://allenchou.net/2018/05/game-math-swing-twist-interpolation-sterp/
+function decomposeSTAxis( q, twistAxis, swing=[0,0,0,1], twist=[0,0,0,1] ){
+    const mag = QuatEx.axisSqrLen( q );
+
+    // console.log( mag, vec3.dot( q, twistAxis ) );
+
+    // singularity: rotation by 180 degree
+    if( mag < 0.000001 ){
+        // if( vec3.dot( q, twistAxis ) < 0.000001 ){
+        console.log( 'EP--singularity: rotation by 180 degree' );
+
+        const rotTwistAxis = vec3.transformQuat( [0,0,0], twistAxis, q );
+        const swingAxis    = vec3.cross( [0,0,0], twistAxis, rotTwistAxis );
+
+        if( vec3.sqrLen( swingAxis ) > 0.000001 ){
+            const swingAngle = vec3.angle( twistAxis, rotTwistAxis );
+            quat.setAxisAngle( swing, swingAxis, swingAngle );
+            quat.normalize( swing, swing );
+        }else{
+            // more singularity: rotation axis parallel to twist axis
+            swing[ 0 ] = 0;
+            swing[ 1 ] = 0;
+            swing[ 2 ] = 0;
+            swing[ 3 ] = 1;
+        }
+
+        quat.setAxisAngle( twist, twistAxis, Math.PI );
+        return;
+    }
+    
+    // console.log( mag );
+
+    const proj = Vec3Ex.project( [0,0,0], q, twistAxis );
+    // console.log( proj );
+    
+    twist[ 0 ] = proj[ 0 ];
+    twist[ 1 ] = proj[ 1 ];
+    twist[ 2 ] = proj[ 2 ];
+    twist[ 3 ] = q[ 3 ];
+    quat.normalize( twist, twist );
+
+    // QuatEx.dotNegate( twist, twist, q );
+
+    const tInv = quat.invert( [0,0,0,1], twist );
+    QuatEx.dotNegate( tInv, tInv, q );
+    quat.mul( swing, tInv, q ); // works kinda better
+    // quat.mul( swing, q, tInv );
+    // console.log( 'proj', q, twist, swing );
+}
+
+/*
+public static void DecomposeSwingTwist
+(
+  Quaternion q, 
+  Vector3 twistAxis, 
+  out Quaternion swing, 
+  out Quaternion twist
+)
+{
+  Vector3 r = new Vector3(q.x, q.y, q.z);
+ 
+  // singularity: rotation by 180 degree
+  if (r.sqrMagnitude < MathUtil.Epsilon)
+  {
+    Vector3 rotatedTwistAxis = q * twistAxis;
+    Vector3 swingAxis = 
+      Vector3.Cross(twistAxis, rotatedTwistAxis);
+ 
+    if (swingAxis.sqrMagnitude > MathUtil.Epsilon)
+    {
+      float swingAngle = 
+        Vector3.Angle(twistAxis, rotatedTwistAxis);
+      swing = Quaternion.AngleAxis(swingAngle, swingAxis);
+    }
+    else
+    {
+      // more singularity: 
+      // rotation axis parallel to twist axis
+      swing = Quaternion.identity; // no swing
+    }
+ 
+    // always twist 180 degree on singularity
+    twist = Quaternion.AngleAxis(180.0f, twistAxis);
+    return;
+  }
+ 
+  // meat of swing-twist decomposition
+  Vector3 p = Vector3.Project(r, twistAxis);
+  twist = new Quaternion(p.x, p.y, p.z, q.w);
+  twist = Normalize(twist);
+  swing = q * Quaternion.Inverse(twist);
+}
+*/
+// https://www.chadvernon.com/blog/swing-twist/
+
+</script></body></html>
