@@ -1,4 +1,4 @@
-import { Transform, transform }    from '../maths/transform';
+import Transform        from '../maths/Transform';
 import { quat, vec3 }   from 'gl-matrix';
 
 export interface BoneProps{
@@ -25,9 +25,13 @@ export default class Bone{
         if( typeof props?.parent === 'number' ) this.pindex = props.parent; 
         if( props?.parent instanceof Bone )     this.pindex = props.parent.index;
 
-        if( props?.rot ) quat.copy( this.local.rot, props.rot );
-        if( props?.pos ) vec3.copy( this.local.pos, props.pos );
-        if( props?.scl ) vec3.copy( this.local.scl, props.scl );
+        // if( props?.rot ) quat.copy( this.local.rot, props.rot );
+        // if( props?.pos ) vec3.copy( this.local.pos, props.pos );
+        // if( props?.scl ) vec3.copy( this.local.scl, props.scl );
+
+        if( props?.rot ) this.local.rot.copy( props.rot );
+        if( props?.pos ) this.local.pos.copy( props.pos );
+        if( props?.scl ) this.local.scl.copy( props.scl );
 
         if( props?.len ) this.len = props.len;
     }
@@ -41,8 +45,10 @@ export default class Bone{
         b.pindex    = this.pindex;
         b.len       = this.len;
 
-        transform.copy( b.local, this.local );
-        transform.copy( b.world, this.world );
+        b.local.copy( this.local );
+        b.world.copy( this.world );
+        // transform.copy( b.local, this.local );
+        // transform.copy( b.world, this.world );
         return b;
     }
     // #endregion

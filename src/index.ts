@@ -16,11 +16,13 @@ export { MatrixSkin, DQTSkin, TranMatrixSkin, DualQuatSkin };
 // #region KINEMATICS
 import IKTarget         from './kinematics/IKTarget';
 import IKChain          from './kinematics/IKChain';
-import LookSolver       from './kinematics/solvers/LookSolver';
-export { IKTarget, IKChain, LookSolver };
+// import AimSolver       from './kinematics/solvers/AimSolver';
+export { IKTarget, IKChain };
 // #endregion
 
 // #region MATHS
-import { transform, Transform } from './maths/transform';
-export { transform, Transform };
+import Transform    from './maths/Transform';
+import Vec3         from './maths/Vec3';
+import Quat         from './maths/Quat';
+export { Transform, Vec3, Quat };
 // #endregion

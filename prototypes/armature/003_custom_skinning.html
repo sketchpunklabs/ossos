@@ -10,9 +10,12 @@ import { Armature, Pose,
 import { vec3, quat }               from 'gl-matrix';
 import Gltf2                        from '../_lib/gltf2Parser.es.js';
 
+import SQTSkin from '../../src/skinning/SQTSkin.ts';
+
 import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
 import DQTSkinMaterial              from '../_lib/customSkinning/DQTSkinMaterial.js';
 import DualQuatSkinMaterial         from '../_lib/customSkinning/DualQuatSkinMaterial.js';
+import SQTSkinMaterial              from '../_lib/customSkinning/SQTSkinMaterial.js';
 //#endregion
 
 //#region MAIN
@@ -31,11 +34,11 @@ window.addEventListener( 'load', async _=>{
     const bGeo = gtlfGeoBuffer( gltf );
     const arm  = gltfArmature( gltf );
     
-    /**/
+    /*
     const skin = new MatrixSkin( arm );
     // const skin = new TranMatrixSkin( arm );
     const mat  = MatrixSkinMaterial( 'cyan', skin );
-    
+    */
     
     /*
     const skin = new DQTSkin( arm );
@@ -47,6 +50,11 @@ window.addEventListener( 'load', async _=>{
     const mat  = DualQuatSkinMaterial( 'cyan', skin );
     */
 
+    /**/
+    const skin = new SQTSkin( arm );
+    const mat  = SQTSkinMaterial( 'cyan', skin );
+    
+   
     const mesh = new THREE.Mesh( bGeo, mat );
 
     App.scene.add( mesh );
@@ -64,10 +72,10 @@ window.addEventListener( 'load', async _=>{
     pose.rotLocal( 'Spine3', -10 );
     pose.rotLocal( 'Neck', 15 );
     pose.rotLocal( 'Head', 20 );
-    pose.rotLocal( 'Head', 40, 'y' );
+    pose.rotLocal( 'Head', 40, 1 );
 
     pose.rotLocal( 'Thigh_R', 80 );
-    pose.rotLocal( 'Thigh_R', 4, 'z' );
+    pose.rotLocal( 'Thigh_R', 4, 2 );
     pose.rotLocal( 'Shin_R', -100 );
     pose.rotLocal( 'Foot_R', -30 );
 

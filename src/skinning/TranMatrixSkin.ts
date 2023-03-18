@@ -3,8 +3,9 @@ import type Armature        from '../armature/Armature';
 import type Bone            from '../armature/Bone';
 import type ISkeleton       from '../armature/ISkeleton';
 import Mat4Ex               from '../maths/Mat4Ex';
-import { Transform, transform } from '../maths/transform';
+import Transform            from '../maths/Transform';
 import { mat4 }             from 'gl-matrix';
+import type { vec3 }        from 'gl-matrix';
 // #endregion
 
 
@@ -38,11 +39,15 @@ export default class TranMatrixSkin{
             b = arm.bones[ i ];
 
             // Compute Bone's world space transform
-            if( b.pindex !== -1 ) transform.mul(  world[ i ], world[ b.pindex ], b.local );
-            else                  transform.copy( world[ i ], b.local );
+            // if( b.pindex !== -1 ) transform.mul(  world[ i ], world[ b.pindex ], b.local );
+            // else                  transform.copy( world[ i ], b.local );
+
+            if( b.pindex !== -1 ) world[ i ].fromMul( world[ b.pindex ], b.local );
+            else                  world[ i ].copy( b.local );
 
             // Inverting it to create a Bind Transform
-            transform.invert( bind[ i ], world[ i ] );
+            // transform.invert( bind[ i ], world[ i ] );
+            bind[ i ].fromInvert( world[ i ] );
         }
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,15 +70,18 @@ export default class TranMatrixSkin{
 
             // ----------------------------------------
             // Compute Bone's world space transform
-            if( b.pindex !== -1 ) transform.mul( w[ i ], w[ b.pindex ], b.local );
-            else                  transform.mul( w[ i ], pose.offset,   b.local );
+            // if( b.pindex !== -1 ) transform.mul( w[ i ], w[ b.pindex ], b.local );
+            // else                  transform.mul( w[ i ], pose.offset,   b.local );
+
+            if( b.pindex !== -1 ) w[ i ].fromMul( w[ b.pindex ], b.local );
+            else                  w[ i ].fromMul( pose.offset,   b.local );
 
             // Compute Offset Transform that will be used for skinning a mesh
             // OffsetTransform = Bone.WorldTransform * Bone.BindTransform
-            transform.mul( bOffset, w[ i ], this.bind[ i ] );
+            bOffset.fromMul( w[ i ], this.bind[ i ] );
 
             // Convert Transform to a Matrix
-            mat4.fromRotationTranslationScale( m, bOffset.rot,  bOffset.pos, bOffset.scl );
+            mat4.fromRotationTranslationScale( m, bOffset.rot, bOffset.pos as unknown as vec3, bOffset.scl as unknown as vec3 );
 
             // Save to Buffer
             Mat4Ex.toBuf( m, this.offsetBuffer, i * 16 );

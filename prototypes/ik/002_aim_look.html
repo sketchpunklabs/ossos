@@ -1,0 +1,403 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import useTransformControl          from '../_lib/useTransformControl.js';
+import Util                         from '../_lib/misc/Util.js';
+import { vec3, quat }               from 'gl-matrix';
+
+import { 
+    IKTarget, //IKChain,
+    Quat, Vec3, Transform,
+} from '../../src/index';
+
+// #endregion
+
+// #region MAIN
+let App = useDarkScene( useThreeWebGL2(), { ambient:0xffffff } );
+let Ref = {
+    pos     : [-0.2,0.9,1],
+    gizmo   : useTransformControl( App ).useAxes(),
+};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 45, 20, 3, [ 0, 0.6, 0 ] );
+    Debug = await useVisualDebug( App );
+    Ref.gizmo.setPos( Ref.pos );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const ikbot = await MK01.fetch( App.scene );
+    ikbot.setPosition( [0,0.6,0] );
+    ikbot.setEyeLids( 0.7, 0.7 );
+    ikbot.updateSkin();
+
+    // Util.debugBones( ikbot.arm.bones, Debug );
+
+    Ref.bot     = ikbot;
+    Ref.target  = new IKTarget();
+    Ref.target.setPosition( Ref.pos );
+
+
+    const chain = new IKChain( Ref.bot.arm.getBones( ['Eye'] ) )
+        .bindAxes( Ref.bot.arm );
+    Ref.chain = chain
+
+    lookSolver( Ref.target, Ref.chain, Ref.bot.pose );
+    Ref.bot.updateSkin();
+
+    // const bone = Ref.bot.arm.getBone( 'Eye' );    
+    // // solver2( Ref.target, bone, Ref.bot.pose );
+    // solver3( Ref.target, chain, Ref.bot.pose );
+    // Ref.bot.updateSkin();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.rLoop = App.RenderLoop( onPreRender ).start(); // App.renderLoop();
+});
+
+Ref.gizmo.onMove = p=>{
+    Ref.target.setPosition( p );
+    
+    // const bone = Ref.bot.arm.getBone( 'Eye' );    
+    // solver2( Ref.target, bone, Ref.bot.pose );
+    lookSolver( Ref.target, Ref.chain, Ref.bot.pose );
+    // Ref.bot.updateSkin();
+}
+
+// import noise2  from '../_lib/perlin2.js';
+function onPreRender( dt, et ){
+    // let n3 = noise2.simplex2( et * 0.4 + 3, 0 ) * 0.5 + 0.5;
+    // Ref.bot.setEyeLids( n3, n3 );
+    // Ref.bot.updateSkin();
+}
+
+// #endregion
+
+
+// #region IK
+
+class IKLink{
+    index     = -1;
+    pindex    = -1;
+    localBind = new Transform;
+
+    constructor( bone ){
+        this.index  = bone.index;
+        this.pindex = bone.pindex;
+        this.localBind.copy( bone.local );
+    }
+}
+
+class IKChain{
+    axes  = new Axes();
+    links = [];
+
+    constructor( bones=null ){
+        if( bones ) this.addBones( bones );
+    }
+
+    addBones( bones ){
+        for( let b of bones ){
+            this.links.push( new IKLink( b ) ); 
+        }
+        return this;
+    }
+
+    bindAxes( skel ){
+        const q = skel.getWorldRotation( this.links[0].index );
+        this.axes.rotInvQuat( q );
+        return this;
+    }
+}
+
+function solverxxx( tar, bone, pose ){
+    Debug.ln.reset();
+    // const invAxes = new Axes();
+    // const invAxes = Axes.fromInvQuat( bone.world.rot );
+    const invAxes = Axes.fromPointingUp();
+    const pTran   = pose.getWorldTransform( bone.pindex );
+    const cTran   = pTran.clone().mul( bone.local );
+    let   axes    = invAxes.fromQuat( cTran.rot );
+
+    const toTar   = [0,0,0];
+    vec3.sub( toTar, tar.targetPos, cTran.pos );
+    vec3.normalize( toTar, toTar );
+
+    // Render Target
+    // Debug.pnt.add( cTran.pos, 0xffffff, 2 );
+    // Debug.pnt.add( tar.targetPos, 0xffffff, 2 );
+    // Debug.ln.add( cTran.pos, vec3.add( [], cTran.pos, toTar ), 0xffffff );
+
+    // Render inv Axes
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.z, 1 ), 0xff0000 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.x, 1 ), 0x00ff00 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.y, 1 ), 0x0000ff );
+
+    // Swing Rotation    
+    const swing = [0,0,0,1];
+    quat.rotationTo( swing, axes.z, toTar );
+
+    const rot = quat.mul( [0,0,0,1], swing, cTran.rot );
+
+    axes = invAxes.fromQuat( rot );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.z, 1 ), 0xff0000 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.x, 1 ), 0x00ff00 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.y, 1 ), 0x0000ff );
+
+    const dot = vec3.dot( axes.z, [0,1,0] );
+    let upTwist;
+    // Edge Cases When forward is either UP or DOWN
+    if( dot <= -0.9999 )     upTwist = [0,0,1];  // Pointing Down
+    else if( dot >= 0.9999 ) upTwist = [0,0,-1]; // Pointing Up
+    else                     upTwist = [0,1,0];
+
+    let rit = vec3.cross( [], upTwist, toTar );
+    let up = vec3.cross( [], toTar, rit );
+    vec3.normalize( up, up );
+    let twist = quat.rotationTo( [], axes.y, up );
+    quat.mul( rot, twist, rot );
+
+    axes = invAxes.fromQuat( rot );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.z, 1 ), 0xff0000 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.x, 1 ), 0x00ff00 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.y, 1 ), 0x0000ff );
+
+    QuatEx.pmulInvert( rot, rot, pTran.rot );
+    pose.setLocalRot( bone.index, rot );
+
+    rit = vec3.cross( [], [0,1,0], toTar );
+    up = vec3.cross( [], toTar, rit );
+    vec3.normalize( up, up );
+    vec3.normalize( rit, rit );
+
+    
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, toTar, 1.5 ), 0xff0000 );
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, up, 1.5 ), 0x0000ff );
+    Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, rit, 1.5 ), 0x00ff00 );
+
+    // console.log( vec3.dot( toTar, rit ), vec3.dot( toTar, axes.x ) );
+    // console.log( vec3.dot( toTar, up ), vec3.dot( toTar, axes.y ) );
+}
+
+function solver2( tar, bone, pose ){
+    Debug.ln.reset();
+    // const invAxes = new Axes();
+    // const invAxes = Axes.fromInvQuat( bone.world.rot );
+    const invAxes = Axes.fromPointingUp();
+    const pTran   = pose.getWorldTransform( bone.pindex );
+    const cTran   = pTran.clone().mul( bone.local );
+    let   axes    = invAxes.fromQuat( cTran.rot );
+
+    const toTar   = new Vec3().fromSub( tar.targetPos, cTran.pos ).norm();
+
+    // Render Target
+    // Debug.pnt.add( cTran.pos, 0xffffff, 2 );
+    // Debug.pnt.add( tar.targetPos, 0xffffff, 2 );
+    // Debug.ln.add( cTran.pos, vec3.add( [], cTran.pos, toTar ), 0xffffff );
+
+    // Render inv Axes
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.z, 1 ), 0xff0000 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.x, 1 ), 0x00ff00 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.y, 1 ), 0x0000ff );
+
+    // Swing Rotation    
+    const swing = new Quat().fromSwing( axes.z, toTar );
+    const rot   = new Quat().fromMul( swing, cTran.rot );
+
+    axes = invAxes.fromQuat( rot );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.z, 1 ), 0xff0000 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.x, 1 ), 0x00ff00 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.y, 1 ), 0x0000ff );
+
+    const dot = Vec3.dot( axes.z, [0,1,0] );
+    let upTwist;
+    // Edge Cases When forward is either UP or DOWN
+    if( dot <= -0.9999 )     upTwist = Vec3.FORWARD;  // Pointing Down
+    else if( dot >= 0.9999 ) upTwist = Vec3.BACK; // Pointing Up
+    else                     upTwist = Vec3.UP;
+
+    let rit = Vec3.cross( upTwist, toTar ).norm();
+    let up  = Vec3.cross( toTar, rit ).norm();
+
+    let twist = new Quat().fromSwing( axes.y, up );
+    rot.pmul( twist );
+
+    axes = invAxes.fromQuat( rot );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.z, 1 ), 0xff0000 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.x, 1 ), 0x00ff00 );
+    // Debug.ln.add( cTran.pos, vec3.scaleAndAdd( [], cTran.pos, axes.y, 1 ), 0x0000ff );
+
+    rot.pmulInvert( pTran.rot )
+    pose.setLocalRot( bone.index, rot );
+
+    rit.fromCross( Vec3.UP, toTar ).norm();
+    up.fromCross( toTar, rit ).norm();
+    
+    Debug.ln.add( cTran.pos, Vec3.scaleThenAdd( 1.5, toTar, cTran.pos ), 0xff0000 );
+    Debug.ln.add( cTran.pos, Vec3.scaleThenAdd( 1.5, up, cTran.pos ), 0x0000ff );
+    Debug.ln.add( cTran.pos, Vec3.scaleThenAdd( 1.5, rit, cTran.pos ), 0x00ff00 );
+
+    // console.log( vec3.dot( toTar, rit ), vec3.dot( toTar, axes.x ) );
+    // console.log( vec3.dot( toTar, up ), vec3.dot( toTar, axes.y ) );
+}
+
+function lookSolver( tar, chain, pose ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Get bone's world transform from its bindpose local transform
+    const bone  = pose.getBone( chain.links[ 0 ].index );
+    const pTran = pose.getWorldTransform( bone.pindex );
+    const cTran = pTran.clone().mul( chain.links[ 0 ].localBind );
+    
+    // Create worldspace directions of the bone
+    const axes  = chain.axes.getFromQuat( cTran.rot );
+    
+    // Get Direction from Bone to IK Target
+    const toTar = new Vec3( tar.targetPos )
+        .sub( cTran.pos )
+        .norm();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Swing Rotation
+    const rot = new Quat()
+        .fromSwing( axes.z, toTar ) // Create Swing Rotation
+        .mul( cTran.rot );          // Apply swing to current bone rotation
+
+    // Get the current up direction after applying swing
+    const swingUp = new Vec3( chain.axes.y ).transformQuat( rot );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Reset Twisting Rotation
+
+    // With swing rotation now aligned to the target direction,
+    // test to see if the target direction is pointing directly at a pole
+    // The reset direction will change depending on the pole.
+    const dot = Vec3.dot( toTar, Vec3.UP );
+    let resetDir;
+    if( dot >= 0.9999 )         resetDir = Vec3.BACK;       // Pointing Up
+    else if( dot <= -0.9999)    resetDir = Vec3.FORWARD;    // Pointing Down
+    else                        resetDir = Vec3.UP;         // Not pointing at a pole
+    
+    // Get axes using the reset direction as up
+    axes.look( toTar, resetDir );
+
+    // Create rotation that will reset the twisting so its axis aligned
+    const twistReset = new Quat().fromSwing( swingUp, axes.y );
+    rot .pmul( twistReset )          // Apply Reset
+        .pmulInvert( pTran.rot )     // Localspace
+        .copyTo( bone.local.rot );   // Save
+}
+
+/*
+Define What is a bone's direction, Whats Forward and UP?
+- forward can be UP, since it points UP. up can then be BACK.
+*/
+
+class Axes{
+    x = new Vec3( 1, 0, 0 );
+    y = new Vec3( 0, 1, 0 );
+    z = new Vec3( 0, 0, 1 );
+
+    look( fwd, up=[0,1,0] ){
+        this.z.copy( fwd ).norm();                  // Forward
+        this.x.fromCross( up, this.z ).norm();      // Orthogonal Right
+        this.y.fromCross( this.z, this.x ).norm();  // Orthogonal Up
+        return this;
+    }
+
+    getFromQuat( q, ax = new Axes() ){
+        ax.x.fromQuat( q, this.x );
+        ax.y.fromQuat( q, this.y );
+        ax.z.fromQuat( q, this.z );
+        return ax;
+    }
+
+    rotInvQuat( q ){
+        const qi = new Quat( q ).invert();
+        this.x.fromQuat( qi, this.x );
+        this.y.fromQuat( qi, this.y );
+        this.z.fromQuat( qi, this.z );
+        return this
+    }
+
+    // static fromInvQuat( q, x=[1,0,0], y=[0,1,0], z=[0,0,1] ){
+    //     const ax = new Axes();
+    //     const qi = new Quat( q ).invert();
+    //     ax.x.fromQuat( qi, this.x );
+    //     ax.y.fromQuat( qi, this.y );
+    //     ax.z.fromQuat( qi, this.z );
+    //     return ax;
+    // }
+
+    static fromPointingUp(){
+        const ax = new Axes();
+        ax.x.xyz( 1, 0,  0 );
+        ax.y.xyz( 0, 0, -1 );
+        ax.z.xyz( 0, 1,  0 );
+        return ax;
+    }
+}
+// #endregion
+
+
+// #region IK BOT
+import { GltfUtil }             from '../_lib/misc/GltfUtil.js';
+import { TranMatrixSkin, Pose } from '../../src/index';
+
+const MAX_EYELID_ANG = 30;
+const MAX_EYELID_RAD = MAX_EYELID_ANG * Math.PI / 180;
+
+class MK01{
+    constructor( gltf ){
+        this.arm    = GltfUtil.parseArmature( gltf );
+        this.skin   = new TranMatrixSkin( this.arm );
+        this.group  = new THREE.Group();
+        this.pose   = new Pose( this.arm );
+
+        const nList = GltfUtil.filterMeshNodes( gltf, true, 'MKB_' );
+        GltfUtil.loadNodeMeshes( gltf, nList, this.skin, this.group );
+    }
+
+    static async fetch( scene ){
+        const gltf  = await GltfUtil.fetch( '/prototypes/_res/models/MK01.gltf' );
+        const ikbot = new MK01( gltf );
+        scene.add( ikbot.group );
+        return ikbot;
+    }
+    
+    // #region CONTROLS
+    setPosition( p ){ this.pose.posLocal( 'Root', p  ); return this; }
+    setEyeLids( up, dn ){
+        const q = [0,0,0,1];
+        let b;
+
+        // Clamp Range
+        up = Math.min( Math.max( up, 0 ), 1 );
+        dn = Math.min( Math.max( dn, 0 ), 1 );
+        
+        // Top Eyelid
+        b = this.arm.getBone( 'EyelidUp' );
+        quat.setAxisAngle( q, [1,0,0], -MAX_EYELID_RAD * up );
+        quat.mul( q, q, b.local.rot );
+        this.pose.setLocalRot( 'EyelidUp', q );
+
+        // Bottom Eyelid
+        b = this.arm.getBone( 'EyelidDn' );
+        quat.setAxisAngle( q, [1,0,0], MAX_EYELID_RAD * dn );
+        quat.mul( q, q, b.local.rot );
+        this.pose.setLocalRot( 'EyelidDn', q );
+        
+        return this;
+    }
+    // #endregion
+
+    updateSkin(){
+        this.pose.updateWorld();
+        this.skin.updateFromPose( this.pose );
+    }
+}
+// #endregion
+
+</script></body></html>

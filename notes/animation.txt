@@ -1,0 +1,4 @@
+https://lisyarus.github.io/blog/programming/2023/02/17/animation.html
+good article about creating an animation queue, uses binary heap to sort & remove completed animations.
+--- https://blog.bitsrc.io/implementing-heaps-in-javascript-c3fbf1cb2e65
+--- https://weekendtutorial.com/how-to-implement-binary-heap-in-javascript-in-2022/

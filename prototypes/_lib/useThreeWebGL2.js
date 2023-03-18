@@ -99,17 +99,18 @@ export default function useThreeWebGL2(){
         return self;
     };
 
-    const RenderLoop = ( fnPreRender=null, fnPostRender=null )=>{
+    const createRenderLoop = ( fnPreRender=null, fnPostRender=null )=>{
         let   reqId = 0;
-        const rLoop = {
-            stop        : ()=>{ window.cancelAnimationFrame( reqId ); return rLoop; },
-            start       : ()=>{ rLoop.onRender(); return rLoop; },
-            onRender    : ()=>{
-                render( fnPreRender, fnPostRender );
-                reqId = window.requestAnimationFrame( rLoop.onRender );
-            },
+
+        const onRender = ()=>{
+            render( fnPreRender, fnPostRender );
+            reqId = window.requestAnimationFrame( onRender );
         };
-        return rLoop;
+        
+        return {
+            stop    : () => window.cancelAnimationFrame( reqId ),
+            start   : () => onRender(),
+        };
     };
 
     const sphericalLook = ( lon, lat, radius, target=null )=>{
@@ -138,6 +139,141 @@ export default function useThreeWebGL2(){
         return self;
     };
 
+    // computeSphericalLook(
+    //     lon: number,
+    //     lat: number,
+    //     radius: number,
+    //     target?: TVec3,
+    //     ): {pos: Array<number>, rot: Array<number> | null} {
+    //     const result: {pos: Array<number>, rot: Array<number> | null} = {
+    //         pos: [0, 0, 0],
+    //         rot: null,
+    //     };
+    //     const phi: number = ((90 - lat) * Math.PI) / 180;
+    //     const theta: number = ((lon + 180) * Math.PI) / 180;
+
+    //     result.pos[0] = -(radius * Math.sin(phi) * Math.sin(theta));
+    //     result.pos[1] = radius * Math.cos(phi);
+    //     result.pos[2] = -(radius * Math.sin(phi) * Math.cos(theta));
+
+    //     if (target) {
+    //         // Rotate camera to look directly at the target
+    //         result.pos[0] += target[0];
+    //         result.pos[1] += target[1];
+    //         result.pos[2] += target[2];
+
+    //         result.rot = [0, 0, 0, 1];
+    //         quatEx.lookAt(result.rot, result.pos, target);
+    //     }
+
+    //     return result;
+    // }
+
+    // /** Use a bounding box to compute the distance and position of the camera */
+    // boundFitLook( bMin, bMax, offsetScl = 0.9 ){
+    //     const size    = vec3.sub([0, 0, 0], bMax, bMin);
+    //     const center  = vec3.lerp([0, 0, 0], bMin, bMax, 0.5);
+    //     const maxSize = Math.max(size[0], size[1], size[2]);
+
+    //     const fitHDist = maxSize / ( 2 * Math.atan(( Math.PI * this.camera.fov ) / 360 ));
+    //     const fitWDist = fitHDist / this.camera.aspect;
+    //     const dist     = offsetScl * Math.max( fitHDist, fitWDist );
+
+    //     const look     = this.computeSphericalLook(0, 20, dist, center);
+    //     this.cameraController.targetMove(look.pos);
+    //     if (look.rot) {
+    //         this.cameraController.targetLook(look.rot);
+    //     }
+
+    //     return this;
+    // }
+
+    // delete3DObject(
+    //     obj: Any3JS,
+    //     incMaterial: boolean = true,
+    //     performRemove: boolean = true,
+    //   ) {
+    //     if (incMaterial && obj.material) {
+    //       if (obj.material instanceof Array) {
+    //         obj.material.forEach(mat => this.deleteMaterial(mat));
+    //       } else {
+    //         this.deleteMaterial(obj.material);
+    //       }
+    //     }
+    
+    //     obj?.geometry?.dispose(); // Not all Objects3D have geometry
+    
+    //     // Auto removing causes an error during the scene's cleanup
+    //     // Dispose will call this method with removal turned off
+    //     if (performRemove) {
+    //       obj?.removeFromParent();
+    //     }
+    //   }
+    
+    //   /** Dispose the resources of a material */
+    //   deleteMaterial(mat: Any3JS): void {
+    //     if (!mat.isMaterial) {
+    //       return;
+    //     }
+    
+    //     // Find & dispose textures
+    //     let value: Any3JS;
+    //     for (const key of Object.keys(mat)) {
+    //       value = mat[key];
+    //       if (value && typeof value === 'object' && 'minFilter' in value) {
+    //         value.dispose();
+    //       }
+    //     }
+    
+    //     mat.dispose();
+    //   }
+    
+    //   dispose(): void {
+    //     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //     // Clean up Scene
+    //     this.scene?.traverse(o => {
+    //       // The scene it self is on the list, do not
+    //       // perform any cleanup action on itself.
+    //       if (!o.isScene) {
+    //         this.delete3DObject(o, true, false);
+    //       }
+    //     });
+    
+    //     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //     // Misc clean up
+    //     if (this.resizeObserver) {
+    //       this.resizeObserver.disconnect();
+    //     }
+    
+    //     this.renderer = null;
+    //   }
+
+    // getRenderSize(){
+    //     //let w = 0, h = 0, v = { set:(ww,hh)=>{ w=ww; h=hh; } }; // Hacky Three.Vector2
+    //     let v = new THREE.Vector2();
+    //     this.renderer.getSize( v );
+    //     //return [w,h];
+    //     return v.toArray();
+    // }
+
+    // useParentElementToResize(): this {
+    //     const elm = this.renderer.domElement.parentNode;
+    //     if (this.resizeObserver) {
+    //       this.resizeObserver.disconnect();
+    //       this.resizeObserver = null;
+    //     }
+    
+    //     this.resizeObserver = new ResizeObserver(entries => {
+    //       const ent = entries[0];
+    //       const w = Math.round(ent.contentRect.width);
+    //       const h = Math.round(ent.contentRect.height);
+    //       this.resize(w, h);
+    //     });
+    
+    //     this.resizeObserver.observe(elm);
+    //     return this;
+    //   }
+
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     window.addEventListener( 'resize', ()=>resize() );
@@ -151,7 +287,7 @@ export default function useThreeWebGL2(){
 
         render,
         renderLoop,
-        RenderLoop,
+        createRenderLoop,
         sphericalLook,
         resize,
     };
