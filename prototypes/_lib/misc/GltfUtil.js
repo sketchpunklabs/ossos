@@ -3,7 +3,7 @@ import * as THREE               from 'three';
 import { vec3, quat }           from 'gl-matrix';
 import { Armature }             from '../../../src/index';
 import Gltf2                    from '../gltf2Parser.es.js';
-import MatrixSkinMaterial       from '../customSkinning/MatrixSkinMaterial.js';
+// import MatrixSkinMaterial       from '../customSkinning/MatrixSkinMaterial.js';
 import MatrixSkinPbrMaterial    from '../customSkinning/MatrixSkinPbrMaterial.js';
 // #endregion
 
@@ -32,12 +32,18 @@ export class GltfUtil{
     // #region METHODS
     static async fetch( url ){ return await Gltf2.fetch( url ); }
 
-    static filterMeshNodes( gltf, hasSkin=true, nameFind=null ){
+    static filterNodes( gltf, props={} ){
+        const { 
+            prefix  = '', 
+            isMesh  = false,
+            hasSkin = false,
+        } = props;
+
         const out = [];
         for( let n of gltf.json.nodes ){
-            if( n.mesh === undefined ) continue;
+            if( isMesh  && n.mesh === undefined ) continue;
             if( hasSkin && n.skin === undefined ) continue;
-            if( nameFind && n.name && n.name.indexOf( nameFind ) === -1 ) continue;
+            if( prefix  && !n.name.startsWith( prefix ) ) continue;
             out.push( n );
         }
 
@@ -48,7 +54,6 @@ export class GltfUtil{
         const matCache  = {};
         const useSkin   = !!skin;
 
-        let mAry;
         let m;
         let geo;
         let mat;
@@ -59,7 +64,7 @@ export class GltfUtil{
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             // Check if there is any mesh available
             m = gltf.getMesh( n.mesh );
-            if( !m || m.primitives.length == 0 ){ console.error( 'No gltf mesh found', id ); continue; }
+            if( !m || m.primitives.length == 0 ){ console.error( 'No gltf mesh found', n.mesh ); continue; }
 
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             for( let p of m.primitives ){

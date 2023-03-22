@@ -118,6 +118,62 @@ export default class Quat extends Array<number>{
         this[ 3 ]    =  a3 * invDot;
         return this;
     }
+
+    fromLookDir( dir: ConstVec3, up: ConstVec3 = [0,1,0] ): this{
+        // Ported to JS from C# example at https://pastebin.com/ubATCxJY
+        // TODO, if Dir and Up are equal, a roll happends. Need to find a way to fix this.
+        const zAxis	= new Vec3( dir ).norm();                       // Forward
+        const xAxis = new Vec3().fromCross( up, zAxis ).norm();     // Right
+        const yAxis = new Vec3().fromCross( zAxis, xAxis ).norm();  // Up
+
+        //fromAxis - Mat3 to Quat
+        const m00 = xAxis[0], m01 = xAxis[1], m02 = xAxis[2],
+              m10 = yAxis[0], m11 = yAxis[1], m12 = yAxis[2],
+              m20 = zAxis[0], m21 = zAxis[1], m22 = zAxis[2],
+              t   = m00 + m11 + m22;
+
+        let x: number, 
+            y: number, 
+            z: number, 
+            w: number, 
+            s: number;
+
+        if(t > 0.0){
+            s = Math.sqrt(t + 1.0);
+            w = s * 0.5 ; // |w| >= 0.5
+            s = 0.5 / s;
+            x = (m12 - m21) * s;
+            y = (m20 - m02) * s;
+            z = (m01 - m10) * s;
+        }else if((m00 >= m11) && (m00 >= m22)){
+            s = Math.sqrt(1.0 + m00 - m11 - m22);
+            x = 0.5 * s;// |x| >= 0.5
+            s = 0.5 / s;
+            y = (m01 + m10) * s;
+            z = (m02 + m20) * s;
+            w = (m12 - m21) * s;
+        }else if(m11 > m22){
+            s = Math.sqrt(1.0 + m11 - m00 - m22);
+            y = 0.5 * s; // |y| >= 0.5
+            s = 0.5 / s;
+            x = (m10 + m01) * s;
+            z = (m21 + m12) * s;
+            w = (m20 - m02) * s;
+        }else{
+            s = Math.sqrt(1.0 + m22 - m00 - m11);
+            z = 0.5 * s; // |z| >= 0.5
+            s = 0.5 / s;
+            x = (m20 + m02) * s;
+            y = (m21 + m12) * s;
+            w = (m01 - m10) * s;
+        }
+
+        this[ 0 ] = x;
+        this[ 1 ] = y;
+        this[ 2 ] = z;
+        this[ 3 ] = w;
+        return this;
+    }
     // #endregion
 
     // #region OPERATORS

@@ -1,0 +1,356 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import Util                         from '../_lib/misc/Util.js';
+import { TranMatrixSkin, Pose }     from '../../src/index';
+import { vec3, quat }               from 'gl-matrix';
+import { GltfUtil }                 from '../_lib/misc/GltfUtil.js';
+//#endregion
+
+// #region MAIN
+let App = useDarkScene( useThreeWebGL2(), { ambient:0x303030 } );
+let Ref = {};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 5, 1.5, [ 0, 0.3, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // Debug.pnt.add( [0,0.5,0], 0x00ff00, 2 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const gltf = await GltfUtil.fetch( '/prototypes/_res/models/MK00_roller_arm.gltf' );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const bldCache = new BLDCache();
+    bldCache.loadGLTF( gltf );
+
+    // App.scene.add( new SolidBonePrefab( bldCache ) );
+    // App.scene.add( new SolidBonePrefab( bldCache ).setLength( 0.4 ).setPosition( 0.2,0,0 ) );
+    // App.scene.add( new SolidBonePrefab( bldCache ).setLength( 0.6 ).setPosition( 0.4,0,0 ) );
+
+    const spring =  new SpringBonePrefab( bldCache, 0.5 ).setSpringScale( 0.3 );
+    Ref.spring = spring;
+    App.scene.add( spring );
+    
+    // .setSpringScale( 0.5 )
+
+
+        // App.scene.add( bldCache.getMesh( 'base' ) );
+
+    // const roller = new MK00_RollerArm( gltf );
+    // // App.scene.add( roller.createBase() );
+    // roller.createSolidBone();
+
+    // const ikbot = new MK01( gltf );
+    // App.scene.add( ikbot.group );
+
+    // ikbot.setPosition( [0,0.6,0] );
+    // ikbot.setEyeLids( 0, 0.7 );
+    // ikbot.setLook( -20, -5 );
+    
+    // ikbot.updateSkin();
+
+    // Ref.bot = ikbot;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.rLoop = App.createRenderLoop( onPreRender ).start(); 
+    // App.renderLoop();
+    // let max = -Infinity;
+    // for( let i=0; i < 5000; i++ ){
+    //     //let n = noise( i * 0.01 + 0 );  // around 0.17 and 0.85
+    //     let n = noise2.simplex2( i * 0.1 + 373, 0 ); // -0.9 to 0.9
+    //     //let n = noise2.perlin2( i * 0.07 + 373, 0 ); // Max Range of -0.5 & 0.5;
+    //     min = Math.min( min, n );
+    //     max = Math.max( max, n );
+    //     // console.log( n );
+    // }
+    // console.log( min, max );
+});
+// #endregion
+
+function onPreRender( dt, et ){
+
+    if( Ref.spring ){
+        const min = 0.3;
+        const max = 1.3;
+        const t   = Math.sin( et * 1.2 ) * 0.5 + 0.5;
+
+        Ref.spring.setSpringScale( min * (1-t) + max * t );
+    }
+
+}
+
+class BLDCache{
+    geo       = {};
+    data      = {};
+    materials = {};
+    constructor(){}
+
+    loadGLTF( gltf ){
+        let name;
+        let obj;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Parse out geometry
+        const meshNodes = GltfUtil.filterNodes( gltf, { prefix:'BLD_', isMesh:true } );
+        for( const n of meshNodes ){
+            name = n.name.substr( 4 );
+            this.geo[ name ] = {
+                geo : gltf.getMesh( n.mesh ),
+                gen : null,
+            };
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Parse out data
+        const dataNodes = GltfUtil.filterNodes( gltf, { prefix:'IBLD_' } );
+        for( const n of dataNodes ){
+            name               = n.name.substr( 5 );
+            obj                = {};
+            this.data[ name ]  = obj;
+
+            if( n.translation ) obj.pos = n.translation;
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Save Materials
+        Object.assign( this.materials, gltf.getAllMaterials() );
+    }
+
+    primitiveMesh( prim ){
+        const bGeo  = GltfUtil.geoPrimitive( prim );
+        const mat   = this.materials[ prim.materialName ];
+        const color = ( prim.materialName )? this.materials[ prim.materialName ].baseColorGammaHex : 0x00ffff;
+        const mesh  = new THREE.Mesh( bGeo, new THREE.MeshPhongMaterial( {color}) );
+        return mesh;
+    }
+
+    getMesh( key ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Reuse existing
+        const cache = this.geo[ key ];
+        if( cache.gen ) return cache.gen;
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Create Meshes
+        let rtn;
+        if( cache.geo.primitives.length > 1 ){
+            rtn = new THREE.Group();
+            let mesh;
+            for( const prim of cache.geo.primitives ){
+                rtn.add( this.primitiveMesh( prim ) )
+            }
+        }else{
+            rtn = this.primitiveMesh( cache.geo.primitives[0] );
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Final
+        if( cache.geo.position ) rtn.position.fromArray( cache.geo.position );
+
+        cache.gen = rtn;
+        return rtn;
+    }
+}
+
+class MK00_RollerArm{
+    // #region MAIN
+    geoCache    = {};
+    dataCache   = {};
+    materials   = null;
+
+    constructor( gltf ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Parse out geometry
+        const meshNodes = GltfUtil.filterNodes( gltf, { prefix:'BLD_', isMesh:true } );
+        for( const n of meshNodes ){
+            const name = n.name.substr( 4 );
+            this.geoCache[ name ] = {
+                geo : gltf.getMesh( n.mesh ),
+                gen : null,
+            };
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Parse out data
+        const dataNodes = GltfUtil.filterNodes( gltf, { prefix:'IBLD_' } );
+        for( const n of dataNodes ){
+            const name              = n.name.substr( 5 );
+            const obj               = {};
+            this.dataCache[ name ]  = obj;
+
+            if( n.translation ) obj.yPos = n.translation[1];
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.materials = gltf.getAllMaterials();
+    }
+    // #endregion
+
+    createBase(){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const cache = this.geoCache[ 'base' ];
+        if( cache.gen ) return cache.gen;
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        let color;
+        let mat;
+        let bGeo;
+        let mesh;
+
+        const grp = new THREE.Group();
+        for( const prim of cache.geo.primitives ){
+            bGeo  = GltfUtil.geoPrimitive( prim );
+
+            mat   = this.materials[ prim.materialName ];
+            color = ( prim.materialName )? this.materials[ prim.materialName ].baseColorGammaHex : 0x00ffff;
+            
+            mesh  = new THREE.Mesh( bGeo, new THREE.MeshPhongMaterial( {color}) );
+            grp.add( mesh )
+        }
+
+        cache.gen = grp;
+        return grp;
+    }
+
+    primitiveMesh( prim ){
+        const bGeo  = GltfUtil.geoPrimitive( prim );
+        const mat   = this.materials[ prim.materialName ];
+        const color = ( prim.materialName )? this.materials[ prim.materialName ].baseColorGammaHex : 0x00ffff;
+        const mesh  = new THREE.Mesh( bGeo, new THREE.MeshPhongMaterial( {color}) );
+        return mesh;
+    }
+
+    getMesh( key ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Reuse existing
+        const cache = this.geoCache[ key ];
+        if( cache.gen ) return cache.gen;
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Create Meshes
+        let rtn;
+        if( cache.geo.primitives.length > 1 ){
+            rtn = new THREE.Group();
+            let mesh;
+            for( const prim of cache.geo.primitives ){
+                console.log( prim );
+                rtn.add( this.primitiveMesh( prim ) )
+            }
+        }else{
+            rtn = this.primitiveMesh( cache.geo.primitives[0] );
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Final
+        if( cache.geo.position ) rtn.position.fromArray( cache.geo.position );
+
+        cache.gen = rtn;
+        return rtn;
+    }
+
+    createSolidBone(){
+        // console.log( this.getMesh( 'arm_bottom_ring' ) );
+        // console.log( this.getMesh( 'arm_top_ring' ) );
+        // console.log( this.dataCache.arm_length.yPos );
+        // console.log( this.geoCache );
+        // App.scene.add( this.getMesh( 'arm_bottom_ring' ) );
+        // App.scene.add( this.getMesh( 'arm_top_ring' ) );
+        // App.scene.add( this.getMesh( 'arm_rod_big' ) );
+
+
+        // console.log( this.geoCache );
+        return new SolidBonePrefab(  );
+    }
+}
+
+// BLD_arm_top_ring, arm_bottom_ring arm_rod_big arm_rod_thin
+
+class SolidBonePrefab extends THREE.Group{
+    constructor( bldCache ){
+        super();
+
+        // Data from GLTF
+        this.rodLen     = bldCache.data.arm_length.pos[ 1 ];
+        this.ballCenter = bldCache.data.arm_ball_center.pos[ 1 ];
+        this.baseOffset = Math.abs( bldCache.data.arm_base_offset.pos[ 1 ] );
+
+        // Derived Data
+        this.ballOffset = this.ballCenter - this.rodLen; // Distance from end of rod to ball center
+
+        // Meshes
+        this.bottomRing = bldCache.getMesh( 'arm_bottom_ring' ).clone();
+        this.topRing    = bldCache.getMesh( 'arm_top_ring' ).clone();
+        this.rod        = bldCache.getMesh( 'arm_rod_big' ).clone();
+        this.add( this.bottomRing, this.topRing, this.rod );
+
+        // Apply base offset
+        this.bottomRing.position.y += this.baseOffset;
+        this.topRing.position.y    += this.baseOffset;
+        this.rod.position.y        += this.baseOffset;        
+    }
+
+    setPosition( x,y,z ){ this.position.set( x,y,z ); return this; }
+
+    setLength( v ){
+        const scl = ( v - this.ballOffset - this.baseOffset ) / this.rodLen;
+        // Move top ring
+        this.topRing.position.y = this.baseOffset + this.rodLen * scl;
+        // Stretch rod
+        this.rod.scale.y = scl;
+        return this;
+    }
+}
+
+import SpringMesh from '../_lib/meshes/SpringMesh.js';
+class SpringBonePrefab extends THREE.Group{
+    constructor( bldCache, initLength=0.5 ){
+        super();
+
+        // Data from GLTF
+        this.rodLen     = bldCache.data.arm_length.pos[ 1 ];
+        this.ballCenter = bldCache.data.arm_ball_center.pos[ 1 ];
+        this.baseOffset = Math.abs( bldCache.data.arm_base_offset.pos[ 1 ] );
+
+        // Derived Data
+        this.ballOffset = this.ballCenter - this.rodLen; // Distance from end of rod to ball center
+
+        const scl = ( initLength - this.ballOffset - this.baseOffset ) / this.rodLen;
+        this.initialLen = this.rodLen * scl;
+        this.initialScl = scl;
+
+        // Meshes
+        // ringRadius=1.0, radius=0.5, steps=16, span=0.6, iter=2
+        const iterSpan  = ( this.rodLen * scl ) / 7;
+        this.spring     = new SpringMesh( 0.009, 0.035, 12, iterSpan, 7 );
+
+        this.bottomRing = bldCache.getMesh( 'arm_bottom_ring' ).clone();
+        this.topRing    = bldCache.getMesh( 'arm_top_ring' ).clone();
+        this.rod        = bldCache.getMesh( 'arm_rod_thin' ).clone();
+        this.add( this.bottomRing, this.topRing, this.rod, this.spring );
+
+        // Apply Initial Values
+        this.bottomRing.position.y += this.baseOffset;
+        this.topRing.position.y     = this.baseOffset + this.initialLen;
+        this.spring.position.y     += this.baseOffset;
+        this.rod.position.y        += this.baseOffset;
+        this.rod.scale.y            = scl;        
+    }
+
+    setPosition( x,y,z ){ this.position.set( x,y,z ); return this; }
+
+    setSpringScale( n ){
+        this.spring.setSpringScale( n );
+        this.rod.scale.y        = this.initialScl * n;
+        this.topRing.position.y = this.initialLen * n;
+        return this;
+    }
+}
+
+
+</script></body></html>

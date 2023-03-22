@@ -16,10 +16,10 @@ export default class Vec3 extends Array<number>{
 
     // #region MAIN 
     constructor()
-    constructor( v: TVec3 )
+    constructor( v: TVec3 | ConstVec3 )
     constructor( v: number )
     constructor( x: number, y: number, z: number )
-    constructor( v ?: TVec3 | number, y ?: number, z ?: number ){
+    constructor( v ?: TVec3 | ConstVec3 | number, y ?: number, z ?: number ){
         super( 3 );
         
         if( v instanceof Vec3 || v instanceof Float32Array || ( v instanceof Array && v.length == 3 )){
@@ -176,7 +176,6 @@ export default class Vec3 extends Array<number>{
         return this;
     }
     // #endregion
-
 
     // #region STATIC    
     static len( a: ConstVec3 ): number{ return Math.sqrt( a[ 0 ]**2 + a[ 1 ]**2 + a[ 2 ]** 2 ); }

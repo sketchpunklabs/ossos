@@ -1,9 +1,3 @@
-var __defProp = Object.defineProperty;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __publicField = (obj, key, value) => {
-  __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-  return value;
-};
 const GLB_MAGIC = 1179937895;
 const GLB_JSON = 1313821514;
 const GLB_BIN = 5130562;
@@ -47,6 +41,7 @@ async function parseGLB(res) {
   }
   return [json, bin];
 }
+
 const ComponentTypeMap = {
   5120: [1, Int8Array, "int8", "BYTE"],
   5121: [1, Uint8Array, "uint8", "UNSIGNED_BYTE"],
@@ -64,16 +59,17 @@ const ComponentVarMap = {
   MAT3: 9,
   MAT4: 16
 };
+
 class Accessor {
+  componentLen = 0;
+  elementCnt = 0;
+  byteOffset = 0;
+  byteSize = 0;
+  boundMin = null;
+  boundMax = null;
+  type = null;
+  data = null;
   constructor(accessor, bufView, bin) {
-    __publicField(this, "componentLen", 0);
-    __publicField(this, "elementCnt", 0);
-    __publicField(this, "byteOffset", 0);
-    __publicField(this, "byteSize", 0);
-    __publicField(this, "boundMin", null);
-    __publicField(this, "boundMax", null);
-    __publicField(this, "type", null);
-    __publicField(this, "data", null);
     const [
       compByte,
       compType,
@@ -96,12 +92,13 @@ class Accessor {
     }
   }
 }
+
 class Attrib {
+  byteOffset = 0;
+  componentLen = 0;
+  boundMin = null;
+  boundMax = null;
   constructor(accID, json) {
-    __publicField(this, "byteOffset", 0);
-    __publicField(this, "componentLen", 0);
-    __publicField(this, "boundMin", null);
-    __publicField(this, "boundMax", null);
     const accessor = json.accessors[accID];
     this.componentLen = ComponentVarMap[accessor.type];
     this.byteOffset = accessor.byteOffset;
@@ -110,20 +107,20 @@ class Attrib {
   }
 }
 class InterleavedBuffer {
+  data = null;
+  elementCnt = 0;
+  componentLen = 0;
+  byteStride = 0;
+  byteSize = 0;
+  position = null;
+  normal = null;
+  tangent = null;
+  texcoord_0 = null;
+  texcoord_1 = null;
+  color_0 = null;
+  joints_0 = null;
+  weights_0 = null;
   constructor(attr, json, bin) {
-    __publicField(this, "data", null);
-    __publicField(this, "elementCnt", 0);
-    __publicField(this, "componentLen", 0);
-    __publicField(this, "byteStride", 0);
-    __publicField(this, "byteSize", 0);
-    __publicField(this, "position", null);
-    __publicField(this, "normal", null);
-    __publicField(this, "tangent", null);
-    __publicField(this, "texcoord_0", null);
-    __publicField(this, "texcoord_1", null);
-    __publicField(this, "color_0", null);
-    __publicField(this, "joints_0", null);
-    __publicField(this, "weights_0", null);
     const accessor = json.accessors[attr.POSITION];
     const bView = json.bufferViews[accessor.bufferView];
     this.elementCnt = accessor.count;
@@ -150,53 +147,48 @@ class InterleavedBuffer {
     }
   }
 }
+
 class Mesh {
-  constructor() {
-    __publicField(this, "index", null);
-    __publicField(this, "name", null);
-    __publicField(this, "primitives", []);
-    __publicField(this, "position", null);
-    __publicField(this, "rotation", null);
-    __publicField(this, "scale", null);
-  }
+  index = null;
+  name = null;
+  primitives = [];
+  position = null;
+  rotation = null;
+  scale = null;
 }
 class Primitive {
-  constructor() {
-    __publicField(this, "materialName", null);
-    __publicField(this, "materialIdx", null);
-    __publicField(this, "indices", null);
-    __publicField(this, "position", null);
-    __publicField(this, "normal", null);
-    __publicField(this, "tangent", null);
-    __publicField(this, "texcoord_0", null);
-    __publicField(this, "texcoord_1", null);
-    __publicField(this, "color_0", null);
-    __publicField(this, "joints_0", null);
-    __publicField(this, "weights_0", null);
-    __publicField(this, "interleaved", null);
-  }
+  materialName = null;
+  materialIdx = null;
+  indices = null;
+  position = null;
+  normal = null;
+  tangent = null;
+  texcoord_0 = null;
+  texcoord_1 = null;
+  color_0 = null;
+  joints_0 = null;
+  weights_0 = null;
+  interleaved = null;
 }
+
 class Skin {
-  constructor() {
-    __publicField(this, "index", null);
-    __publicField(this, "name", null);
-    __publicField(this, "joints", []);
-    __publicField(this, "position", null);
-    __publicField(this, "rotation", null);
-    __publicField(this, "scale", null);
-  }
+  index = null;
+  name = null;
+  joints = [];
+  position = null;
+  rotation = null;
+  scale = null;
 }
 class SkinJoint {
-  constructor() {
-    __publicField(this, "name", null);
-    __publicField(this, "index", null);
-    __publicField(this, "parentIndex", null);
-    __publicField(this, "bindMatrix", null);
-    __publicField(this, "position", null);
-    __publicField(this, "rotation", null);
-    __publicField(this, "scale", null);
-  }
+  name = null;
+  index = null;
+  parentIndex = null;
+  bindMatrix = null;
+  position = null;
+  rotation = null;
+  scale = null;
 }
+
 const ETransform = {
   Rot: 0,
   Pos: 1,
@@ -207,16 +199,16 @@ const ELerp = {
   Linear: 1,
   Cubic: 2
 };
-const _Track = class {
-  constructor() {
-    __publicField(this, "transform", ETransform.Pos);
-    __publicField(this, "interpolation", ELerp.Step);
-    __publicField(this, "jointIndex", 0);
-    __publicField(this, "timeStampIndex", 0);
-    __publicField(this, "keyframes");
-  }
+class Track {
+  static Transform = ETransform;
+  static Lerp = ELerp;
+  transform = ETransform.Pos;
+  interpolation = ELerp.Step;
+  jointIndex = 0;
+  timeStampIndex = 0;
+  keyframes;
   static fromGltf(jointIdx, target, inter) {
-    const t = new _Track();
+    const t = new Track();
     t.jointIndex = jointIdx;
     switch (target) {
       case "translation":
@@ -242,33 +234,30 @@ const _Track = class {
     }
     return t;
   }
-};
-let Track = _Track;
-__publicField(Track, "Transform", ETransform);
-__publicField(Track, "Lerp", ELerp);
+}
 class Animation {
+  name = "";
+  timestamps = [];
+  tracks = [];
   constructor(name) {
-    __publicField(this, "name", "");
-    __publicField(this, "timestamps", []);
-    __publicField(this, "tracks", []);
     if (name)
       this.name = name;
   }
 }
+
 class Texture {
-  constructor() {
-    __publicField(this, "index", null);
-    __publicField(this, "name", null);
-    __publicField(this, "mime", null);
-    __publicField(this, "blob", null);
-  }
+  index = null;
+  name = null;
+  mime = null;
+  blob = null;
 }
+
 class PoseJoint {
+  index;
+  rot;
+  pos;
+  scl;
   constructor(idx, rot, pos, scl) {
-    __publicField(this, "index");
-    __publicField(this, "rot");
-    __publicField(this, "pos");
-    __publicField(this, "scl");
     this.index = idx;
     this.rot = rot;
     this.pos = pos;
@@ -276,9 +265,9 @@ class PoseJoint {
   }
 }
 class Pose {
+  name = "";
+  joints = [];
   constructor(name) {
-    __publicField(this, "name", "");
-    __publicField(this, "joints", []);
     if (name)
       this.name = name;
   }
@@ -286,10 +275,56 @@ class Pose {
     this.joints.push(new PoseJoint(idx, rot, pos, scl));
   }
 }
+
+function gamma(v) {
+  return v <= 31308e-7 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+}
+function hex(r, g, b) {
+  return Math.round(r * 255) << 16 | Math.round(g * 255) << 8 | Math.round(b * 255);
+}
+function hexString(r, g, b) {
+  const rr = "0" + Math.round(r * 255).toString(16);
+  const gg = "0" + Math.round(g * 255).toString(16);
+  const bb = "0" + Math.round(b * 255).toString(16);
+  return ("#" + rr.slice(-2) + gg.slice(-2) + bb.slice(-2)).toUpperCase();
+}
+class Material {
+  index = -1;
+  name = "";
+  baseColor = [0, 0, 0, 1];
+  metallic = 0;
+  roughness = 0;
+  constructor(mat) {
+    this.name = mat.name || window.crypto.randomUUID();
+    if (mat.pbrMetallicRoughness) {
+      if (mat.pbrMetallicRoughness.baseColorFactor) {
+        this.baseColor[0] = mat.pbrMetallicRoughness.baseColorFactor[0];
+        this.baseColor[1] = mat.pbrMetallicRoughness.baseColorFactor[1];
+        this.baseColor[2] = mat.pbrMetallicRoughness.baseColorFactor[2];
+        this.baseColor[3] = mat.pbrMetallicRoughness.baseColorFactor[3];
+      }
+      this.metallic = mat.pbrMetallicRoughness.metallicFactor || 0;
+      this.roughness = mat.pbrMetallicRoughness.roughnessFactor || 0;
+    }
+  }
+  get baseColorHex() {
+    return hex(this.baseColor[0], this.baseColor[1], this.baseColor[2]);
+  }
+  get baseColorGammaHex() {
+    return hex(gamma(this.baseColor[0]), gamma(this.baseColor[1]), gamma(this.baseColor[2]));
+  }
+  get baseColorString() {
+    return hexString(this.baseColor[0], this.baseColor[1], this.baseColor[2]);
+  }
+  get baseColorGammaString() {
+    return hexString(gamma(this.baseColor[0]), gamma(this.baseColor[1]), gamma(this.baseColor[2]));
+  }
+}
+
 class Gltf2Parser {
+  json;
+  bin;
   constructor(json, bin) {
-    __publicField(this, "json");
-    __publicField(this, "bin");
     this.json = json;
     this.bin = bin || new ArrayBuffer(0);
   }
@@ -395,7 +430,7 @@ class Gltf2Parser {
       mesh.primitives.push(prim);
     }
     const nodes = this.getMeshNodes(mIdx);
-    if (nodes == null ? void 0 : nodes.length) {
+    if (nodes?.length) {
       if (nodes[0].translation)
         mesh.position = nodes[0].translation.slice(0);
       if (nodes[0].rotation)
@@ -422,7 +457,6 @@ class Gltf2Parser {
     return null;
   }
   getSkin(id) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     if (!this.json.skins) {
       console.warn("No Skins in GLTF File");
       return null;
@@ -471,9 +505,9 @@ class Gltf2Parser {
       joint = new SkinJoint();
       joint.index = i;
       joint.name = node.name ? node.name : "bone_" + i;
-      joint.rotation = (_b = (_a = node == null ? void 0 : node.rotation) == null ? void 0 : _a.slice(0)) != null ? _b : null;
-      joint.position = (_d = (_c = node == null ? void 0 : node.translation) == null ? void 0 : _c.slice(0)) != null ? _d : null;
-      joint.scale = (_f = (_e = node == null ? void 0 : node.scale) == null ? void 0 : _e.slice(0)) != null ? _f : null;
+      joint.rotation = node?.rotation?.slice(0) ?? null;
+      joint.position = node?.translation?.slice(0) ?? null;
+      joint.scale = node?.scale?.slice(0) ?? null;
       if (bind && bind.data) {
         bi = i * 16;
         joint.bindMatrix = Array.from(bind.data.slice(bi, bi + 16));
@@ -492,7 +526,7 @@ class Gltf2Parser {
     for (i = 0; i < js.joints.length; i++) {
       ni = js.joints[i];
       node = json.nodes[ni];
-      if ((_g = node == null ? void 0 : node.children) == null ? void 0 : _g.length) {
+      if (node?.children?.length) {
         for (j = 0; j < node.children.length; j++) {
           bi = jMap.get(node.children[j]);
           if (bi != void 0)
@@ -506,9 +540,9 @@ class Gltf2Parser {
       const snode = this.getNodeByName(skin.name);
       if (snode) {
         const n = snode[0];
-        skin.rotation = (_i = (_h = n == null ? void 0 : n.rotation) == null ? void 0 : _h.slice(0)) != null ? _i : null;
-        skin.position = (_k = (_j = n == null ? void 0 : n.translation) == null ? void 0 : _j.slice(0)) != null ? _k : null;
-        skin.scale = (_m = (_l = n == null ? void 0 : n.scale) == null ? void 0 : _l.slice(0)) != null ? _m : null;
+        skin.rotation = n?.rotation?.slice(0) ?? null;
+        skin.position = n?.translation?.slice(0) ?? null;
+        skin.scale = n?.scale?.slice(0) ?? null;
       }
     }
     return skin;
@@ -519,18 +553,46 @@ class Gltf2Parser {
       return null;
     }
     const json = this.json;
-    let mat = null;
+    let idx = -1;
     switch (typeof id) {
       case "number":
-        if (id < json.materials.length) {
-          mat = json.materials[id].pbrMetallicRoughness;
+        if (id >= json.materials.length) {
+          console.error("Material index out of bounds", id);
+          break;
+        }
+        idx = id;
+        break;
+      case "string":
+        for (let i = 0; i < json.materials.length; i++) {
+          if (json.materials[i].name === id) {
+            idx = i;
+            break;
+          }
         }
         break;
       default:
-        mat = json.materials[0].pbrMetallicRoughness;
+        idx = 0;
         break;
     }
+    if (idx === -1) {
+      console.error("Material not found ", id);
+      return null;
+    }
+    const mat = new Material(json.materials[idx]);
+    mat.index = idx;
     return mat;
+  }
+  getAllMaterials() {
+    const rtn = {};
+    if (this.json.materials) {
+      let mat;
+      for (let i = 0; i < this.json.materials.length; i++) {
+        mat = new Material(this.json.materials[i]);
+        mat.index = i;
+        rtn[mat.name] = mat;
+      }
+    }
+    return rtn;
   }
   getTexture(id) {
     const js = this.json;
@@ -719,4 +781,5 @@ class Gltf2Parser {
     return null;
   }
 }
+
 export { Accessor, Animation, ELerp, ETransform, Mesh, Pose, Primitive, Skin, SkinJoint, Texture, Track, Gltf2Parser as default, parseGLB };
