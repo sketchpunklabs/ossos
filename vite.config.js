@@ -1,6 +1,6 @@
 import path     from "path";
 import fs       from "fs";
-import { directoryPlugin } from 'vite-plugin-list-directory-contents/dist/plugin.js';
+import { directoryPlugin } from 'vite-plugin-list-directory-contents';
 
 const ignorePaths = [ ".git", "node_modules", "dist", "site" ];
 
