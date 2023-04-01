@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { useDarkScene } from '../_lib/useThreeWebGL2.js';
+import facedCube  from '../_lib/meshes/facedCube.js';
+import { Easing, AnimationQueue } from '../../src/index';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Debug = {};
+let Ref   = {};
+
+// https://lisyarus.github.io/blog/programming/2023/02/17/animation.html
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    App.scene.add( ( Ref.cube  = facedCube() ) );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.queue = new AnimationQueue();
+
+    setTimeout( ()=>{
+        Ref.queue
+            .addTask( 1.5, ThreeAniTasks.scale( Ref.cube, 0, 1, Easing.bounceOut ) )
+            .addTask( 1.5, ThreeAniTasks.move( Ref.cube, [2,0,0], Easing.bounceOut ) )
+        ;
+    }, 1000 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( onPreRender ).start();
+});
+
+function onPreRender( dt, et ){
+    Ref.queue.update( dt );
+}
+
+class ThreeAniTasks{
+    static scale( obj, start, end, easing=null ){
+        return ( task )=>{
+            const t = ( easing )? easing( task.normTime ) : task.normTime;
+            obj.scale.setScalar( start * (1-t) + end * t );
+        }
+    }
+
+    static move( obj, end, easing=null ){
+        const start = obj.position.toArray();
+        return ( task )=>{
+            const t  = ( easing )? easing( task.normTime ) : task.normTime;
+            const ti = 1 - t;
+            obj.position.x = start[ 0 ] * ti + end[ 0 ] * t;
+            obj.position.y = start[ 1 ] * ti + end[ 1 ] * t;
+            obj.position.z = start[ 2 ] * ti + end[ 2 ] * t;
+        }
+    }
+}
+
+//#endregion
+</script></body></html>

@@ -29,24 +29,25 @@ export default class Heap<T>{
     }
 
     /** Remove item from heap, if no index is set then it pops off the first item */
-    remove( idx = 0 ): this{
-        if( this.items.length === 0 ) return this;
+    remove( idx = 0 ): T | undefined{
+        if( this.items.length === 0 ) return undefined;
 
         // We remove an item by swopping it with the LAST
         // item on the list.
         const i        = this.items.length - 1;  // Last Index
-        const lastItem = this.items.pop();       // Remove Last Item
+        const rmItem   = this.items[ idx ];      // Item being removed
+        const lastItem = this.items.pop();       // Remove Last Item for swopping
 
         // If we ended up deleting the last one or there was nothing there
         // we are done. Undefined check is needed by typescript guard checking
-        if( idx === i || lastItem === undefined ) return this;                
+        if( idx === i || this.items.length === 0 || lastItem === undefined ) return rmItem;                
 
         // If the item removed wasn't the last one on the list,
         // then place the last item in the spot that we want to delete. 
         // From there bubble down the item so its placed properly in the tree.
         this.items[ idx ] = lastItem;
         this.bubbleDown( idx );
-        return this;
+        return rmItem;
     }
     // #endregion
 

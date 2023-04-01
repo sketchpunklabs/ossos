@@ -26,3 +26,9 @@ import Vec3         from './maths/Vec3';
 import Quat         from './maths/Quat';
 export { Transform, Vec3, Quat };
 // #endregion
+
+// #region ANIMATION
+import AnimationQueue    from './animation/AnimationQueue';
+import Easing            from './animation/Easing';
+export { AnimationQueue, Easing };
+// #endregion
