@@ -51,13 +51,16 @@ export default class Heap<T>{
     // #endregion
 
     // #region SHIFTING
+
+    /** Will move item down the tree by swopping the parent with one 
+        of it's 2 children when conditions are met */
     bubbleDown( idx: number ): this{
         const ary = this.items;
         const len = ary.length; // Used for bound checking
         const itm = ary[ idx ]; // Item being moved around
         let   lft = 0;          // Index to LEFT Child
         let   rit = 0;          // Index to RIGHT Child
-        let   mov = -1;         //
+        let   mov = -1;         // Index of item to be moved
 
         while( idx < len ){
             // Compute Children Indices
@@ -86,8 +89,7 @@ export default class Heap<T>{
         return this;
     }
 
-    // Will move item up the tree by swopping with it's parent if
-    // conditions are met.
+    /** Will move item up the tree by swopping with it's parent if conditions are met */
     bubbleUp( idx: number ): this{
         const ary = this.items;
         let pidx: number;
