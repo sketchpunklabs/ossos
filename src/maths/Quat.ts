@@ -1,4 +1,4 @@
-import type { ConstVec3 }   from './Vec3';
+import type { ConstVec3, TVec3 }   from './Vec3';
 import Vec3                 from './Vec3';
 
 export type TQuat     = [number,number,number,number] | Float32Array | Array<number>;
@@ -174,6 +174,29 @@ export default class Quat extends Array<number>{
         this[ 3 ] = w;
         return this;
     }
+
+
+    // /** Create a rotation from eye & target position */
+    // lookAt(
+    //   out: TVec4,
+    //   eye: TVec3, // Position of camera or object
+    //   target: TVec3 = [0, 0, 0], // Position to look at
+    //   up: TVec3 = [0, 1, 0], // Up direction for orientation
+    // ): TVec4 {
+    //   // Forward is inverted, will face correct direction when converted
+    //   // to a ViewMatrix as it'll invert the Forward direction anyway
+    //   const z: TVec3 = vec3.sub([0, 0, 0], eye, target);
+    //   const x: TVec3 = vec3.cross([0, 0, 0], up, z);
+    //   const y: TVec3 = vec3.cross([0, 0, 0], z, x);
+    
+    //   vec3.normalize(x, x);
+    //   vec3.normalize(y, y);
+    //   vec3.normalize(z, z);
+    
+    //   // Format: column-major, when typed out it looks like row-major
+    //   quat.fromMat3(out, [...x, ...y, ...z]);
+    //   return quat.normalize(out, out);
+    // }
     // #endregion
 
     // #region OPERATORS
@@ -352,6 +375,33 @@ export default class Quat extends Array<number>{
     // #region STATIC
     static dot( a: ConstQuat, b: ConstQuat ) : number{ return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]; }
     static lenSqr( a: ConstQuat, b: ConstQuat ) : number{ return (a[0]-b[0]) ** 2 + (a[1]-b[1]) ** 2 + (a[2]-b[2]) ** 2 + (a[3]-b[3]) ** 2; }
+
+    // // https://pastebin.com/66qSCKcZ
+    // // https://forum.unity.com/threads/manually-calculate-angular-velocity-of-gameobject.289462/#post-4302796
+    // static angularVelocity( foreLastFrameRotation: ConstQuat, lastFrameRotation: ConstQuat): TVec3{
+    //     var q = lastFrameRotation * Quaternion.Inverse(foreLastFrameRotation);
+        
+    //     // no rotation?
+    //     // You may want to increase this closer to 1 if you want to handle very small rotations.
+    //     // Beware, if it is too close to one your answer will be Nan
+    //     if ( Mathf.Abs(q.w) > 1023.5f / 1024.0f ) return [0,0,0]; Vector3.zero;
+        
+    //     float gain;
+    //     // handle negatives, we could just flip it but this is faster
+    //     if( q.w < 0.0f ){
+    //         var angle = Mathf.Acos(-q.w);
+    //         gain = -2.0f * angle / (Mathf.Sin(angle) * Time.deltaTime);
+    //     }else{
+    //         var angle = Mathf.Acos(q.w);
+    //         gain = 2.0f * angle / (Mathf.Sin(angle) * Time.deltaTime);
+    //     }
+
+    //     Vector3 angularVelocity = new Vector3(q.x * gain, q.y * gain, q.z * gain);
+
+    //     if(float.IsNaN(angularVelocity.z)) angularVelocity = Vector3.zero;
+
+    //     return angularVelocity;
+    // }
     // #endregion
 
 }

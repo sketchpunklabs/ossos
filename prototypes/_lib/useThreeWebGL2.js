@@ -290,6 +290,8 @@ export default function useThreeWebGL2(){
         createRenderLoop,
         sphericalLook,
         resize,
+
+        version: ()=>{ return THREE.REVISION; },
     };
 }
 // #endregion
