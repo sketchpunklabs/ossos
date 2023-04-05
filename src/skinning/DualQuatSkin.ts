@@ -2,7 +2,7 @@
 import type Armature        from '../armature/Armature';
 import type Bone            from '../armature/Bone';
 import type ISkeleton       from '../armature/ISkeleton';
-import Vec4Ex               from '../maths/Vec4Ex';
+import Vec4               from '../maths/Vec4';
 import { quat2 }            from 'gl-matrix';
 // #endregion
 

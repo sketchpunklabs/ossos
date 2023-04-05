@@ -5,8 +5,8 @@
 import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
 import Util                 from '../_lib/misc/Util.js';
 import { Armature }         from '../../src/index';
-import { vec3, quat }       from 'gl-matrix';
 import Gltf2                from '../_lib/gltf2Parser.es.js';
+import { vec3, quat }       from 'gl-matrix';
 //#endregion
 
 //#region MAIN
@@ -29,32 +29,32 @@ window.addEventListener( 'load', async _=>{
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Ossos Armature from GLTF's Skin Data
     const arm  = gltfAmature( gltf );
+    const pose = arm.poses.bind;
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Pose Armature
     const xLocal = ( arm, bName, xDeg )=>{
         const q  = quat.setAxisAngle( [], [1,0,0], xDeg * Math.PI / 180 );
-        const qb = arm.getBone( bName ).local.rot;
+        const qb = pose.getBone( bName ).local.rot;
         quat.mul( qb, q, qb );
     };
 
-    xLocal( arm, 'Head', -45 );
-    xLocal( arm, 'Thigh_R', -45 );
-    xLocal( arm, 'Shin_R', -45 );
-    xLocal( arm, 'Foot_R', -45 );
-    xLocal( arm, 'Thigh_L', 45 );
-    xLocal( arm, 'Shin_L', -45 );
-    xLocal( arm, 'Foot_L', -45 );
+    xLocal( pose, 'Head', -45 );
+    xLocal( pose, 'Thigh_R', -45 );
+    xLocal( pose, 'Shin_R', -45 );
+    xLocal( pose, 'Foot_R', -45 );
+    xLocal( pose, 'Thigh_L', 45 );
+    xLocal( pose, 'Shin_L', -45 );
+    xLocal( pose, 'Foot_L', -45 );
 
-    arm.updateWorld();
-    Util.debugBones( arm.bones, Debug, 0.07, 1.3 );
+    pose.updateWorld();
+    Util.debugBones( pose.bones, Debug, 0.07, 1.3 );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Apply Pose to 3JS Skeleton
-    for( const b of arm.bones ){
+    for( const b of pose.bones ){
         char.skel.bones[ b.index ].quaternion.fromArray( b.local.rot );
     }
-
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // const skel = char.skel;

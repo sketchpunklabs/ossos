@@ -1,10 +1,9 @@
 import type { ConstQuat } from './Quat';
 
 export type TVec3     = [number,number,number] | Float32Array | Array<number> | number[];
-export type ConstVec3 = Readonly< [number,number,number] | Float32Array | Array<number> | number[] >
+export type ConstVec3 = Readonly< TVec3 >;
 
-
-export default class Vec3 extends Array<number>{
+export default class Vec3 extends Array< number >{
     // #region STATIC PROPERTIES
     static UP       = [  0,  1,  0 ];
     static DOWN     = [  0, -1,  0 ];

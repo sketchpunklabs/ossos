@@ -35,11 +35,14 @@ window.addEventListener( 'load', async _=>{
     const arm  = gltfArmature( gltf );
     
     /*
-    const skin = new MatrixSkin( arm );
-    // const skin = new TranMatrixSkin( arm );
+    // const skin = new MatrixSkin( arm.bindPose );
+    // const skin = arm.useSkin( new MatrixSkin( arm.bindPose ) );
+    // const skin = arm.useSkin( MatrixSkin );
+    
+    const skin = arm.useSkin( TranMatrixSkin );
     const mat  = MatrixSkinMaterial( 'cyan', skin );
     */
-    
+
     /*
     const skin = new DQTSkin( arm );
     const mat  = DQTSkinMaterial( 'cyan', skin );
@@ -51,17 +54,16 @@ window.addEventListener( 'load', async _=>{
     */
 
     /**/
-    const skin = new SQTSkin( arm );
+    const skin = new SQTSkin( arm.bindPose );
     const mat  = SQTSkinMaterial( 'cyan', skin );
     
    
     const mesh = new THREE.Mesh( bGeo, mat );
-
     App.scene.add( mesh );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Pose Armature
-    const pose = new Pose( arm );
+    const pose = arm.newPose;
     pose.offset.pos[2] = -0.5;
 
     pose.rotWorld( 'Hips', 20 );

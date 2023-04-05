@@ -1,33 +1,30 @@
-import Transform        from '../maths/Transform';
-import { quat, vec3 }   from 'gl-matrix';
+import Transform from '../maths/Transform';
+import { TVec3 } from '../maths/Vec3';
+import { TQuat } from '../maths/Quat';
 
 export interface BoneProps{
     name    ?: string;
     parent  ?: Bone | number | string;
     len     ?: number;
-    pos     ?: vec3;
-    rot     ?: quat;
-    scl     ?: vec3;
+    pos     ?: TVec3;
+    rot     ?: TQuat;
+    scl     ?: TVec3;
 }
 
 export default class Bone{
     // #region MAIN
-    index   = -1;
-    pindex  = -1;
-    name    = '';
-    len     = 0;
-    local   = new Transform();
-    world   = new Transform();
+    index   = -1;               // Array Index
+    pindex  = -1;               // Array Index of Parent
+    name    = '';               // Bone Name
+    len     = 0;                // Length of Bone
+    local   = new Transform();  // Local space transform
+    world   = new Transform();  // World space transform
 
     constructor( props ?: BoneProps ){
         this.name  = ( props?.name )? props.name : 'bone' + Math.random();
 
         if( typeof props?.parent === 'number' ) this.pindex = props.parent; 
         if( props?.parent instanceof Bone )     this.pindex = props.parent.index;
-
-        // if( props?.rot ) quat.copy( this.local.rot, props.rot );
-        // if( props?.pos ) vec3.copy( this.local.pos, props.pos );
-        // if( props?.scl ) vec3.copy( this.local.scl, props.scl );
 
         if( props?.rot ) this.local.rot.copy( props.rot );
         if( props?.pos ) this.local.pos.copy( props.pos );
@@ -47,8 +44,6 @@ export default class Bone{
 
         b.local.copy( this.local );
         b.world.copy( this.world );
-        // transform.copy( b.local, this.local );
-        // transform.copy( b.world, this.world );
         return b;
     }
     // #endregion

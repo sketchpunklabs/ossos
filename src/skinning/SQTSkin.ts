@@ -1,16 +1,16 @@
 // #region IMPORTS
-import type Armature        from '../armature/Armature';
-import type Bone            from '../armature/Bone';
-import type ISkeleton       from '../armature/ISkeleton';
-import Vec3Ex               from '../maths/Vec3Ex';
-import Vec4Ex               from '../maths/Vec4Ex';
-import Transform            from '../maths/Transform';
+import type Pose from '../armature/Pose';
+import type Bone from '../armature/Bone';
+
+import Transform from '../maths/Transform';
+import Vec3      from '../maths/Vec3';
+import Quat      from '../maths/Quat';
 // #endregion
 
 export default class SQTSkin{
     // #region MAIN
-    bind            !: Array< Transform >;
-    world           !: Array< Transform >;
+    bind          !: Array< Transform >;
+    world         !: Array< Transform >;
 
     // Split into 3 Buffers because THREEJS does handle mat4x3 correctly
     // Since using in Shader Uniforms, can skip the 16 byte alignment for scale + pos, store data as Vec3 instead of Vec4.
@@ -18,8 +18,8 @@ export default class SQTSkin{
     offsetPBuffer !: Float32Array;  // Translation
     offsetSBuffer !: Float32Array;  // Scale
 
-    constructor( arm: Armature ){
-        const bCnt                          = arm.bones.length;
+    constructor( bindPose: Pose ){
+        const bCnt                          = bindPose.bones.length;
         const world : Array< Transform >    = new Array( bCnt );    // World space matrices
         const bind  : Array< Transform >    = new Array( bCnt );    // bind pose matrices
         
@@ -31,20 +31,23 @@ export default class SQTSkin{
         this.offsetSBuffer = new Float32Array( 3 * bCnt );
 
         // Fill Arrays
+        const vScl = new Vec3( 1, 1, 1 );
+        const vPos = new Vec3();
+        const vRot = new Quat();
         for( let i=0; i < bCnt; i++ ){
             world[ i ] = new Transform();
             bind[ i ]  = new Transform();
 
             // Fill Buffers with Identity Data
-            Vec4Ex.toBuf( [0,0,0,1], this.offsetQBuffer, i * 4 );        // Init Offsets : Quat Identity
-            Vec3Ex.toBuf( [0,0,0],   this.offsetPBuffer, i * 3 );        // ...No Translation
-            Vec3Ex.toBuf( [1,1,1],   this.offsetSBuffer, i * 3 );        // ...No Scale
+            vRot.toBuf( this.offsetQBuffer, i * 4 );        // Init Offsets : Quat Identity
+            vPos.toBuf( this.offsetPBuffer, i * 3 );        // ...No Translation
+            vScl.toBuf( this.offsetSBuffer, i * 3 );        // ...No Scale
         }
         
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         let b: Bone;
         for( let i=0; i < bCnt; i++ ){
-            b = arm.bones[ i ];
+            b = bindPose.bones[ i ];
 
             // Compute Bone's world space transform
             if( b.pindex !== -1 ) world[ i ].fromMul( world[ b.pindex ], b.local );
@@ -63,7 +66,7 @@ export default class SQTSkin{
 
     // #region METHODS
 
-    updateFromPose( pose: ISkeleton ): this{
+    updateFromPose( pose: Pose ): this{
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         const bOffset = new Transform();
         const w       = this.world;

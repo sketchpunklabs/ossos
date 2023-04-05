@@ -30,15 +30,16 @@ window.addEventListener( 'load', async _=>{
     arm.bind( 0.4 );
 
     // Modify bones in local space
+    const pose = arm.poses.bind;
     quat.setAxisAngle( b0.local.rot, [1,0,0], 22.5 * Math.PI / 180 );
     quat.setAxisAngle( b1.local.rot, [1,0,0], 45 * Math.PI / 180 );
     quat.setAxisAngle( b2.local.rot, [1,0,0], 45 * Math.PI / 180 );
     quat.setAxisAngle( b3.local.rot, [1,0,0], 45 * Math.PI / 180 );
     quat.setAxisAngle( b4.local.rot, [1,0,0], -90 * Math.PI / 180 );
-    arm.updateWorld();
+    pose.updateWorld();
 
     // View Bones
-    Util.debugBones( arm.bones, Debug );
+    Util.debugBones( pose.bones, Debug );
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     App.renderLoop();

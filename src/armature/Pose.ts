@@ -1,27 +1,19 @@
 // #region IMPORT
-import type ISkeleton             from './ISkeleton';
 import type Armature              from './Armature';
 import type Bone                  from './Bone';
 import Transform                  from '../maths/Transform';
-import { vec3, quat }             from 'gl-matrix';
-import Quat                       from '../maths/Quat';
 import Vec3, { TVec3, ConstVec3 } from '../maths/Vec3';
+import Quat                       from '../maths/Quat';
 // #endregion
 
-export default class Pose implements ISkeleton{
+export default class Pose {
     // #region MAIN
     arm !: Armature;
-    bones: Array< Bone > = new Array();
-    offset               = new Transform(); 
+    offset               = new Transform(); // Additional offset transformation to apply to pose root
+    linkedBone ?: Bone   = undefined;       // This skeleton extends another skeleton
+    bones: Array< Bone > = new Array();     // Bone transformation heirarchy
 
-    constructor( arm: Armature ){
-        this.arm = arm;
-
-        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        // Clone data
-        this.offset.copy( this.arm.offset );
-        for( let b of this.arm.bones ) this.bones.push( b.clone() );
-    }
+    constructor( arm: Armature ){ this.arm = arm; }
     // #endregion
 
     // #region GETTERS
@@ -50,7 +42,13 @@ export default class Pose implements ISkeleton{
         return rtn;
     }
 
-    clone(): Pose{ return new Pose( this.arm ).copy( this ); }
+    clone(): Pose{ 
+        const p = new Pose( this.arm );
+        p.offset.copy( this.offset );
+
+        for( let b of this.bones ) p.bones.push( b.clone() );
+        return p;
+    }
     // #endregion
 
     // #region SETTERS
@@ -81,8 +79,18 @@ export default class Pose implements ISkeleton{
     // #region COMPUTE
     updateWorld(): this{
         for( const b of this.bones ){
-            if( b.pindex !== -1 ) b.world.fromMul( this.bones[ b.pindex ].world, b.local );
-            else                  b.world.fromMul( this.offset, b.local );
+            if( b.pindex !== -1 ){
+                // Parent Exists
+                b.world.fromMul( this.bones[ b.pindex ].world, b.local );
+            }else{
+                // No Parent, apply any possible offset
+                b.world.fromMul( this.offset, b.local );
+
+                // If pose is linked to another armature bone, append it as its true root
+                if( this.linkedBone ){
+                    b.world.pmul( this.linkedBone.world );
+                }
+            }
         }
 
         return this;
@@ -120,6 +128,10 @@ export default class Pose implements ISkeleton{
 
         // Add offset
         out.pmul( this.offset.rot );
+
+        // Add linked bone if available
+        if( this.linkedBone ) out.pmul( this.linkedBone.world.rot );
+
         return out;
     }
 
@@ -140,6 +152,10 @@ export default class Pose implements ISkeleton{
 
         // Add offset
         out.pmul( this.offset );
+
+        // Add linked bone if available
+        if( this.linkedBone ) out.pmul( this.linkedBone.world );
+
         return out;
     }
 

@@ -1,23 +1,21 @@
 // #region IMPORTS
-import type Armature        from '../armature/Armature';
+import type ISkin           from './ISkin';
+import type Pose            from '../armature/Pose';
 import type Bone            from '../armature/Bone';
-import type ISkeleton       from '../armature/ISkeleton';
-import Mat4Ex               from '../maths/Mat4Ex';
+
 import Transform            from '../maths/Transform';
-import { mat4 }             from 'gl-matrix';
-import type { vec3 }        from 'gl-matrix';
+import Mat4                 from '../maths/Mat4';
 // #endregion
 
-
-export default class TranMatrixSkin{
+export default class TranMatrixSkin implements ISkin{
     // #region MAIN
     bind            !: Array< Transform >;
     world           !: Array< Transform >;
     offsetBuffer    !: Float32Array;
 
-    constructor( arm: Armature ){
-        const bCnt                          = arm.bones.length;
-        const mat4Identity                  = mat4.create();        // used to fill in buffer with default data
+    constructor( bindPose: Pose ){
+        const bCnt                          = bindPose.bones.length;
+        const mat4Identity                  = new Mat4();        // used to fill in buffer with default data
         const world : Array< Transform >    = new Array( bCnt );    // World space matrices
         const bind  : Array< Transform >    = new Array( bCnt );    // bind pose matrices
         
@@ -30,23 +28,19 @@ export default class TranMatrixSkin{
             world[ i ] = new Transform();
             bind[ i ]  = new Transform();
             
-            Mat4Ex.toBuf( mat4Identity, this.offsetBuffer, i * 16 );  // Fill in Offset with Unmodified matrices
+            mat4Identity.toBuf( this.offsetBuffer, i * 16 );  // Fill in Offset with Unmodified matrices
         }
         
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         let b: Bone;
         for( let i=0; i < bCnt; i++ ){
-            b = arm.bones[ i ];
+            b = bindPose.bones[ i ];
 
             // Compute Bone's world space transform
-            // if( b.pindex !== -1 ) transform.mul(  world[ i ], world[ b.pindex ], b.local );
-            // else                  transform.copy( world[ i ], b.local );
-
             if( b.pindex !== -1 ) world[ i ].fromMul( world[ b.pindex ], b.local );
             else                  world[ i ].copy( b.local );
 
             // Inverting it to create a Bind Transform
-            // transform.invert( bind[ i ], world[ i ] );
             bind[ i ].fromInvert( world[ i ] );
         }
 
@@ -58,21 +52,17 @@ export default class TranMatrixSkin{
     // #endregion
 
     // #region METHODS
-    updateFromPose( pose: ISkeleton ): this{
+    updateFromPose( pose: Pose ): this{
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         const bOffset = new Transform();
         const w       = this.world;
-        const m       = mat4.create();
+        const m       = new Mat4();
         let b: Bone;
 
         for( let i=0; i < pose.bones.length; i++ ){
             b = pose.bones[ i ];
 
-            // ----------------------------------------
             // Compute Bone's world space transform
-            // if( b.pindex !== -1 ) transform.mul( w[ i ], w[ b.pindex ], b.local );
-            // else                  transform.mul( w[ i ], pose.offset,   b.local );
-
             if( b.pindex !== -1 ) w[ i ].fromMul( w[ b.pindex ], b.local );
             else                  w[ i ].fromMul( pose.offset,   b.local );
 
@@ -80,11 +70,9 @@ export default class TranMatrixSkin{
             // OffsetTransform = Bone.WorldTransform * Bone.BindTransform
             bOffset.fromMul( w[ i ], this.bind[ i ] );
 
-            // Convert Transform to a Matrix
-            mat4.fromRotationTranslationScale( m, bOffset.rot, bOffset.pos as unknown as vec3, bOffset.scl as unknown as vec3 );
-
-            // Save to Buffer
-            Mat4Ex.toBuf( m, this.offsetBuffer, i * 16 );
+            // Convert Transform to a Matrix, then Save to Buffer
+            m   .fromQuatTranScale( bOffset.rot, bOffset.pos, bOffset.scl )
+                .toBuf( this.offsetBuffer, i * 16 );
         }
 
         return this;

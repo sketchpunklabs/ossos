@@ -2,9 +2,9 @@ import type { ConstVec3, TVec3 }   from './Vec3';
 import Vec3                 from './Vec3';
 
 export type TQuat     = [number,number,number,number] | Float32Array | Array<number>;
-export type ConstQuat = Readonly<TQuat>
+export type ConstQuat = Readonly< TQuat >
 
-export default class Quat extends Array<number>{
+export default class Quat extends Array< number >{
 
     // #region MAIN
     constructor( v ?: ConstQuat ){
@@ -175,6 +175,23 @@ export default class Quat extends Array<number>{
         return this;
     }
 
+    /** Used to get data from a flat buffer */
+    fromBuf( ary: Array<number> | Float32Array, idx: number ): this{
+        this[ 0 ] = ary[ idx ];
+        this[ 1 ] = ary[ idx + 1 ];
+        this[ 2 ] = ary[ idx + 2 ];
+        this[ 3 ] = ary[ idx + 3 ];
+        return this;
+    }
+
+    /** Put data into a flat buffer */
+    toBuf( ary : Array<number> | Float32Array, idx: number ): this{ 
+        ary[ idx ]     = this[ 0 ];
+        ary[ idx + 1 ] = this[ 1 ];
+        ary[ idx + 2 ] = this[ 2 ];
+        ary[ idx + 3 ] = this[ 3 ];
+        return this;
+    }
 
     // /** Create a rotation from eye & target position */
     // lookAt(

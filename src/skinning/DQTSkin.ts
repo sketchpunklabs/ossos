@@ -4,7 +4,7 @@ import type Bone            from '../armature/Bone';
 import type ISkeleton       from '../armature/ISkeleton';
 import type { vec3, quat }  from 'gl-matrix';
 import Vec3Ex               from '../maths/Vec3Ex';
-import Vec4Ex               from '../maths/Vec4Ex';
+import Vec4               from '../maths/Vec4';
 import Transform            from '../maths/Transform';
 import { quat2 }            from 'gl-matrix';
 // #endregion

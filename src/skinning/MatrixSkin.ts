@@ -1,26 +1,26 @@
 // #region IMPORTS
-import type Armature        from '../armature/Armature';
-import type Bone            from '../armature/Bone';
-import type { Transform }   from '../maths/transform';
-import type ISkeleton       from '../armature/ISkeleton';
-import Mat4Ex               from '../maths/Mat4Ex';
-import { mat4 }             from 'gl-matrix';
+import type ISkin       from './ISkin';
+import type Bone        from '../armature/Bone';
+import type Pose        from '../armature/Pose';
+import type Transform   from '../maths/Transform';
+
+import Mat4             from '../maths/Mat4';
 // #endregion
 
 const COMP_LEN = 16;            // 16 Floats
 // const BYTE_LEN = COMP_LEN * 4;  // 16 Floats * 4 Bytes Each
 
-export default class MatrixSkin{
+export default class MatrixSkin implements ISkin{
     // #region MAIN
-    bind            !: Array< mat4 >;
-    world           !: Array< mat4 >;
+    bind            !: Array< Mat4 >;
+    world           !: Array< Mat4 >;
     offsetBuffer    !: Float32Array;
 
-    constructor( arm: Armature ){
-        const bCnt                  = arm.bones.length;
-        const mat4Identity          = mat4.create();        // used to fill in buffer with default data
-        const world: Array< mat4 >  = new Array( bCnt );    // World space matrices
-        const bind : Array< mat4 >  = new Array( bCnt );    // bind pose matrices
+    constructor( bindPose: Pose ){
+        const bCnt                  = bindPose.bones.length;
+        const mat4Identity          = new Mat4();           // used to fill in buffer with default data
+        const world: Array< Mat4 >  = new Array( bCnt );    // World space matrices
+        const bind : Array< Mat4 >  = new Array( bCnt );    // bind pose matrices
         
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Create Flat Buffer Space
@@ -28,25 +28,26 @@ export default class MatrixSkin{
 
         // Fill Arrays
         for( let i=0; i < bCnt; i++ ){
-            world[ i ]  = mat4.create();
-            bind[ i ]   = mat4.create();
+            world[ i ]  = new Mat4(); //mat4.create();
+            bind[ i ]   = new Mat4(); //mat4.create();
 
-            Mat4Ex.toBuf( mat4Identity, this.offsetBuffer, i * COMP_LEN );  // Fill in Offset with Unmodified matrices
+            // Fill in Offset with Unmodified matrices
+            mat4Identity.toBuf( this.offsetBuffer, i * COMP_LEN );
         }
         
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         let b: Bone;
         let l: Transform;
-        let m: mat4;
+        let m: Mat4 = new Mat4();
         for( let i=0; i < bCnt; i++ ){
-            b = arm.bones[ i ];
+            b = bindPose.bones[ i ];
             l = b.local;
             m = world[ i ];
             
-            mat4.fromRotationTranslationScale( m, l.rot, l.pos, l.scl );    // Local Space Matrix
-            if( b.pindex !== -1 ) mat4.mul( m, world[ b.pindex ], m );      // Add Parent if Available
+            m.fromQuatTranScale( l.rot, l.pos, l.scl );         // Local Space Matrix
+            if( b.pindex !== -1 ) m.pmul( world[ b.pindex ] );  // Add Parent if Available
                                  
-            mat4.invert( bind[ i ], m );                                    // Invert for Bind Pose
+            bind[ i ].fromInvert( m );                          // Invert for Bind Pose
         }
 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -57,23 +58,20 @@ export default class MatrixSkin{
     // #endregion
 
     // #region METHODS
-
-    updateFromPose( pose: ISkeleton ): this{
+    updateFromPose( pose: Pose ): this{
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Get Pose Starting Offset
-        const offset = mat4.create();
-        mat4.fromRotationTranslationScale(
-            offset,
-            pose.offset.rot,
-            pose.offset.pos,
-            pose.offset.scl,
+        const offset = new Mat4().fromQuatTranScale( 
+            pose.offset.rot, 
+            pose.offset.pos, 
+            pose.offset.scl
         );
 
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        const bOffset = mat4.create();
-        const w       = this.world;
+        const bOffset = new Mat4();
+        const w: Array< Mat4 > = this.world;
         let b : Bone;
-        let m : mat4;
+        let m : Mat4;
         let i : number;
 
         for( i=0; i < pose.bones.length; i++ ){
@@ -82,16 +80,17 @@ export default class MatrixSkin{
             // ----------------------------------------
             // Compute Worldspace Matrix for Each Bone
             m = w[ i ];
-            mat4.fromRotationTranslationScale( m, b.local.rot,  b.local.pos, b.local.scl ); // Local Space Matrix
+            m.fromQuatTranScale( b.local.rot,  b.local.pos, b.local.scl ); // Local Space Matrix
 
-            if( b.pindex !== -1 ) mat4.mul( m, w[ b.pindex ], m );                          // Add Parent if Available (PMUL)
-            else                  mat4.mul( m, offset, m );                                 // Or use Offset on all root bones (PMUL)
+            if( b.pindex !== -1 ) m.pmul( w[ b.pindex ] );  // Add Parent if Available (PMUL)
+            else                  m.pmul( offset );         // Or use Offset on all root bones (PMUL)
 
             // ----------------------------------------
             // Compute Offset Matrix that will be used for skin a mesh
             // OffsetMatrix = Bone.WorldMatrix * Bone.BindMatrix 
-            mat4.mul( bOffset, m, this.bind[ i ] );
-            Mat4Ex.toBuf( bOffset, this.offsetBuffer, i * COMP_LEN );
+            bOffset
+                .fromMul( m, this.bind[ i ] )
+                .toBuf( this.offsetBuffer, i * COMP_LEN );
         }
 
         return this;
