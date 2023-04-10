@@ -1,0 +1,194 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import Util                         from '../_lib/misc/Util.js';
+import Gltf2                        from '../_lib/gltf2Parser.es.js';
+
+import { Armature, Pose, TranMatrixSkin, Maths, PoseAnimator, Clip, LerpType, TrackQuat } from '../../src/index';
+
+import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
+//#endregion
+
+//#region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 20, 20, 5, [ 0, 1, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create Skinned Mesh from GLTF Model
+    const gltf = await Gltf2.fetch( '/prototypes/_res/models/pete/pete.gltf' );
+    const bGeo = gtlfGeoBuffer( gltf );
+    const arm  = gltfArmature( gltf );
+    const pose = arm.newPose( 'skin' );
+    
+    const skin = arm.useSkin( TranMatrixSkin );
+    const mat  = MatrixSkinMaterial( 'silver', arm.skin );
+
+    const mesh = new THREE.Mesh( bGeo, mat );
+    App.scene.add( mesh );
+
+
+    // console.log( gltf.getAnimationNames() );
+    // console.log( gltf.getAnimation( 'Walking' ) );
+
+    const glAnim = gltf.getAnimation( 'Walking' );
+    // console.log( glAnim );
+    // console.log( glAnim.name, 'Time', glAnim.timestamps[0].boundMax[0],  'Frames', glAnim.timestamps[0].elementCnt ); // glAnim.timestamps[0].data
+    
+    const clip = gltfClip( glAnim );
+    // console.log( clip );
+
+    const animator = new PoseAnimator();
+    animator.setClip( clip );
+    // animator.step( 0 );
+    animator.atFrame( 0 );
+    animator.updatePose( pose );
+
+    console.log( animator );
+    pose.updateWorld();
+    skin.updateFromPose( pose );
+    Util.debugBones( pose.bones, Debug, 0.05, 0.8 );
+
+//    ELerp = {
+//     Step    : 0,
+//     Linear  : 1,
+//     Cubic   : 2,
+// }
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+//#endregion
+
+function gltfClip( anim ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const clip = new Clip( anim.name );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    let i;
+    for( i of anim.timestamps ){
+        if( i.data )                         clip.timeStamps.push( new Float32Array( i.data ) ); // Clone TimeStamp Data so its not bound to GLTF's BIN
+        if( i.elementCnt > clip.frameCount ) clip.frameCount = i.elementCnt;                     // Find max frame counts
+        if( i?.boundMax[0] > clip.duration ) clip.duration   = i.boundMax[0];                    // Find full duration
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    let gTrack; // Gltf Track
+    let oTrack; // Ossos Track
+
+    for( gTrack of anim.tracks ){
+        // -------------------------------------------
+        if( !gTrack.keyframes.data ){
+            console.error( 'GLTF Animation Track has no keyframe data' );
+            continue;
+        }
+
+        // -------------------------------------------
+        oTrack = null;
+        switch( gTrack.transform ){
+            // Rotation
+            case 0: oTrack = new TrackQuat( gTrack.interpolation ); break;
+
+            // Translation
+            case 1: break;
+
+            // Scale
+            case 2: break;
+        }
+
+        // -------------------------------------------
+        if( !oTrack ) continue;
+
+        oTrack.setData( gTrack.keyframes.data );
+        oTrack.boneIndex = gTrack.jointIndex;
+        oTrack.timeIndex = gTrack.timeStampIndex;
+
+        clip.tracks.push( oTrack );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    return clip;
+}
+
+
+// #region GLTF HELPERS
+function gltfArmature( gltf ){
+    const skin = gltf.getSkin();
+    const arm  = new Armature();
+
+    let b;
+    for( const j of skin.joints ){
+        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) b.local.rot.copy( j.rotation );
+        if( j.position ) b.local.pos.copy( j.position );
+        if( j.scale )    b.local.scl.copy( j.scale );
+    }
+
+    arm.bind( 0.1 );
+    return arm;
+}
+
+function gtlfGeoBuffer( gltf ){
+    const gMesh = gltf.getMesh();
+    const gPrim = gMesh.primitives[ 0 ];
+    const bGeo  = Util.geoBuffer(
+        gPrim.position.data,
+        gPrim.indices.data, 
+        gPrim.normal.data, 
+        gPrim.texcoord_0.data, 
+        gPrim.joints_0.data, 
+        gPrim.weights_0.data, 
+        gPrim.weights_0.componentLen,
+    );
+
+    return bGeo;
+}
+
+function gltfCustomSkinnedMesh( gltf, SkinObject, SkinMaterial ){
+    const out = {};
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Generate Skeleton
+    const skin  = gltf.getSkin();
+    out.arm     = new Armature();
+
+    let b;
+    for( const j of skin.joints ){
+        b = out.arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) quat.copy( b.local.rot, j.rotation );
+        if( j.position ) vec3.copy( b.local.pos, j.position );
+        if( j.scale )    vec3.copy( b.local.scl, j.scale );
+    }
+
+    out.arm.bind( 0.1 );
+
+    out.skin = new SkinObject( out.arm );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Skinned Mesh
+    const gMesh = gltf.getMesh();
+    const gPrim = gMesh.primitives[ 0 ];
+    const bGeo  = Util.geoBuffer(
+        gPrim.position.data,
+        gPrim.indices.data, 
+        gPrim.normal.data, 
+        gPrim.texcoord_0.data, 
+        gPrim.joints_0.data, 
+        gPrim.weights_0.data, 
+        gPrim.weights_0.componentLen,
+    );
+
+    const mat = new SkinMaterial( 'cyan', out.skin ); // new THREE.MeshPhongMaterial()
+    out.mesh  = new THREE.Mesh( bGeo, mat );
+    return out;
+}   
+// #endregion
+
+</script></body></html>

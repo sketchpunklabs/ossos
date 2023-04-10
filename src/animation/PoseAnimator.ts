@@ -1,26 +1,31 @@
 
-import type Clip    from './Clip';
-import type Pose    from '../armature/Pose';
-
-import Maths        from '../maths/Maths';
+import type Clip from './Clip';
+import type Pose from '../armature/Pose';
+import Maths     from '../maths/Maths';
 
 export default class PoseAnimator{
+    // #region MAIN
     clip  ?: Clip               = undefined;    // Animation Clip
     clock  : number             = 0;            // Animation Clock
     fInfo  : Array<FrameInfo>   = [];           // Clips can have multiple Timestamps
-
+    // #endregion
+    
+    // #region SETTERS
     setClip( clip: Clip ): this{
         this.clip           = clip;
         this.clock          = 0;
         this.fInfo.length   = 0;
 
+        // For each set of timesteps, create a frame info struct for it
         for( let i=0; i < clip.timeStamps.length; i++ ){
             this.fInfo.push( new FrameInfo() );
         }
         
         return this;
     }
+    // #endregion
 
+    // #region FRAME CONTROLS
     step( dt: number ): this{
         if( this.clip ){
             this.clock = ( this.clock + dt ) % this.clip.duration;
@@ -45,8 +50,7 @@ export default class PoseAnimator{
             ts      = tsAry[ i ];
             fi      = fiAry[ i ];
             tsLen   = ts.length - 1;
-            fi.t    = 1;
-            fi.ti   = 0;
+            fi.t    = 0;
             fi.kA   = ( n <= tsLen )? n : tsLen;
             fi.kB   = fi.kA;
             fi.kC   = fi.kA;
@@ -55,7 +59,9 @@ export default class PoseAnimator{
 
         return this;
     }
+    // #endregion
 
+    // #region METHODS
     updatePose( pose: Pose ): this{
         if( this.clip ){
             let t;
@@ -66,16 +72,18 @@ export default class PoseAnimator{
 
         return this;
     }
+    // #endregion
 
+    // #region PRIVATE METHODS
     computeFrameInfo(){
         if( !this.clip ) return;
 
         const time = this.clock;
-        let fi      : FrameInfo;
-        let ts      : ArrayLike<number>;
-        let imin    : number;
-        let imax    : number;
-        let imid    : number;
+        let fi     : FrameInfo;
+        let ts     : ArrayLike<number>;
+        let imin   : number;
+        let imax   : number;
+        let imid   : number;
 
         for( let i=0; i < this.fInfo.length; i++ ){
             fi = this.fInfo[ i ];
@@ -112,17 +120,17 @@ export default class PoseAnimator{
             }
 
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // Lerp Time & it's inverse
+            // Lerp Time
             fi.t  = ( time - ts[ fi.kB ] ) / ( ts[ fi.kC ] - ts[ fi.kB ] ); // Map Time between the Two Time Stamps
-            fi.ti = 1 - fi.t;
         }
 
     }
+    // #endregion
 }
+
 
 export class FrameInfo{
     t  : number =  0; // Lerp Time
-    ti : number =  0; // Lerp Time Inverse
     kA : number = -1; // Keyframe Pre Tangent
     kB : number = -1; // Keyframe Lerp Start
     kC : number = -1; // Keyframe Lerp End
@@ -130,11 +138,10 @@ export class FrameInfo{
 
     // Set info for single frame timeStamp
     singleFrame(){
-        this.t  = 1;
-        this.ti = 0;
-        this.kA = 0;
+        this.t  =  1;
+        this.kA =  0;
         this.kB = -1;
         this.kC = -1;
-        this.kD = 0;
+        this.kD =  0;
     }
 }

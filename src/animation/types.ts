@@ -11,6 +11,7 @@ export interface ITrack{
     timeIndex       : number;
     values          : Float32Array | Array<number>;
     boneIndex       : number;
-    setInterpolation( i: number ): this;
+
+    setData( data:ArrayLike<number> ): this;
     apply( pose: Pose, fi: FrameInfo ): this;
 }
