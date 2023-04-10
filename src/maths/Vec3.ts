@@ -200,5 +200,53 @@ export default class Vec3 extends Array< number >{
         out[2] = a[2] * scale + b[2];
         return out;
     }
+
+    /*
+    static smoothDamp( cur: ConstVec3, tar: ConstVec3, vel: TVec3, dt: number, smoothTime: number = 0.25, maxSpeed: number = Infinity ): TVec3{
+        // Based on Game Programming Gems 4 Chapter 1.10
+        smoothTime   = Math.max( 0.0001, smoothTime );
+        const omega  = 2 / smoothTime;
+        const x      = omega * dt;
+        const exp    = 1 / ( 1 + x + 0.48 * x * x + 0.235 * x * x * x );
+    
+        const change = vec3.sub( [0,0,0], cur, tar );
+    
+        // Clamp maximum speed
+        const maxChange   = maxSpeed * smoothTime;
+        const maxChangeSq = maxChange * maxChange;
+        const magnitudeSq = change[0]**2 + change[1]**2 + change[2]**2;
+    
+        if( magnitudeSq > maxChangeSq ){
+            const magnitude = Math.sqrt( magnitudeSq );
+            vec3.scale( change, change, 1 / (magnitude * maxChange ) );
+        }
+    
+        const diff = vec3.sub( [0,0,0], cur, change );
+    
+        // const tempX = ( velocity.x + omega * changeX ) * deltaTime;
+        const temp  = vec3.scaleAndAdd( [0,0,0], vel, change, omega );
+        vec3.scale( temp, temp, dt );
+    
+        // velocityR.x = ( velocity.x - omega * tempX ) * exp;
+        vec3.scaleAndAdd( vel, vel, temp, -omega );
+        vec3.scale( vel, vel, exp );
+    
+        // out.x = targetX + ( changeX + tempX ) * exp;
+        const out = vec3.add( [0,0,0], change, temp );
+        vec3.scale( out, out, exp );
+        vec3.add( out, diff, out );
+    
+        // Prevent overshooting
+        const origMinusCurrent = vec3.sub( [0,0,0], tar, cur );
+        const outMinusOrig     = vec3.sub( [0,0,0], out, tar );
+        if( origMinusCurrent[0] * outMinusOrig[0] + origMinusCurrent[1] * outMinusOrig[1] +  origMinusCurrent[2] * outMinusOrig[2] > -0.00001 ){
+            vec3.copy( out, tar );
+            vec3.copy( vel, [0,0,0] );
+        }
+    
+        return out;
+    }
+    */
+
     // #endregion
 }

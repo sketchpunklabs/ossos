@@ -2,7 +2,8 @@
 import Armature     from './armature/Armature';
 import Bone         from './armature/Bone';
 import Pose         from './armature/Pose';
-export { Armature, Bone, Pose };
+import BoneBindings from './armature/BoneBindings';
+export { Armature, Bone, Pose, BoneBindings };
 // #endregion
 
 // #region SKINNING
@@ -21,14 +22,24 @@ export { IKTarget, IKChain };
 // #endregion
 
 // #region MATHS
+import Maths        from './maths/Maths';
 import Transform    from './maths/Transform';
 import Vec3         from './maths/Vec3';
 import Quat         from './maths/Quat';
-export { Transform, Vec3, Quat };
+export { Maths, Transform, Vec3, Quat };
 // #endregion
 
 // #region ANIMATION
 import AnimationQueue    from './animation/AnimationQueue';
 import Easing            from './animation/Easing';
-export { AnimationQueue, Easing };
+
+import { LerpType }      from './animation/types';
+import TrackQuat         from './animation/TrackQuat';
+import Clip              from './animation/Clip';
+import PoseAnimator      from './animation/PoseAnimator';
+
+export { 
+    AnimationQueue, Easing, 
+    PoseAnimator, Clip, LerpType, TrackQuat,
+};
 // #endregion

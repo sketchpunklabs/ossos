@@ -1,10 +1,18 @@
-import type { ConstVec3, TVec3 }   from './Vec3';
+import type { ConstVec3 }   from './Vec3';
 import Vec3                 from './Vec3';
 
 export type TQuat     = [number,number,number,number] | Float32Array | Array<number>;
 export type ConstQuat = Readonly< TQuat >
 
 export default class Quat extends Array< number >{
+    // #region STATIC CONSTANTS
+    static LOOKXP = [0,-0.7071067811865475,0,0.7071067811865475];
+    static LOOKXN = [0,0.7071067811865475,0,0.7071067811865475];
+    static LOOKYP = [0.7071067811865475,0,0,0.7071067811865475];
+    static LOOKYN = [-0.7071067811865475,0,0,0.7071067811865475];
+    static LOOKZP = [0,-1,0,0];
+    static LOOKZN = [0,0,0,1];
+    // #endregion
 
     // #region MAIN
     constructor( v ?: ConstQuat ){
@@ -393,6 +401,31 @@ export default class Quat extends Array< number >{
     static dot( a: ConstQuat, b: ConstQuat ) : number{ return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]; }
     static lenSqr( a: ConstQuat, b: ConstQuat ) : number{ return (a[0]-b[0]) ** 2 + (a[1]-b[1]) ** 2 + (a[2]-b[2]) ** 2 + (a[3]-b[3]) ** 2; }
 
+    static nblend( a: ConstQuat, b: ConstQuat, t: number, out: Quat ): Quat{
+        // https://physicsforgames.blogspot.com/2010/02/quaternions.html
+        const a_x = a[ 0 ];	// Quaternion From
+        const a_y = a[ 1 ];
+        const a_z = a[ 2 ];
+        const a_w = a[ 3 ];
+        const b_x = b[ 0 ];	// Quaternion To
+        const b_y = b[ 1 ];
+        const b_z = b[ 2 ];
+        const b_w = b[ 3 ];
+        const dot = a_x*b_x + a_y*b_y + a_z*b_z + a_w*b_w;
+        const ti  = 1 - t;
+
+        // if Rotations with a dot less then 0 causes artifacts when lerping,
+        // Can fix this by switching the sign of the To Quaternion.
+        const s  = ( dot < 0 )? -1 : 1;
+
+        out[ 0 ] = ti * a_x + t * b_x * s;
+        out[ 1 ] = ti * a_y + t * b_y * s;
+        out[ 2 ] = ti * a_z + t * b_z * s;
+        out[ 3 ] = ti * a_w + t * b_w * s;
+
+        return out.norm();
+    }
+
     // // https://pastebin.com/66qSCKcZ
     // // https://forum.unity.com/threads/manually-calculate-angular-velocity-of-gameobject.289462/#post-4302796
     // static angularVelocity( foreLastFrameRotation: ConstQuat, lastFrameRotation: ConstQuat): TVec3{
@@ -422,3 +455,30 @@ export default class Quat extends Array< number >{
     // #endregion
 
 }
+
+
+// https://gist.github.com/maxattack/4c7b4de00f5c1b95a33b
+/*
+public static Quaternion IntegrateRotation(Quaternion Rotation, Vector3 AngularVelocity, float DeltaTime) {
+    if (DeltaTime < Mathf.Epsilon) return Rotation;
+    var Deriv = AngVelToDeriv(Rotation, AngularVelocity);
+    var Pred = new Vector4(
+            Rotation.x + Deriv.x * DeltaTime,
+            Rotation.y + Deriv.y * DeltaTime,
+            Rotation.z + Deriv.z * DeltaTime,
+            Rotation.w + Deriv.w * DeltaTime
+    ).normalized;
+    return new Quaternion(Pred.x, Pred.y, Pred.z, Pred.w);
+}
+
+public static Quaternion AngVelToDeriv(Quaternion Current, Vector3 AngVel) {
+    var Spin = new Quaternion(AngVel.x, AngVel.y, AngVel.z, 0f);
+    var Result = Spin * Current;
+    return new Quaternion(0.5f * Result.x, 0.5f * Result.y, 0.5f * Result.z, 0.5f * Result.w);
+} 
+
+public static Vector3 DerivToAngVel(Quaternion Current, Quaternion Deriv) {
+    var Result = Deriv * Quaternion.Inverse(Current);
+    return new Vector3(2f * Result.x, 2f * Result.y, 2f * Result.z);
+}
+*/

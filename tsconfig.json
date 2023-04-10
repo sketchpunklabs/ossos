@@ -4,7 +4,7 @@
     "useDefineForClassFields": true,
     "module": "ESNext",
     "moduleResolution": "Node",
-    "lib": ["ESNext", "DOM"],
+    "lib": ["ESNext", "DOM", "ES2021.WeakRef"],
     "allowSyntheticDefaultImports"      : true,
     "allowJs"                           : false,
     "skipLibCheck"                      : false,

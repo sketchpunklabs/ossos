@@ -2,7 +2,7 @@
 import Bone, { BoneProps }      from './Bone';
 import Pose                     from './Pose';
 import Vec3                     from '../maths/Vec3';
-import ISkin, { AnySkin }                    from '../skinning/ISkin';
+import ISkin, { AnySkin }       from '../skinning/ISkin';
 // #endregion
 
 // type Nullable<T> = T | null | undefined;
@@ -19,7 +19,12 @@ export default class Armature{
 
     // #region GETTERS
     get bindPose():Readonly<Pose>{ return this.poses.bind; }
-    get newPose():Pose{ return this.poses.bind.clone(); }
+    
+    newPose( saveAs ?: string ): Pose {
+        const p = this.poses.bind.clone();
+        if( saveAs ) this.poses[ saveAs ] = p;
+        return p;
+    }
     // #endregion
 
     // #region METHODS
@@ -70,7 +75,7 @@ export default class Armature{
                 break;
         }
         return this.skin;
-    };
+    }
     // #endregion
 
     // #region #COMPUTE

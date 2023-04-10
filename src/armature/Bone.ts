@@ -47,4 +47,4 @@ export default class Bone{
         return b;
     }
     // #endregion
-};
+}
