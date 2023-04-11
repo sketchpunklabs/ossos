@@ -4,15 +4,21 @@
 //#region IMPORTS
 import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
 import Util                         from '../_lib/misc/Util.js';
-import Gltf2                        from '../_lib/gltf2Parser.es.js';
+import fetchTexture                 from '../_lib/misc/fetchTexture.js';
+// import Gltf2                        from '../_lib/gltf2Parser.es.js';
+import GltfUtil, { Gltf2 }          from '../_lib/misc/GltfUtil.js';
 
-import { Armature, Pose, TranMatrixSkin, Maths, PoseAnimator, Clip, LerpType, TrackQuat } from '../../src/index';
+import { Armature, Pose, TranMatrixSkin, BoneSockets, Maths, PoseAnimator, Clip, LerpType, TrackQuat, TrackVec3, Quat } from '../../src/index';
 
 import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
 //#endregion
 
 //#region MAIN
 let App = useDarkScene( useThreeWebGL2() );
+let Ref = { 
+    left    : false,
+    right   : false,
+};
 let Debug;
 
 window.addEventListener( 'load', async _=>{
@@ -23,51 +29,119 @@ window.addEventListener( 'load', async _=>{
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Create Skinned Mesh from GLTF Model
+    const tex  = await fetchTexture( '/prototypes/_res/models/pete/pete_texture.png', false );
     const gltf = await Gltf2.fetch( '/prototypes/_res/models/pete/pete.gltf' );
-    const bGeo = gtlfGeoBuffer( gltf );
-    const arm  = gltfArmature( gltf );
+    const bGeo = GltfUtil.loadGeoBuffers( gltf, 'Character' )[0];
+    const arm  = GltfUtil.parseArmature( gltf );
     const pose = arm.newPose( 'skin' );
     
     const skin = arm.useSkin( TranMatrixSkin );
-    const mat  = MatrixSkinMaterial( 'silver', arm.skin );
+    const mat  = MatrixSkinMaterial( tex, arm.skin );
 
     const mesh = new THREE.Mesh( bGeo, mat );
     App.scene.add( mesh );
 
+    console.log( 'Get', gltf.getAnimationNames() )
 
-    // console.log( gltf.getAnimationNames() );
-    // console.log( gltf.getAnimation( 'Walking' ) );
+    // Give it a handler to update THREEJS Objects
+    const sockets = new BoneSockets( (t, obj)=>{
+        obj.position.fromArray( t.pos );
+        obj.scale.fromArray( t.scl );
+        obj.quaternion.fromArray( t.rot );
+    });
 
-    const glAnim = gltf.getAnimation( 'Walking' );
-    // console.log( glAnim );
-    // console.log( glAnim.name, 'Time', glAnim.timestamps[0].boundMax[0],  'Frames', glAnim.timestamps[0].elementCnt ); // glAnim.timestamps[0].data
-    
-    const clip = gltfClip( glAnim );
-    // console.log( clip );
+    sockets.add( 'head',  pose.getBone( 'head' ),   [0,0,0] );
+    sockets.add( 'handl', pose.getBone( 'hand.l' ), [0,0.1,-0.01] );
+    sockets.add( 'handr', pose.getBone( 'hand.r' ), [0,0.1,-0.01] );
+
+    Ref.sockets = sockets;
+
+    const glAnim = gltf.getAnimation( 'Walking' );  // Walking Attack_RightHand_Overhead   
+    const clip = gltfClip( glAnim, arm.poses.bind );
+    clip.addEvent( 'FootL_Down', 0 );
+    clip.addEvent( 'FootR_Down', 13 );
 
     const animator = new PoseAnimator();
+    animator.scale = 1.0;
     animator.setClip( clip );
-    // animator.step( 0 );
-    animator.atFrame( 0 );
-    animator.updatePose( pose );
+    animator.onEvent = onAnimationEvent;
 
-    console.log( animator );
+    
+    // animator.atFrame( 0 );
+    // animator.updatePose( pose );
+
+    Ref.animator = animator;
+    Ref.pose     = pose;
+    Ref.skin     = skin;
+
     pose.updateWorld();
     skin.updateFromPose( pose );
     Util.debugBones( pose.bones, Debug, 0.05, 0.8 );
+    sockets.debugAll( pose, Debug );
 
-//    ELerp = {
-//     Step    : 0,
-//     Linear  : 1,
-//     Cubic   : 2,
-// }
+    // console.log( pose.bones );
+
+    const q = new Quat();
+    const mHelmet = gltfGetAsset( gltf, 'Helmet', tex );
+    App.scene.add( mHelmet );
+    sockets.attach( 'head', mHelmet );
+
+    const mSword = gltfGetAsset( gltf, 'Sword', tex );
+    App.scene.add( mSword );
+    q.rotZ( 90 * Maths.DEG2RAD );
+    q.rotY( 180 * Maths.DEG2RAD );
+    sockets.attach( 'handr', mSword, null, q );
+
+    const mShield = gltfGetAsset( gltf, 'Shield', tex );
+    App.scene.add( mShield );
+    q.identity();
+    q.rotZ( 90 * Maths.DEG2RAD );
+    sockets.attach( 'handl', mShield, [0,0,0.14], q );
+
+    sockets.updateFromPose( pose );
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    App.renderLoop();
+    // Ref.shake = cameraShake( App.camera );
+    App.createRenderLoop( onPreRender ).start(); 
+    // App.renderLoop();
 });
 //#endregion
 
-function gltfClip( anim ){
+function onPreRender( dt, et ){
+    Ref.animator
+        .step( dt )
+        .updatePose( Ref.pose );
+    
+    Ref.pose.updateWorld();
+    Ref.skin.updateFromPose( Ref.pose );
+    Ref.sockets.updateFromPose( Ref.pose );
+
+    Debug.pnt.reset();
+    Debug.ln.reset();
+    Util.debugBones( Ref.pose.bones, Debug, 0.05, 0.8 );
+
+    Debug.pnt.add( [0.5,0.2,0],  (Ref.left)?  0x00ff00:0xff0000, 4 );
+    Debug.pnt.add( [-0.5,0.2,0], (Ref.right)? 0x00ff00:0xff0000, 4 );
+
+    // Ref.shake.update();
+}
+
+function onAnimationEvent( evtName ){
+    switch( evtName ){
+        case 'FootL_Down':
+            Ref.left  = true;
+            Ref.right = false;
+            
+            break;
+        case 'FootR_Down':
+            Ref.left  = false;
+            Ref.right = true;
+            // Ref.shake.start();
+            break;
+    }
+}
+
+function gltfClip( anim, pose ){
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     const clip = new Clip( anim.name );
 
@@ -82,6 +156,8 @@ function gltfClip( anim ){
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     let gTrack; // Gltf Track
     let oTrack; // Ossos Track
+    let bName;  // Bone Name
+    let reBoneFilter = new RegExp( /(root|hips?)/i ); // Only use Vec3 tracks for root or hip bone
 
     for( gTrack of anim.tracks ){
         // -------------------------------------------
@@ -97,7 +173,12 @@ function gltfClip( anim ){
             case 0: oTrack = new TrackQuat( gTrack.interpolation ); break;
 
             // Translation
-            case 1: break;
+            case 1:
+                bName = pose.bones[ gTrack.jointIndex ].name;
+                if( reBoneFilter.test( bName ) ){
+                    oTrack = new TrackVec3( gTrack.interpolation ); break;
+                }
+                break;
 
             // Scale
             case 2: break;
@@ -117,78 +198,69 @@ function gltfClip( anim ){
     return clip;
 }
 
+function cameraShake( camera ){
+    const pos       = [0,0,0];
+    const cur       = [0,0,0];
+    const tar       = [0,0,0];
+    let isRunning   = false;
+    let cnt         = 0;  
+    let lmt         = 5;
+    let cycle       = 0;
+
+    return {
+        start: ()=>{
+            const p = camera.position.toArray();
+            pos[ 0 ] = p[0];
+            pos[ 1 ] = p[1];
+            pos[ 2 ] = p[2];
+            isRunning = true;
+            cycle = 0;
+            cnt = 0;
+        },
+
+        update( dt ){
+            if( !isRunning ) return;
+
+            if( cnt === 0 ){
+                cycle++;
+                if( cycle > 5 ){
+                    isRunning = false;
+                    camera.position.x = pos[0];
+                    camera.position.y = pos[1];
+                    camera.position.z = pos[2];
+                    return;
+                }
+
+                tar[ 0 ] = (Math.random() * 0.3 + -0.15) + pos[0];
+                tar[ 1 ] = (Math.random() * 0.3 + -0.15) + pos[1];
+                tar[ 2 ] = (Math.random() * 0.3 + -0.15) + pos[2];
+
+                cur[0] = pos[0];
+                cur[1] = pos[1];
+                cur[2] = pos[2];
+            }
+
+            let t  = cnt / lmt;
+            let ti = 1 - t;
+
+            camera.position.x = cur[0] * ti + tar[0] * t;
+            camera.position.y = cur[1] * ti + tar[1] * t;
+            camera.position.z = cur[2] * ti + tar[2] * t;
+
+            cnt++;
+            if( cnt > lmt ) cnt = 0;
+        },
+    }
+}
 
 // #region GLTF HELPERS
-function gltfArmature( gltf ){
-    const skin = gltf.getSkin();
-    const arm  = new Armature();
 
-    let b;
-    for( const j of skin.joints ){
-        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
-        if( j.rotation ) b.local.rot.copy( j.rotation );
-        if( j.position ) b.local.pos.copy( j.position );
-        if( j.scale )    b.local.scl.copy( j.scale );
-    }
-
-    arm.bind( 0.1 );
-    return arm;
+function gltfGetAsset( gltf, name, tex ){
+    const bGeo = GltfUtil.loadGeoBuffers( gltf, name, false )[0];
+    const mat  = new THREE.MeshBasicMaterial( {map:tex} );
+    return new THREE.Mesh( bGeo, mat );
 }
 
-function gtlfGeoBuffer( gltf ){
-    const gMesh = gltf.getMesh();
-    const gPrim = gMesh.primitives[ 0 ];
-    const bGeo  = Util.geoBuffer(
-        gPrim.position.data,
-        gPrim.indices.data, 
-        gPrim.normal.data, 
-        gPrim.texcoord_0.data, 
-        gPrim.joints_0.data, 
-        gPrim.weights_0.data, 
-        gPrim.weights_0.componentLen,
-    );
-
-    return bGeo;
-}
-
-function gltfCustomSkinnedMesh( gltf, SkinObject, SkinMaterial ){
-    const out = {};
-    
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Generate Skeleton
-    const skin  = gltf.getSkin();
-    out.arm     = new Armature();
-
-    let b;
-    for( const j of skin.joints ){
-        b = out.arm.addBone( { name: j.name, parent: j.parentIndex } );
-        if( j.rotation ) quat.copy( b.local.rot, j.rotation );
-        if( j.position ) vec3.copy( b.local.pos, j.position );
-        if( j.scale )    vec3.copy( b.local.scl, j.scale );
-    }
-
-    out.arm.bind( 0.1 );
-
-    out.skin = new SkinObject( out.arm );
-
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Skinned Mesh
-    const gMesh = gltf.getMesh();
-    const gPrim = gMesh.primitives[ 0 ];
-    const bGeo  = Util.geoBuffer(
-        gPrim.position.data,
-        gPrim.indices.data, 
-        gPrim.normal.data, 
-        gPrim.texcoord_0.data, 
-        gPrim.joints_0.data, 
-        gPrim.weights_0.data, 
-        gPrim.weights_0.componentLen,
-    );
-
-    const mat = new SkinMaterial( 'cyan', out.skin ); // new THREE.MeshPhongMaterial()
-    out.mesh  = new THREE.Mesh( bGeo, mat );
-    return out;
-}   
 // #endregion
 
 </script></body></html>

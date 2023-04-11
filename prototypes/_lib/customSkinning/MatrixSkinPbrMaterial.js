@@ -159,6 +159,13 @@ vec3 BRDF_specularGGX(vec3 f0, vec3 f90, float alphaRoughness, float specularWei
 }
 // #endregion
 
+vec3 linear_SRGB( vec3 v ){ 
+    return vec3(
+        ( v.r <= 0.0031308 )? v.r * 12.92 : 1.055 * pow( v.r, 1.0/2.4) - 0.055,
+        ( v.g <= 0.0031308 )? v.g * 12.92 : 1.055 * pow( v.g, 1.0/2.4) - 0.055,
+        ( v.b <= 0.0031308 )? v.b * 12.92 : 1.055 * pow( v.b, 1.0/2.4) - 0.055
+    );
+}
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -225,6 +232,7 @@ void main(){
 
     vec3 ambient = mat.baseColor * 0.3;
     out_color = vec4( ambient + f_diffuse + f_specular, 1.0 );
+    // out_color.rgb = linear_SRGB( out_color.rgb );
 }`;
 
 // FRAGMENT THAT ONLY RENDERS TEXTURE

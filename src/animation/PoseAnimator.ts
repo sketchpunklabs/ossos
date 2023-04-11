@@ -3,11 +3,17 @@ import type Clip from './Clip';
 import type Pose from '../armature/Pose';
 import Maths     from '../maths/Maths';
 
+export type TOnEventHandler = ( evt:string )=>void;
+
 export default class PoseAnimator{
     // #region MAIN
-    clip  ?: Clip               = undefined;    // Animation Clip
-    clock  : number             = 0;            // Animation Clock
-    fInfo  : Array<FrameInfo>   = [];           // Clips can have multiple Timestamps
+    isRunning                           = true;
+    clip       ?: Clip                  = undefined;    // Animation Clip
+    clock       : number                = 0;            // Animation Clock
+    fInfo       : Array<FrameInfo>      = [];           // Clips can have multiple Timestamps
+    scale       : number                = 1;            // Scale the speed of the animation
+    onEvent    ?: TOnEventHandler       = undefined;    //
+    eventCache ?: Map<string, boolean>  = undefined;
     // #endregion
     
     // #region SETTERS
@@ -20,6 +26,11 @@ export default class PoseAnimator{
         for( let i=0; i < clip.timeStamps.length; i++ ){
             this.fInfo.push( new FrameInfo() );
         }
+
+        // Create an event cache if clip has events
+        if( clip.events && !this.eventCache ){
+            this.eventCache = new Map();
+        }
         
         return this;
     }
@@ -27,9 +38,28 @@ export default class PoseAnimator{
 
     // #region FRAME CONTROLS
     step( dt: number ): this{
-        if( this.clip ){
-            this.clock = ( this.clock + dt ) % this.clip.duration;
+        if( this.clip && this.isRunning ){
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            const tick = dt * this.scale;
+
+            if( !this.clip.isLooped && this.clock + tick >= this.clip.duration ){
+                this.clock      = this.clip.duration;
+                this.isRunning  = false;
+            }else{
+                // Clear event cache if restarting new loop
+                if( ( this.clock + tick ) >= this.clip.duration ){
+                    this.eventCache?.clear();
+                }
+
+                this.clock = ( this.clock + tick ) % this.clip.duration;
+            }
+
             this.computeFrameInfo();
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            if( this.clip.events  && this.onEvent ){
+                this.checkEvents();
+            }
         }
         return this;
     }
@@ -100,6 +130,8 @@ export default class PoseAnimator{
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             // If the clock has moved passed the previous keyframe range, recompute new range
             if( time < ts[ fi.kB ] || time > ts[ fi.kC ] || fi.kB === -1 ){
+                // Save previous frame
+                fi.pkB = fi.kB;
 
                 // Find the first frame that is greater then the clock time.
                 // Do this by using a binary search by shrinking a range of indices
@@ -123,18 +155,43 @@ export default class PoseAnimator{
             // Lerp Time
             fi.t  = ( time - ts[ fi.kB ] ) / ( ts[ fi.kC ] - ts[ fi.kB ] ); // Map Time between the Two Time Stamps
         }
+    }
 
+    checkEvents(): void{
+        // const fi = this.fInfo[ 0 ];
+        if( !this?.clip?.events || !this.onEvent ) return;
+
+        // For every timestamp set...
+        for( const fi of this.fInfo ){
+
+            // Check if a marker has been crossed.
+            for( const evt of this.clip.events ){
+
+                if( evt.start >= fi.pkB && evt.start < fi.kB && !this.eventCache?.get( evt.name ) ){
+                    this.eventCache?.set( evt.name, true );     // Trigger only once per cycle
+                    try{
+                        this.onEvent( evt.name );
+                    }catch( err ){
+                        const msg = ( err instanceof Error )? err.message : String( err );
+                        console.error( 'Error while calling animation event callback:', msg );
+                    }
+                    break;
+                }
+            }
+        }
     }
     // #endregion
 }
 
 
 export class FrameInfo{
-    t  : number =  0; // Lerp Time
-    kA : number = -1; // Keyframe Pre Tangent
-    kB : number = -1; // Keyframe Lerp Start
-    kC : number = -1; // Keyframe Lerp End
-    kD : number = -1; // Keyframe Post Tangent
+    t   : number =  0; // Lerp Time
+    kA  : number = -1; // Keyframe Pre Tangent
+    kB  : number = -1; // Keyframe Lerp Start
+    kC  : number = -1; // Keyframe Lerp End
+    kD  : number = -1; // Keyframe Post Tangent
+
+    pkB : number = 0;
 
     // Set info for single frame timeStamp
     singleFrame(){

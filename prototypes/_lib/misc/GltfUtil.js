@@ -1,7 +1,8 @@
 // #region IMPORTS
 import * as THREE               from 'three';
 import { vec3, quat }           from 'gl-matrix';
-import { Armature }             from '../../../src/index';
+import { Armature, Clip, TrackVec3, TrackQuat } 
+                                from '../../../src/index';
 import Gltf2                    from '../gltf2Parser.es.js';
 // import MatrixSkinMaterial       from '../customSkinning/MatrixSkinMaterial.js';
 import MatrixSkinPbrMaterial    from '../customSkinning/MatrixSkinPbrMaterial.js';
@@ -9,7 +10,7 @@ import MatrixSkinPbrMaterial    from '../customSkinning/MatrixSkinPbrMaterial.js
 
 export { Gltf2 };
 
-export class GltfUtil{
+export default class GltfUtil{
 
     // #region ARMATURE
     static parseArmature( gltf ){
@@ -50,7 +51,7 @@ export class GltfUtil{
         return out;
     }
 
-    static loadNodeMeshes( gltf, nList, skin=null, grp = new THREE.Group ){
+    static loadNodeMeshes( gltf, nList, skin=null, grp=new THREE.Group ){
         const matCache  = {};
         const useSkin   = !!skin;
 
@@ -77,7 +78,7 @@ export class GltfUtil{
                 mat     = matCache[ matId ];
                 if( !mat ){
                     const color = ( p.materialIdx !== undefined )? 
-                        gltf.getMaterial( p.materialIdx ).baseColorFactor.slice( 0, 2 ) : 
+                        gltf.getMaterial( p.materialIdx ).baseColor.slice( 0, 2 ) : 
                         'cyan';
 
                     mat = ( skin )? 
@@ -146,6 +147,84 @@ export class GltfUtil{
 
         return geo;
 
+    }
+
+    static loadGeoBuffers( gltf, id, useSkin=true ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const m = gltf.getMesh( id );
+        if( !m || m.primitives.length == 0 ){
+            console.error( 'No gltf mesh found', id );
+            return null;
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const out = [];
+        for( let p of m.primitives ){
+            out.push( this.geoPrimitive( p, useSkin ) );
+        }
+
+        return out;
+    }
+    
+    // #endregion
+
+    // #region ANIMATIONS
+    static loadAnimationClip( gltf, name, pose ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const anim  = gltf.getAnimation( name );
+        const clip  = new Clip( anim.name );
+    
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        let i;
+        for( i of anim.timestamps ){
+            if( i.data )                         clip.timeStamps.push( new Float32Array( i.data ) ); // Clone TimeStamp Data so its not bound to GLTF's BIN
+            if( i.elementCnt > clip.frameCount ) clip.frameCount = i.elementCnt;                     // Find max frame counts
+            if( i?.boundMax[0] > clip.duration ) clip.duration   = i.boundMax[0];                    // Find full duration
+        }
+    
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        let gTrack; // Gltf Track
+        let oTrack; // Ossos Track
+        let bName;  // Bone Name
+        let reBoneFilter = new RegExp( /(root|hips?)/i ); // Only use Vec3 tracks for root or hip bone
+    
+        for( gTrack of anim.tracks ){
+            // -------------------------------------------
+            if( !gTrack.keyframes.data ){
+                console.error( 'GLTF Animation Track has no keyframe data' );
+                continue;
+            }
+    
+            // -------------------------------------------
+            oTrack = null;
+            switch( gTrack.transform ){
+                // Rotation
+                case 0: oTrack = new TrackQuat( gTrack.interpolation ); break;
+    
+                // Translation
+                case 1:
+                    bName = pose.bones[ gTrack.jointIndex ].name;
+                    if( reBoneFilter.test( bName ) ){
+                        oTrack = new TrackVec3( gTrack.interpolation ); break;
+                    }
+                    break;
+    
+                // Scale
+                case 2: break;
+            }
+    
+            // -------------------------------------------
+            if( !oTrack ) continue;
+    
+            oTrack.setData( gTrack.keyframes.data );
+            oTrack.boneIndex = gTrack.jointIndex;
+            oTrack.timeIndex = gTrack.timeStampIndex;
+    
+            clip.tracks.push( oTrack );
+        }
+    
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        return clip;
     }
     // #endregion
 

@@ -1,11 +1,16 @@
 import type { FrameInfo }   from './PoseAnimator';
 import type Pose            from '../armature/Pose';
 
+export const EventType = {
+    Frame   : 0,
+    Time    : 1,
+} as const;
+
 export const LerpType = {
     Step    : 0,
     Linear  : 1,
     Cubic   : 2,
-} as const; 
+} as const;
 
 export interface ITrack{
     timeIndex       : number;

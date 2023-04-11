@@ -35,7 +35,7 @@ export function useDarkScene( tjs, props={} ){
     // Renderer
     tjs.renderer.setClearColor( 0x3a3a3a, 1 );
     return tjs;
-};
+}
 
 export async function useVisualDebug( tjs ){
     const ary = await Promise.all([
@@ -51,7 +51,12 @@ export async function useVisualDebug( tjs ){
 // #endregion
 
 // #region MAIN
-export default function useThreeWebGL2(){
+export default function useThreeWebGL2( props={} ){
+    props = Object.assign( {
+        colorMode : false,
+        shadows   : false,
+    }, props );
+
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // RENDERER
     const options = { 
@@ -66,6 +71,22 @@ export default function useThreeWebGL2(){
     const renderer = new THREE.WebGLRenderer( options );
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setClearColor( 0x3a3a3a, 1 );
+
+    if( props.colorMode ){
+        // React-Fiber changes the default settings which causes big issues trying to map colors 1:1
+        // https://docs.pmnd.rs/react-three-fiber/api/canvas#render-defaults
+        // https://threejs.org/docs/#manual/en/introduction/Color-management
+
+        renderer.outputEncoding = THREE.sRGBEncoding;           // Turns on sRGB Encoding & Gamma Correction :: THREE.LinearEncoding
+        renderer.toneMapping    = THREE.ACESFilmicToneMapping;  // Try to make it close to HDR :: THREE.NoToneMapping
+        THREE.ColorManagement.legacyMode = false;               // Turns old 3JS's old color manager  :: true
+    }
+
+    if( props.shadows ){
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type    = THREE.PCFSoftShadowMap; // default THREE.PCFShadowMap
+    }
+
     document.body.appendChild( renderer.domElement );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

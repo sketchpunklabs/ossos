@@ -1,0 +1,106 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import Util                         from '../_lib/misc/Util.js';
+import fetchTexture                 from '../_lib/misc/fetchTexture.js';
+import GltfUtil, { Gltf2 }          from '../_lib/misc/GltfUtil.js';
+
+import { Armature, Pose, TranMatrixSkin, PoseAnimator, Maths, Quat } from '../../src/index';
+
+import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
+//#endregion
+
+//#region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Ref = { 
+    left    : false,
+    right   : false,
+};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 90, 2, 5, [ 0, 1, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create Skinned Mesh from GLTF Model
+    // const tex  = await fetchTexture( '/prototypes/_res/models/pete/pete_texture.png', false );
+    const gltf = await Gltf2.fetch( '/prototypes/_res/models/pete/pete.gltf' );
+    const bGeo = GltfUtil.loadGeoBuffers( gltf, 'Character' )[0];
+    const arm  = GltfUtil.parseArmature( gltf );
+    const pose = arm.newPose( 'skin' );
+    
+    const skin = arm.useSkin( TranMatrixSkin );
+    const mat  = MatrixSkinMaterial( 'silver', arm.skin );
+
+    const mesh = new THREE.Mesh( bGeo, mat );
+    App.scene.add( mesh );
+
+    // console.log( 'Get', gltf.getAnimationNames() )
+
+    // const glAnim = gltf.getAnimation( 'Walking' );  // Walking Attack_RightHand_Overhead   
+    // const clip = gltfClip( glAnim, arm.poses.bind );
+    const clip = GltfUtil.loadAnimationClip( gltf, 'Walking', arm.poses.bind );
+    // clip.addEvent( 'FootL_Down', 0 );
+    // clip.addEvent( 'FootR_Down', 13 );
+
+    const animator = new PoseAnimator();
+    animator.scale = 1.0;
+    animator.setClip( clip );
+    // animator.onEvent = onAnimationEvent;
+
+    
+    // animator.atFrame( 0 );
+    // animator.updatePose( pose );
+
+    Ref.animator = animator;
+    Ref.pose     = pose;
+    Ref.skin     = skin;
+
+    pose.updateWorld();
+    skin.updateFromPose( pose );
+    Util.debugBones( pose.bones, Debug, 0.05, 0.8 );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Ref.shake = cameraShake( App.camera );
+    App.createRenderLoop( onPreRender ).start(); 
+    // App.renderLoop();
+});
+//#endregion
+
+function onPreRender( dt, et ){
+    Ref.animator
+        .step( dt )
+        .updatePose( Ref.pose );
+    
+    Ref.pose.updateWorld();
+    Ref.skin.updateFromPose( Ref.pose );
+
+    Debug.pnt.reset();
+    Debug.ln.reset();
+    Util.debugBones( Ref.pose.bones, Debug, 0.05, 0.8 );
+
+    // Debug.pnt.add( [0.5,0.2,0],  (Ref.left)?  0x00ff00:0xff0000, 4 );
+    // Debug.pnt.add( [-0.5,0.2,0], (Ref.right)? 0x00ff00:0xff0000, 4 );
+}
+
+function onAnimationEvent( evtName ){
+    switch( evtName ){
+        case 'FootL_Down':
+            Ref.left  = true;
+            Ref.right = false;
+            
+            break;
+        case 'FootR_Down':
+            Ref.left  = false;
+            Ref.right = true;
+            // Ref.shake.start();
+            break;
+    }
+}
+
+</script></body></html>
