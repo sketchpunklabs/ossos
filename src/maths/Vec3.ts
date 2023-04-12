@@ -33,6 +33,10 @@ export default class Vec3 extends Array< number >{
             this[ 0 ] = v;
             this[ 1 ] = v;
             this[ 2 ] = v;
+        }else{
+            this[ 0 ] = 0;
+            this[ 1 ] = 0;
+            this[ 2 ] = 0;
         }
     }
     // #endregion
@@ -55,6 +59,22 @@ export default class Vec3 extends Array< number >{
         this[ 1 ] = a[ 1 ];
         this[ 2 ] = a[ 2 ];
         return this
+    }
+    
+    setInfinite( sign:number=1 ): this{
+        this[ 0 ] = Infinity * sign;
+        this[ 1 ] = Infinity * sign;
+        this[ 2 ] = Infinity * sign;
+        return this
+    }
+
+    /** Generate a random vector. Can choose per axis range */
+    rnd( x0=0, x1=1, y0=0, y1=1, z0=0, z1=1 ): this{
+        let t;
+        t = Math.random(); this[ 0 ] = x0 * (1-t) + x1 * t;
+        t = Math.random(); this[ 1 ] = y0 * (1-t) + y1 * t;
+        t = Math.random(); this[ 2 ] = z0 * (1-t) + z1 * t;
+        return this;
     }
     // #endregion
 
@@ -147,6 +167,20 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
+    scale( v: number ): this{
+        this[ 0 ] *= v;
+        this[ 1 ] *= v;
+        this[ 2 ] *= v;
+        return this;
+    }
+
+    invert(): this{
+        this[0] = 1 / this[0];
+        this[1] = 1 / this[1];
+        this[2] = 1 / this[2];
+        return this;
+    }
+
     norm(): this{
         let mag = Math.sqrt( this[0]**2 + this[1]**2 + this[2]**2 );
         if( mag != 0 ){
@@ -157,6 +191,65 @@ export default class Vec3 extends Array< number >{
         }
         return this;
     }
+
+    abs(): this{ 
+        this[ 0 ] = Math.abs( this[ 0 ] );
+        this[ 1 ] = Math.abs( this[ 1 ] );
+        this[ 2 ] = Math.abs( this[ 2 ] );
+        return this;
+    }
+
+    floor(): this{
+        this[ 0 ] = Math.floor( this[ 0 ] );
+        this[ 1 ] = Math.floor( this[ 1 ] );
+        this[ 2 ] = Math.floor( this[ 2 ] );
+        return this;
+    }
+
+    ceil(): this{
+        this[ 0 ] = Math.ceil( this[ 0 ] );
+        this[ 1 ] = Math.ceil( this[ 1 ] );
+        this[ 2 ] = Math.ceil( this[ 2 ] );
+        return this;
+    }
+
+    min( a: ConstVec3 ) : this{
+        this[ 0 ] = Math.min( this[ 0 ], a[ 0 ] );
+        this[ 1 ] = Math.min( this[ 1 ], a[ 1 ] );
+        this[ 2 ] = Math.min( this[ 2 ], a[ 2 ] );
+        return this;
+    }
+
+    max( a: ConstVec3 ) : this{
+        this[ 0 ] = Math.max( this[ 0 ], a[ 0 ] );
+        this[ 1 ] = Math.max( this[ 1 ], a[ 1 ] );
+        this[ 2 ] = Math.max( this[ 2 ], a[ 2 ] );
+        return this;
+    }
+
+    /** When values are very small, like less then 0.000001, just make it zero */
+    nearZero(): this{
+        if( Math.abs( this[ 0 ] ) <= 1e-6 ) this[ 0 ] = 0;
+        if( Math.abs( this[ 1 ] ) <= 1e-6 ) this[ 1 ] = 0;
+        if( Math.abs( this[ 2 ] ) <= 1e-6 ) this[ 2 ] = 0;
+        return this;
+    }
+
+    negate(): this{
+        this[ 0 ] = -this[ 0 ];
+        this[ 1 ] = -this[ 1 ];
+        this[ 2 ] = -this[ 2 ];
+        return this;
+    }
+
+    clamp( min: ConstVec3, max: ConstVec3 ): this{
+        this[ 0 ] = Math.min( Math.max( this[ 0 ], min[ 0 ] ), max[ 0 ] );
+        this[ 1 ] = Math.min( Math.max( this[ 1 ], min[ 1 ] ), max[ 1 ] );
+        this[ 2 ] = Math.min( Math.max( this[ 2 ], min[ 2 ] ), max[ 2 ] );
+        return this;
+    }
+
+    dot( b: ConstVec3 ): number{ return this[ 0 ] * b[ 0 ] + this[ 1 ] * b[ 1 ] + this[ 2 ] * b[ 2 ]; } 
     // #endregion
 
     // #region TRANFORMS
@@ -172,6 +265,47 @@ export default class Vec3 extends Array< number >{
         this[ 0 ] = vx + 2 * x2;
         this[ 1 ] = vy + 2 * y2;
         this[ 2 ] = vz + 2 * z2;
+        return this;
+    }
+
+    axisAngle( axis: ConstVec3, rad: number ): this{
+        // Rodrigues Rotation formula:
+        // v_rot = v * cos(theta) + cross( axis, v ) * sin(theta) + axis * dot( axis, v) * (1-cos(theta))
+        const cp  = new Vec3().fromCross( axis, this ),
+              dot = Vec3.dot( axis, this ),
+              s   = Math.sin(rad),
+              c   = Math.cos(rad),
+              ci  = 1 - c;
+
+        this[ 0 ] = this[ 0 ] * c + cp[ 0 ] * s + axis[ 0 ] * dot * ci;
+        this[ 1 ] = this[ 1 ] * c + cp[ 1 ] * s + axis[ 1 ] * dot * ci;
+        this[ 2 ] = this[ 2 ] * c + cp[ 2 ] * s + axis[ 2 ] * dot * ci;
+        return this;
+    }
+
+    rotate( rad: number, axis="x" ): this{
+        // https://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/3drota.htm
+        const sin = Math.sin( rad ),
+              cos = Math.cos( rad ),
+              x   = this[ 0 ],
+              y   = this[ 1 ],
+              z   = this[ 2 ];
+
+        switch( axis ){
+            case "y": //..........................
+                this[ 0 ] = z * sin + x * cos; //x
+                this[ 2 ] = z * cos - x * sin; //z
+            break;
+            case "x": //..........................
+                this[ 1 ] = y * cos - z * sin; //y
+                this[ 2 ] = y * sin + z * cos; //z
+            break;
+            case "z": //..........................
+                this[ 0 ] = x * cos - y * sin; //x
+                this[ 1 ] = x * sin + y * cos; //y
+            break;
+        }
+
         return this;
     }
     // #endregion

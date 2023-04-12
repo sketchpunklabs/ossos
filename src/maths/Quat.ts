@@ -466,6 +466,49 @@ export default class Quat extends Array< number >{
         return out;
     }
 
+    static shortest( from: ConstQuat, to: ConstQuat, out:TQuat ): TQuat{
+        // if( Quaternion.Dot(a, b) < 0 ){
+        //     return a * Quaternion.Inverse( Multiply(b, -1) );
+        // }   else return a * Quaternion.Inverse(b);
+
+        const ax  = from[0], ay = from[1], az = from[2], aw = from[3];
+        let   bx  = to[0],   by = to[1],   bz = to[2],   bw = to[3];
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const dot = ax * bx + ay * by + az * bz + aw * bw;
+        if( dot < 0 ){
+            // quat.negate
+            bx = -bx;
+            by = -by;
+            bz = -bz;
+            bw = -bw;
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // quat.invert
+        const d = bx*bx + by*by + bz*bz + bw*bw;
+        if( d === 0 ){
+            bx = 0;
+            by = 0;
+            bz = 0;
+            bw = 0;
+        }else{
+            const di = 1.0 / d;
+            bx    = -bx * di;
+            by    = -by * di;
+            bz    = -bz * di;
+            bw    =  bw * di;
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // quat.mul
+        out[ 0 ] = ax * bw + aw * bx + ay * bz - az * by;
+        out[ 1 ] = ay * bw + aw * by + az * bx - ax * bz;
+        out[ 2 ] = az * bw + aw * bz + ax * by - ay * bx;
+        out[ 3 ] = aw * bw - ax * bx - ay * by - az * bz;
+        return out;
+    }
+
     // // https://pastebin.com/66qSCKcZ
     // // https://forum.unity.com/threads/manually-calculate-angular-velocity-of-gameobject.289462/#post-4302796
     // static angularVelocity( foreLastFrameRotation: ConstQuat, lastFrameRotation: ConstQuat): TVec3{

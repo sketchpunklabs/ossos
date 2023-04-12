@@ -7,7 +7,7 @@ import Util                         from '../_lib/misc/Util.js';
 import fetchTexture                 from '../_lib/misc/fetchTexture.js';
 import GltfUtil, { Gltf2 }          from '../_lib/misc/GltfUtil.js';
 
-import { Armature, Pose, TranMatrixSkin, PoseAnimator, Maths, Quat } from '../../src/index';
+import { Armature, Pose, TranMatrixSkin, PoseAnimator, Maths, Quat, Vec3 } from '../../src/index';
 
 import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
 //#endregion
@@ -27,65 +27,77 @@ window.addEventListener( 'load', async _=>{
     Debug = await useVisualDebug( App );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Create Skinned Mesh from GLTF Model
-    // const tex  = await fetchTexture( '/prototypes/_res/models/pete/pete_texture.png', false );
     const gltf = await Gltf2.fetch( '/prototypes/_res/models/pete/pete.gltf' );
     const bGeo = GltfUtil.loadGeoBuffers( gltf, 'Character' )[0];
     const arm  = GltfUtil.parseArmature( gltf );
-    const pose = arm.newPose( 'skin' );
     
-    const skin = arm.useSkin( TranMatrixSkin );
+    // console.log( 'Get', gltf.getAnimationNames() )
+    
+    arm.newPose( 'anim' );
+    arm.useSkin( TranMatrixSkin );
+    
     const mat  = MatrixSkinMaterial( 'silver', arm.skin );
-
     const mesh = new THREE.Mesh( bGeo, mat );
     App.scene.add( mesh );
 
-    // console.log( 'Get', gltf.getAnimationNames() )
-
-    // const glAnim = gltf.getAnimation( 'Walking' );  // Walking Attack_RightHand_Overhead   
-    // const clip = gltfClip( glAnim, arm.poses.bind );
     const clip = GltfUtil.loadAnimationClip( gltf, 'Walking', arm.poses.bind );
     // clip.addEvent( 'FootL_Down', 0 );
     // clip.addEvent( 'FootR_Down', 13 );
 
     const animator = new PoseAnimator();
-    animator.scale = 1.0;
     animator.setClip( clip );
     // animator.onEvent = onAnimationEvent;
-
-    
     // animator.atFrame( 0 );
     // animator.updatePose( pose );
 
     Ref.animator = animator;
-    Ref.pose     = pose;
-    Ref.skin     = skin;
+    Ref.arm      = arm;
 
-    pose.updateWorld();
-    skin.updateFromPose( pose );
-    Util.debugBones( pose.bones, Debug, 0.05, 0.8 );
+    // onPreRender( 0 );
+
+    const mCompute = new MotionCompute( arm );
+    mCompute
+        .setClip( clip )
+        .setLeftLeg( 'toes.l', 13, 0 )
+        .setRightLeg( 'toes.r', 0, 13 );
+
+    mCompute.process().computeDistance(); //.debugPoints();
+
+
+    let frm = 0;
+    setInterval( ()=>{
+        // console.log( frm );
+        mCompute.atKey( frm, true );
+        mesh.position.fromArray( mCompute.frames[ frm ] );
+        frm = ( frm + 1 ) % clip.frameCount;
+    }, 350);
+
+    //legr_down: 0
+    //legr_up : 13
+    //legl_down : 13
+    //legl_up:   0
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Ref.shake = cameraShake( App.camera );
-    App.createRenderLoop( onPreRender ).start(); 
-    // App.renderLoop();
+    // App.createRenderLoop( onPreRender ).start(); 
+    App.renderLoop();
 });
 //#endregion
 
 function onPreRender( dt, et ){
+    // Generate Pose
     Ref.animator
         .step( dt )
-        .updatePose( Ref.pose );
+        .updatePose( Ref.arm.poses.anim );
     
-    Ref.pose.updateWorld();
-    Ref.skin.updateFromPose( Ref.pose );
+    // Update Skinned Mesh
+    Ref.arm.poses.anim.updateWorld();
+    Ref.arm.skin.updateFromPose( Ref.arm.poses.anim );
 
+    // Render Bones
     Debug.pnt.reset();
     Debug.ln.reset();
-    Util.debugBones( Ref.pose.bones, Debug, 0.05, 0.8 );
-
-    // Debug.pnt.add( [0.5,0.2,0],  (Ref.left)?  0x00ff00:0xff0000, 4 );
-    // Debug.pnt.add( [-0.5,0.2,0], (Ref.right)? 0x00ff00:0xff0000, 4 );
+    Util.debugBones( Ref.arm.poses.anim.bones, Debug, 0.05, 0.8 );
 }
 
 function onAnimationEvent( evtName ){
@@ -103,4 +115,134 @@ function onAnimationEvent( evtName ){
     }
 }
 
+
+class RootMotion{
+
+}
+
+class MotionCompute{
+    animator = new PoseAnimator()
+    pose     = null;
+    arm      = null;
+    footL    = null;
+    footR    = null;
+    isLDown  = false;
+    isRDown  = false;
+    lPoints  = [];
+    rPoints  = [];
+
+    min      = new Vec3();
+    max      = new Vec3();
+
+    frames   = [];
+
+    constructor( arm ){
+        this.arm  = arm;
+        this.pose = arm.newPose();
+        this.animator.onAnimationEvent = this.onEvent;
+    }
+
+    debugPoints(){
+        Debug.ln.box( this.min, this.max, 0xffffff );
+
+        for( let i=0; i < this.lPoints.length; i++ ){
+            Debug.pnt.add( this.rPoints[i], 0x00ff00, 1.2 );
+            Debug.pnt.add( this.lPoints[i], 0x00ffff, 1.2 );
+        }
+
+        return this;
+    }
+
+    computeDistance(){
+        const ymin = this.min[1] + 0.09;
+        const pos  = new Vec3();
+        let z = 0;
+        let l = 0;
+        let r = 0;
+        for( let i=0; i < this.lPoints.length; i++ ){
+            // z = 0;
+            l = 0;
+            r = 0;
+            if( i == 0 )                            z = 0;    // No movement
+            else if( this.rPoints[i][1] <= ymin )   r = this.rPoints[i][2] - this.rPoints[i-1][2];
+            else if( this.lPoints[i][1] <= ymin )   l = this.lPoints[i][2] - this.lPoints[i-1][2];
+            else                                    z *= 1.0; // No feet, start applying friction
+            
+            z = ( l || r )? Math.max( Math.abs(r),  Math.abs(l) ) :  Math.abs(z) ;
+
+            pos[2] += z;
+
+            this.frames.push( pos.slice() );
+
+            // console.log( z, pos );
+            // console.log( '--', this.rPoints[i][2], ((i != 0)? this.rPoints[i-1][2] : 0) );
+            // console.log( '--', this.lPoints[i][2], ((i != 0)? this.lPoints[i-1][2] : 0) );
+
+            Debug.pnt.add( pos, 0xffff00, 1.2 );
+
+            if( this.rPoints[i][1] <= ymin ) Debug.pnt.add( this.rPoints[i], 0x00ff00, 1.2 );
+            if( this.lPoints[i][1] <= ymin ) Debug.pnt.add( this.lPoints[i], 0x00ffff, 1.2 );
+        }
+
+        console.log( this.frames );
+    }
+
+    process(){
+        const fCnt = this.animator.clip.frameCount;
+        this.min.setInfinite();
+        this.max.setInfinite( -1 );
+
+        for( let i=0; i < fCnt; i++ ){
+            this.atKey( i );
+            this.min.min( this.footR.world.pos );
+            this.min.min( this.footL.world.pos );
+            this.max.max( this.footR.world.pos );
+            this.max.max( this.footL.world.pos );
+
+            this.lPoints.push( this.footL.world.pos.slice() );
+            this.rPoints.push( this.footR.world.pos.slice() ); 
+        }
+
+        return this;
+    }
+
+    onEvent = ( name )=>{
+        console.log( name );
+    };
+
+    setClip( c ){ 
+        this.animator.setClip( c ); 
+        return this;
+    }
+
+    setLeftLeg( name, iDown, iUp ){
+        this.footL = this.pose.getBone( name );
+        this.animator.clip.addEvent( 'legl_down', iDown );
+        this.animator.clip.addEvent( 'legl_up', iUp );
+        return this;
+    }
+
+    setRightLeg( name, iDown, iUp ){
+        this.footR = this.pose.getBone( name );
+        this.animator.clip.addEvent( 'legr_down', iDown );
+        this.animator.clip.addEvent( 'legr_up', iUp );
+        return this;
+    }
+    
+    atKey( i, skin=false, debug=false ){
+        this.animator
+            .atFrame( i )
+            .updatePose( this.pose );
+
+        this.pose.updateWorld();
+        if( skin )  this.arm.skin.updateFromPose( this.pose );
+        if( debug ) this.debugBones();
+    }
+
+    debugBones(){
+        Debug.pnt.reset();
+        Debug.ln.reset();
+        Util.debugBones( this.pose.bones, Debug, 0.05, 0.8 );
+    }
+}
 </script></body></html>
