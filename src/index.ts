@@ -38,10 +38,11 @@ import { LerpType }      from './animation/types';
 import TrackQuat         from './animation/TrackQuat';
 import TrackVec3         from './animation/TrackVec3';
 import Clip              from './animation/Clip';
+import RootMotion        from './animation/RootMotion';
 import PoseAnimator      from './animation/PoseAnimator';
 
 export { 
     AnimationQueue, Easing, 
-    PoseAnimator, Clip, LerpType, TrackQuat, TrackVec3,
+    PoseAnimator, Clip, RootMotion, LerpType, TrackQuat, TrackVec3,
 };
 // #endregion

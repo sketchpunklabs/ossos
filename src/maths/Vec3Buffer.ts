@@ -1,6 +1,6 @@
-import Vec3 from './Vec3';
+import Vec3, { TVec3 } from './Vec3';
 
-export default class QuatBuffer{
+export default class Vec3Buffer{
     // #region MAIN
     buf    !: ArrayLike<number>;
     result  = new Vec3();
@@ -11,7 +11,7 @@ export default class QuatBuffer{
     // #endregion
 
     // #region GETTERS
-    get( i: number, out:Vec3 = this.result ): Vec3{
+    get( i: number, out:TVec3 = this.result ): TVec3{
         out[ 0 ] = this.buf[ i+0 ];
         out[ 1 ] = this.buf[ i+1 ];
         out[ 2 ] = this.buf[ i+2 ];
@@ -20,7 +20,7 @@ export default class QuatBuffer{
     // #endregion
 
     // #region INTERPOLATION
-    lerp( ai: number, bi: number, t: number, out: Vec3 = this.result ): Vec3{
+    lerp( ai: number, bi: number, t: number, out: TVec3 = this.result ): TVec3{
         const ary = this.buf;
         const ti  = 1 - t;
         out[ 0 ] = ti * ary[ ai+0 ] + t * ary[ bi+0 ];

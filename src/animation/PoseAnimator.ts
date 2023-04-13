@@ -2,12 +2,13 @@
 import type Clip from './Clip';
 import type Pose from '../armature/Pose';
 import Maths     from '../maths/Maths';
+import { TVec3 } from '../maths/Vec3';
 
 export type TOnEventHandler = ( evt:string )=>void;
 
 export default class PoseAnimator{
     // #region MAIN
-    isRunning                           = true;
+    isRunning                           = false;
     clip       ?: Clip                  = undefined;    // Animation Clip
     clock       : number                = 0;            // Animation Clock
     fInfo       : Array<FrameInfo>      = [];           // Clips can have multiple Timestamps
@@ -92,6 +93,9 @@ export default class PoseAnimator{
     // #endregion
 
     // #region METHODS
+    start(): this{ this.isRunning=true; return this; }
+    stop(): this{ this.isRunning=false; return this; }
+
     updatePose( pose: Pose ): this{
         if( this.clip ){
             let t;
@@ -102,9 +106,25 @@ export default class PoseAnimator{
 
         return this;
     }
+
+    getMotion(): TVec3 | null{
+        const rm = this?.clip?.rootMotion;
+        if( rm ){
+            const fi = this.fInfo[ rm.timeStampIdx ];
+            return rm.getBetweenFrames( fi.pkB, fi.pt, fi.kB, fi.t );
+
+            console.log( rm );
+            console.log( fi );
+            console.log( fi.pkB, fi.kB, fi.pt, fi.t );
+
+            // return [0,0,0];
+        }
+
+        return null;
+    }
     // #endregion
 
-    // #region PRIVATE METHODS
+    // #region INTERNAL METHODS
     computeFrameInfo(){
         if( !this.clip ) return;
 
@@ -128,11 +148,13 @@ export default class PoseAnimator{
             ts = this.clip.timeStamps[ i ];
 
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Save previous frame
+            fi.pkB = Math.max( fi.kB, 0 ); // Might be -1 to denote animation hasn't started yet
+            fi.pt  = fi.t;
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             // If the clock has moved passed the previous keyframe range, recompute new range
             if( time < ts[ fi.kB ] || time > ts[ fi.kC ] || fi.kB === -1 ){
-                // Save previous frame
-                fi.pkB = fi.kB;
-
                 // Find the first frame that is greater then the clock time.
                 // Do this by using a binary search by shrinking a range of indices
                 imin = 0;
@@ -191,14 +213,18 @@ export class FrameInfo{
     kC  : number = -1; // Keyframe Lerp End
     kD  : number = -1; // Keyframe Post Tangent
 
-    pkB : number = 0;
+    pkB : number = 0;  // Previous Lerp Start
+    pt  : number = 0;  // Previous Lerp Time
 
     // Set info for single frame timeStamp
     singleFrame(){
-        this.t  =  1;
-        this.kA =  0;
-        this.kB = -1;
-        this.kC = -1;
-        this.kD =  0;
+        this.t   =  1;
+        this.kA  =  0;
+        this.kB  = -1;
+        this.kC  = -1;
+        this.kD  =  0;
+
+        this.pkB = 0;
+        this.pt  = 0;
     }
 }
