@@ -12,6 +12,7 @@ export default class QuatBuffer{
 
     // #region GETTERS
     get( i: number, out:Quat = this.result ): Quat{
+        i       *= 4;
         out[ 0 ] = this.buf[ i+0 ];
         out[ 1 ] = this.buf[ i+1 ];
         out[ 2 ] = this.buf[ i+2 ];
@@ -22,6 +23,9 @@ export default class QuatBuffer{
 
     // #region INTERPOLATION
     nblend( ai: number, bi: number, t: number, out: Quat = this.result ): Quat{
+        ai *= 4;
+        bi *= 4;
+
         // https://physicsforgames.blogspot.com/2010/02/quaternions.html
         const ary = this.buf;
         const a_x = ary[ ai+0 ];	// Quaternion From
@@ -48,6 +52,9 @@ export default class QuatBuffer{
     }
 
     slerp( ai: number, bi: number, t: number, out: Quat = this.result ): Quat{
+        ai *= 4;
+        bi *= 4;
+
         // benchmarks: http://jsperf.com/Quat-slerp-implementations
         const ary = this.buf;
         const ax  = ary[ai+0], ay = ary[ai+1], az = ary[ai+2], aw = ary[ai+3];
@@ -69,10 +76,10 @@ export default class QuatBuffer{
         // calculate coefficients
         if ( (1.0 - cosom) > 0.000001 ) {
             // standard case (slerp)
-            omega  = Math.acos(cosom);
-            sinom  = Math.sin(omega);
-            scale0 = Math.sin((1.0 - t) * omega) / sinom;
-            scale1 = Math.sin(t * omega) / sinom;
+            omega  = Math.acos( cosom );
+            sinom  = Math.sin( omega );
+            scale0 = Math.sin( ( 1.0 - t ) * omega ) / sinom;
+            scale1 = Math.sin( t * omega ) / sinom;
         }else{
             // "from" and "to" Quats are very close so we can do a linear interpolation
             scale0 = 1.0 - t;

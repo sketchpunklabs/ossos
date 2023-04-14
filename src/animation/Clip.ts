@@ -1,7 +1,9 @@
+// #region IMPORTS
 import type { ITrack } from './types';
 import { EventType }   from './types';
 import AnimationEvent  from './AnimationEvent';
-import RootMotion from './RootMotion';
+import RootMotion      from './RootMotion';
+// #endregion
 
 export default class Clip{
     // #region MAIN

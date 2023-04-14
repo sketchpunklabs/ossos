@@ -8,9 +8,7 @@ import Vec3Buffer           from '../maths/Vec3Buffer';
 import { LerpType }         from './types';
 // #endregion
 
-
 type TLerpFn = ( track: TrackVec3, fi: FrameInfo )=>TQuat;
-
 
 export default class TrackVec3 implements ITrack{
     // #region MAIN
@@ -40,12 +38,12 @@ export default class TrackVec3 implements ITrack{
         switch( this.lerpType ){
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             case LerpType.Step:
-                pose.setLocalPos( this.boneIndex, this.vbuf.get( fi.kB*3 ) );
+                pose.setLocalPos( this.boneIndex, this.vbuf.get( fi.kB ) );
                 break;
 
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             case LerpType.Linear:
-                pose.setLocalPos( this.boneIndex, this.vbuf.lerp( fi.kB*3, fi.kC*3, fi.t ) );
+                pose.setLocalPos( this.boneIndex, this.vbuf.lerp( fi.kB, fi.kC, fi.t ) );
                 break;
 
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

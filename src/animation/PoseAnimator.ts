@@ -1,8 +1,9 @@
-
+// #region IMPORTS
 import type Clip from './Clip';
 import type Pose from '../armature/Pose';
 import Maths     from '../maths/Maths';
 import { TVec3 } from '../maths/Vec3';
+// #endregion
 
 export type TOnEventHandler = ( evt:string )=>void;
 
@@ -198,7 +199,6 @@ export default class PoseAnimator{
     }
     // #endregion
 }
-
 
 export class FrameInfo{
     t   : number =  0; // Lerp Time

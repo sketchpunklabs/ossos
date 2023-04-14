@@ -11,7 +11,8 @@ export default class Vec3Buffer{
     // #endregion
 
     // #region GETTERS
-    get( i: number, out:TVec3 = this.result ): TVec3{
+    get( i: number, out: TVec3 = this.result ): TVec3{
+        i       *= 3;
         out[ 0 ] = this.buf[ i+0 ];
         out[ 1 ] = this.buf[ i+1 ];
         out[ 2 ] = this.buf[ i+2 ];
@@ -23,6 +24,9 @@ export default class Vec3Buffer{
     lerp( ai: number, bi: number, t: number, out: TVec3 = this.result ): TVec3{
         const ary = this.buf;
         const ti  = 1 - t;
+              ai *= 3;
+              bi *= 3;
+
         out[ 0 ] = ti * ary[ ai+0 ] + t * ary[ bi+0 ];
         out[ 1 ] = ti * ary[ ai+1 ] + t * ary[ bi+1 ];
         out[ 2 ] = ti * ary[ ai+2 ] + t * ary[ bi+2 ];

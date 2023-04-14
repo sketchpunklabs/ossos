@@ -40,13 +40,13 @@ export default class TrackQuat implements ITrack{
         switch( this.lerpType ){
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             case LerpType.Step:
-                pose.setLocalRot( this.boneIndex, this.vbuf.get( fi.kB*4 ) );
+                pose.setLocalRot( this.boneIndex, this.vbuf.get( fi.kB ) );
                 break;
 
             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             case LerpType.Linear:
-                this.vbuf.nblend( fi.kB*4, fi.kC*4, fi.t );
-                // this.vbuf.slerp( fi.kB*4, fi.kC*4, fi.t );
+                this.vbuf.nblend( fi.kB, fi.kC, fi.t );
+                // this.vbuf.slerp( fi.kB, fi.kC, fi.t );
                 pose.setLocalRot( this.boneIndex, this.vbuf.result );
                 break;
 
