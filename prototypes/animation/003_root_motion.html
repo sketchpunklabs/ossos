@@ -81,9 +81,9 @@ window.addEventListener( 'load', async _=>{
 function onPreRender( dt, et ){
     if( Ref.animator.isRunning ){
         // Generate Pose
-        Ref.animator
-            .step( dt )
-            .updatePose( Ref.arm.poses.anim );
+        Ref.animator.step( dt );
+        // console.log( Ref.animator.fInfo[0].kB );
+        Ref.animator.updatePose( Ref.arm.poses.anim );
         
         const delta = Ref.animator.getMotion();
         // console.log( delta );

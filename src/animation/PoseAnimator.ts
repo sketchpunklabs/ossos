@@ -112,12 +112,6 @@ export default class PoseAnimator{
         if( rm ){
             const fi = this.fInfo[ rm.timeStampIdx ];
             return rm.getBetweenFrames( fi.pkB, fi.pt, fi.kB, fi.t );
-
-            console.log( rm );
-            console.log( fi );
-            console.log( fi.pkB, fi.kB, fi.pt, fi.t );
-
-            // return [0,0,0];
         }
 
         return null;
