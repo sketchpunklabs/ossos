@@ -34,8 +34,12 @@ export default class PoseAnimator{
             this.eventCache = new Map();
         }
         
+        // Compute the times for the first frame
+        this.computeFrameInfo();
         return this;
     }
+
+    setScale( s: number ): this{ this.scale = s; return this; }
     // #endregion
 
     // #region FRAME CONTROLS

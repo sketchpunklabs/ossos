@@ -1,0 +1,216 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import Util                         from '../_lib/misc/Util.js';
+import fetchTexture                 from '../_lib/misc/fetchTexture.js';
+import GltfUtil, { Gltf2 }          from '../_lib/misc/GltfUtil.js';
+
+import { Armature, Pose, TranMatrixSkin, PoseAnimator, RootMotion, Maths, Quat, Vec3 } from '../../src/index';
+
+import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
+import CanvasKeyboardHanders        from '../_lib/misc/CanvasKeyboardHandlers.js';
+//#endregion
+
+//#region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Ref = { 
+    left    : false,
+    right   : false,
+};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 40, 10, 12, [ 0, 1, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.kb   = new CanvasKeyboardHanders( App.renderer.domElement ).enable();
+    Ref.ctrl = new Controller();
+    await Ref.ctrl.init();
+
+    App.scene.add( Ref.ctrl.mesh );
+
+
+    /*
+    const gltf = await Gltf2.fetch( '/prototypes/_res/models/pete/pete.gltf' );
+    const bGeo = GltfUtil.loadGeoBuffers( gltf, 'Character' )[0];
+    const arm  = GltfUtil.parseArmature( gltf );
+    
+    // console.log( 'Get', gltf.getAnimationNames() )
+    
+    arm.newPose( 'anim' );
+    arm.useSkin( TranMatrixSkin );
+    
+    const mat  = MatrixSkinMaterial( 'silver', arm.skin );
+    const mesh = new THREE.Mesh( bGeo, mat );
+    App.scene.add( mesh );
+    Ref.mesh = mesh;
+
+    const clip = GltfUtil.loadAnimationClip( gltf, 'Walking', arm.poses.bind );
+    // clip.isLooped = false;
+    // clip.addEvent( 'FootL_Down', 0 );
+    // clip.addEvent( 'FootR_Down', 13 );
+
+    const animator = new PoseAnimator();
+    animator.setClip( clip );
+    // animator.scale = 2.0;
+    // animator.onEvent = onAnimationEvent;
+    // animator.atFrame( 0 );
+    // animator.updatePose( pose );
+
+    Ref.animator = animator;
+    Ref.arm      = arm;
+
+    // onPreRender( 0 );
+
+    // clip.setRootMotionData( mCompute.flatFrames );
+
+    setTimeout( ()=>animator.start(), 2000 );
+    */
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( onPreRender ).start();
+    // App.renderLoop();
+});
+//#endregion
+
+function onPreRender( dt, et ){
+
+    const arrows = Ref.kb.getArrowAxes();
+    const spin   = -arrows[0] * 90 * dt;
+
+    if( spin !== 0 )      Ref.ctrl.incAngle( spin );
+    if( arrows[1] > 0.1 ) Ref.ctrl.step( dt ); //forward();
+
+    // console.log( ang );
+
+    /*
+    if( Ref.animator.isRunning ){
+        // Generate Pose
+        Ref.animator.step( dt );
+        // console.log( Ref.animator.fInfo[0].kB );
+        Ref.animator.updatePose( Ref.arm.poses.anim );
+        
+        const delta = Ref.animator.getMotion();
+        // console.log( delta );
+        if( delta ){
+
+            // console.log( 'From', Ref.mesh.position.z, 'Plus',delta[2] , "@", Ref.mesh.position.z + delta[2] );
+            Ref.mesh.position.x += delta[0];
+            Ref.mesh.position.y += delta[1];
+            Ref.mesh.position.z += delta[2];
+
+            // Debug.pnt.add( [-1, 0, Ref.mesh.position.z], 0xffffff, 1.3 );
+            // Debug.pnt._updateGeometry();
+            
+        }
+        
+        // Update Skinned Mesh
+        Ref.arm.poses.anim.updateWorld();
+        Ref.arm.skin.updateFromPose( Ref.arm.poses.anim );
+
+        // Render Bones
+        // Debug.pnt.reset();
+        // Debug.ln.reset();
+        // Util.debugBones( Ref.arm.poses.anim.bones, Debug, 0.05, 0.8 );
+    }
+    */
+}
+
+class FollowCamera{
+    constructor( camera ){
+        this.camera = camera;
+        this.target = null;
+    }
+
+    update( dt ){
+
+    }
+}
+
+class Controller{
+    angle = 0;
+    move  = new Vec3();
+
+    constructor(){}
+
+    async init(){
+        const tex  = await fetchTexture( '/prototypes/_res/models/pete/pete_texture.png', false );
+        const gltf = await Gltf2.fetch( '/prototypes/_res/models/pete/pete.gltf' );
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Armature
+        this.arm = GltfUtil.parseArmature( gltf );
+        this.arm.newPose( 'anim' );
+        this.arm.useSkin( TranMatrixSkin );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Mesh
+        const geo  = GltfUtil.loadGeoBuffers( gltf, 'Character' )[0];
+        const mat  = MatrixSkinMaterial( tex, this.arm.skin );
+        this.mesh  = new THREE.Mesh( geo, mat );
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const clip    = GltfUtil.loadAnimationClip( gltf, 'Walking', this.arm.poses.bind );
+        this.animator = new PoseAnimator()
+            .setClip( clip )
+            .setScale( 1.3 )
+            .start();
+
+        for( let a of gltf.json.animations ){
+            if( a.name === clip.name && a.rootMotion ){
+                clip.setRootMotionData( a.rootMotion );
+                break;
+            }
+        }
+    }
+
+
+    incAngle( inc ){
+        this.angle = ( this.angle + inc ) % 360;
+        this.mesh.rotation.y = this.angle * Math.PI / 180;
+        return this;
+    }
+
+
+    step( dt ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Step next frame of animation
+        const pose = this.arm.poses.anim;
+        this.animator.step( dt );
+        this.animator.updatePose( pose );
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Update Skin
+        this.arm.poses.anim.updateWorld();
+        this.arm.skin.updateFromPose( pose );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Apply Movement
+        const delta = this.animator.getMotion();
+        if( delta ){
+            this.move
+                .copy( delta )
+                .rotate( this.angle * Math.PI / 180, 'y' )
+                .add( this.mesh.position.toArray() );
+            
+            this.mesh.position.fromArray( this.move );
+        }
+    }
+
+    forward(){
+        this.move
+            .xyz( 0,0,1 )
+            .scale( 0.1 )
+            .rotate( this.angle * Math.PI / 180, 'y' )
+            .add( this.mesh.position.toArray() );
+        this.mesh.position.fromArray( this.move );
+    }
+
+}
+
+
+</script></body></html>
