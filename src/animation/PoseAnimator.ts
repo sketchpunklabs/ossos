@@ -70,6 +70,14 @@ export default class PoseAnimator{
         return this;
     }
 
+    atTime( t: number ): this{
+        if( this.clip ){
+            this.clock = t % this.clip.duration; //Math.max( 0, Math.min( this.clip.duration, t ) );
+            this.computeFrameInfo();            
+        }
+        return this;
+    }
+
     atFrame( n: number ): this{
         if( !this.clip ) return this;
         n = Math.max( 0, Math.min( this.clip.frameCount, n ) ); // Clamp frame number

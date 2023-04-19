@@ -1,0 +1,313 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+// import Util                         from '../_lib/misc/Util.js';
+import fetchTexture                 from '../_lib/misc/fetchTexture.js';
+import GltfUtil, { Gltf2 }          from '../_lib/misc/GltfUtil.js';
+
+import { Armature, Pose, TranMatrixSkin, PoseAnimator, RootMotion, Maths, Quat, Vec3 } from '../../src/index';
+
+import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
+//#endregion
+
+//#region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Ref = {};
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 90, 20, 5, [ 0, 1, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const [ gltf, tex ] = await Character.fetch( true );
+    const scl = 0.5;
+    Ref.char0 = new Character()
+        .fromGltf( gltf, tex )
+        .moveTo( [ 0,0,0] )
+        .toScene( App.scene )
+        .useAnimation( gltf, 'Running', scl );
+
+    Ref.char1 = Ref.char0
+        .clone()
+        .moveTo( [0,0,-1] )
+        .toScene( App.scene )
+        .useAnimation( gltf, 'Walking', scl );
+
+    // Foot Markers used in DOOM for Foot Phase Sync
+    // Left Foot Plant, Right Knee Cross, 
+    // Right Foot Plant, Left Knee Cross
+
+    // let f = 0;
+    // Ref.char0.at( f );
+    // Running LP:2 RC:4 RP:15 LC:16
+
+    // Ref.char1.at( f );
+    // Walking LP:1 RC:3 RP:14 LC:16
+
+    // const clip = Ref.char1.animator.clip;
+    // console.log( clip.timeAtFrame( 25 ) );
+
+    const fpSync = new FootPhaseSync();
+    fpSync.add( Ref.char0.animator.clip, 0.0, [2,4,15,16] );
+    fpSync.add( Ref.char1.animator.clip, 1.0, [1,3,14,16] );
+    Ref.sync = fpSync;
+
+    // fpSync.step( 0.126 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( onPreRender ).start();
+    // App.renderLoop();
+
+    // document.getElementById( 'rngFrames' ).addEventListener( 'input', e=>{
+    //     const i = parseInt( e.target.value );
+    //     console.log( 'Frame', i );
+    //     Ref.char0.at( i );
+    //     Ref.char1.at( i );
+    // })
+});
+//#endregion
+
+function onPreRender( dt, et ){
+    Ref.sync.step( dt * 0.1 );
+
+    // console.log( Ref.sync.getClock( 0 ) );
+
+    Ref.char0.atTime( Ref.sync.getClock( 0 ) );
+    Ref.char1.atTime( Ref.sync.getClock( 1 ) );
+}
+
+class Character{
+    // #region MAIN
+    constructor( arm=null, geo=null, tex=null ){
+        if( arm ) this.fromArmature( arm );
+        if( geo ) this.createMesh( geo, tex );
+    }
+
+    static fetch( incTex=false ){
+        const uri = '/prototypes/_res/models/pete/';
+        return Promise.all([ 
+            Gltf2.fetch( uri + 'pete.gltf' ),
+            incTex ? fetchTexture( uri + 'pete_texture.png', false ) 
+                   : null,
+        ]);
+    }
+
+    fromGltf( gltf, tex ){
+        const geo  = GltfUtil.loadGeoBuffers( gltf, 'Character' )[0];
+        const arm  = GltfUtil.parseArmature( gltf );
+        
+        this.fromArmature( arm );
+        this.createMesh( geo, tex );
+
+        // console.log( gltf.getAnimationNames() );
+        return this;
+    }
+
+    fromArmature( arm ){
+        this.arm  = arm;
+        this.skin = new TranMatrixSkin( this.arm.bindPose );
+        this.pose = this.arm.newPose();
+        // this.arm.newPose( 'anim' );
+        // this.arm.useSkin( TranMatrixSkin );
+    }
+
+    createMesh( geo, tex=null ){
+        const mat = MatrixSkinMaterial( tex || 'silver', this.skin );
+        this.mesh = new THREE.Mesh( geo, mat );
+        this.tex  = tex;
+    }
+
+    clone(){
+        const char = new Character( this.arm, this.mesh.geometry, this.tex );
+        return char;
+    }
+
+    useAnimation( gltf, name, scl=1 ){
+        // Running  Walking  Idle
+        const clip    = GltfUtil.loadAnimationClip( gltf, name, this.pose );
+        this.animator = new PoseAnimator()
+            .setClip( clip )
+            .setScale( scl )
+            .start();
+
+        console.log( 'Clip', clip.name, clip.frameCount, clip.duration );
+        return this;
+    }
+    // #endregion
+
+    // #region METHODS
+    toScene( scene ){ scene.add( this.mesh ); return this }
+    moveTo( pos ){ this.mesh.position.fromArray( pos ); return this; }
+
+    step( dt ){ this.animator.step( dt ); this.updateSkin(); }
+    atFrame( i ){ this.animator.atFrame( i ); this.updateSkin(); }
+    atTime( t ){ this.animator.atTime( t ); this.updateSkin(); }
+
+    updateSkin(){
+        this.animator.updatePose( this.pose );
+        this.pose.updateWorld();
+        this.skin.updateFromPose( this.pose );
+    }
+    // #endregion
+}
+
+
+// https://www.youtube.com/watch?v=3lO1q8mQrrg&t=1029s
+// https://www.youtube.com/live/Jkv0pbp0ckQ?feature=share&t=7999
+// Left Foot Plant, Right Knee Cross, Right Foot Plant, Left Knee Cross
+// - Get current frame of each animation
+// - Advance each anim as if they are not synced
+// - Convert frame deltas to phase deltas 
+// - Find weighted average of phase delta, ( 0.25 * 0.3 ) + ( 0.17 * 0.7 ) = 0.19
+// - Convert phase to frame deltas for each animation
+// - Advance each anim, now they are synchronized
+// Walking LP:1 RC:3 RP:14 LC:16
+// Running LP:2 RC:4 RP:15 LC:16
+
+class ClipSet{
+    clip        = null;
+    phaseCount  = -1;
+    markers     = [];
+    weight      = 1.0;
+    clock       = 0;
+    isRollover  = false;
+
+    constructor( clip ){
+        this.clip = clip;
+    }
+
+    setFrameMarkers( ary ){
+
+        console.log( ary );
+        let t;
+        for( const f of ary ){
+            t = this.clip.timeAtFrame( f );
+            if( t !== -1 ) this.markers.push( t );
+            else           console.log( 'Error: ClipSet.setFrameMarkers - frame index not found ', t, ' in', ary );
+        }
+
+        this.phaseCount = this.markers.length;
+
+        if( this.markers[0] > 0.000001 ) this.isRollover = true;
+        return this;
+    }
+
+    getPhaseTime( ph ){
+        const clip = this.clip;
+        const idx  = Math.floor( ph );
+        const t    = ph - idx;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Conver phase time to animation time
+        let time   = -1;
+        if( idx === ( this.phaseCount - 1 ) ){
+            const duration = ( this.isRollover )
+                ? clip.duration - this.markers[ idx ] + this.markers[ 0 ]
+                : clip.duration - this.markers[ idx ];
+
+            time = ( duration * t + this.markers[ idx ] ) % clip.duration;
+        }else{
+            time = this.markers[ idx ] * ( 1-t ) + this.markers[ idx+1 ] * t;
+        }
+
+        return time;
+    }
+
+    getPhase(){
+        const clip = this.clip;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Figure out which phase are we in, basicly which is the starting marker
+        // is the clock closest to
+        let phase = -1;
+        if( this.clock < this.markers[0] ){
+            phase = this.phaseCount-1;  // Final phase rolls overs to the beginning
+        }else{
+            for( let i=this.phaseCount-1; i >= 0; i-- ){
+                if( this.markers[i] <= this.clock ){
+                    phase = i;
+                    break;
+                }
+            }
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // What is the t of the phase the clock is
+        let phaseFract = -1;
+        if( phase === ( this.phaseCount - 1 ) ){
+            // If rollover, time left in the animation plus the time of the first phase
+            // else the duration of the phase is the marker time minus animation duration
+            const duration = ( this.isRollover )
+                ? clip.duration - this.markers[ phase ] + this.markers[ 0 ]
+                : clip.duration - this.markers[ phase ];
+
+            // If clock is rolling over, then add clock to the final phase's duration
+            // else you get the clock time since the start of the final phase
+            const time = ( this.clock < this.markers[ 0 ] )
+                ? clip.duration - this.markers[ phase ] + this.clock
+                : this.clock - this.markers[ phase ];
+
+            phaseFract = time / duration;
+        }else{
+            phaseFract = ( this.clock - this.markers[ phase ] ) / 
+                         ( this.markers[ phase+1 ] - this.markers[ phase ] );
+        }
+
+        return phase + phaseFract;
+    }
+
+    step( dt ){
+        this.clock = ( this.clock + dt ) % this.clip.duration;
+        // console.log( 'phase', this.getPhase() );
+    }
+}
+
+class FootPhaseSync{
+    clipSets = [];
+    phase    = 0;
+
+    add( clip, weight, frames ){
+        const cs  = new ClipSet( clip );
+        cs.weight = weight;
+        cs.setFrameMarkers( frames );
+
+        this.clipSets.push( cs );
+        return this;
+    }
+
+    getPhaseTime( i, phase ){ return this.clipSets[ i ].getPhaseTime( phase ); }
+
+    getClock( i ){ return this.clipSets[ i ].clock; }
+
+    step( dt ){
+        let phase = 0;
+        for( const cs of this.clipSets ){
+            cs.step( dt );
+            phase += cs.getPhase() * cs.weight;
+            // console.log( 'Clock', cs.clock, cs.getPhase() );
+        }
+        // console.log( 'Weighted Phase', phase );
+
+        let i=0;
+        for( const cs of this.clipSets ){
+            let t = cs.getPhaseTime( phase );
+            // console.log( i++, cs.clock, phase, 'time', t, 'phase', cs.getPhase() );
+            cs.clock = t;
+        }
+
+        return this.phase;
+    }
+}
+
+</script>
+
+<div style="position:fixed; bottom:10px; left:10px;">
+    <input id="rngFrames" type="range" min="0" max="26" step="1" value="0">
+</div>
+
+</body></html>

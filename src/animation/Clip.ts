@@ -43,4 +43,18 @@ export default class Clip{
         return this
     }
     // #endregion
+
+    // #region METHODS
+    timeAtFrame( f: number ): number{
+        // Since there is a chance to have more then one time stamp,
+        // use the first one that matches up with the max frame count
+        if( f >=0 && f < this.frameCount ){
+            for( const ts of this.timeStamps ){
+                if( ts.length === this.frameCount ) return ts[ f ];
+            }
+        }  
+
+        return -1;
+    }
+    // #endregion
 }
