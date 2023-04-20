@@ -13,19 +13,27 @@ export { Gltf2 };
 export default class GltfUtil{
 
     // #region ARMATURE
-    static parseArmature( gltf ){
+    static parseArmature( gltf, mkOffsetPose=false ){
         const skin  = gltf.getSkin();
         const arm   = new Armature();
 
         let b;
         for( const j of skin.joints ){
             b = arm.addBone( { name: j.name, parent: j.parentIndex } );
-            if( j.rotation ) quat.copy( b.local.rot, j.rotation );
-            if( j.position ) vec3.copy( b.local.pos, j.position );
-            if( j.scale )    vec3.copy( b.local.scl, j.scale );
+            if( j.rotation ) b.local.rot.copy( j.rotation );
+            if( j.position ) b.local.pos.copy( j.position );
+            if( j.scale )    b.local.scl.copy( j.scale );
         }
 
         arm.bind( 0.1 );
+
+        if( mkOffsetPose && ( skin.scale || skin.rotation ) ){
+            const pose = arm.newPose( 'opose' );
+            if( skin.scale )    pose.offset.scl.copy( skin.scale );
+            if( skin.rotation ) pose.offset.rot.copy( skin.rotation );
+            pose.updateWorld();
+        }
+
         return arm;
     }
     // #endregion

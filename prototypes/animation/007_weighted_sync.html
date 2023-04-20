@@ -1,0 +1,97 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import GltfUtil, { Gltf2 }              from '../_lib/misc/GltfUtil.js';
+import Util                             from '../_lib/misc/Util.js';
+
+import { Armature, Pose, PoseAnimator } 
+    from '../../src/index';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Debug = {};
+let Ref   = {};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.anim = await Promise.all([
+        Animation.fetch( 'Running', [-0.5,0,0] ),
+        Animation.fetch( 'Catwalk', [0.5,0,0] ),
+    ]);
+
+    setWeight( 0 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( onPreRender ).start();
+
+    document.getElementById( 'rngFrames' ).addEventListener( 'input', e=>{
+        const i = parseInt( e.target.value );
+        setWeight( i );
+    })
+});
+
+function onPreRender( dt, et ){
+    Debug.pnt.reset();
+    Debug.ln.reset();
+
+    for( const a of Ref.anim ){
+        a.update( dt );
+    }
+}
+
+function setWeight( t ){
+    const a0    = Ref.anim[0];
+    const a1    = Ref.anim[1];
+
+    const dur   = a0.clip.duration * ( 1.0 - t ) + 
+                  a1.clip.duration * t;
+
+    a0.animator.scale = a0.clip.duration / dur;
+    a1.animator.scale = a1.clip.duration / dur;
+}
+
+class Animation{
+    constructor( gltf ){
+        this.arm        = GltfUtil.parseArmature( gltf, true );
+        this.pose       = this.arm.poses.opose;
+
+        this.clip       = GltfUtil.loadAnimationClip( gltf, null, this.arm.bindPose );
+        this.animator   = new PoseAnimator()
+            .setClip( this.clip )
+            .usePlacementReset( [0,0,1] ) // This animation uses Z for up.
+            .start();
+    }
+
+    static async fetch( name, pos=[0,0,0] ){
+        const gltf = await Gltf2.fetch( `/prototypes/_res/anim/mixamo/${name}.gltf` );
+        return new Animation( gltf ).setPos( pos );
+    }
+
+    setPos( p ){ this.pose.offset.pos.copy( p ); return this; }
+
+    update( dt ){
+        this.animator
+            .step( dt )
+            .updatePose( this.pose );
+
+        this.pose.updateWorld();
+        Util.debugBones( this.pose.bones, Debug, 0.08, 1, false );
+    }
+}
+
+//#endregion
+</script>
+
+<span style="position:fixed; bottom:10px; left:50%;">
+    <input id="rngFrames" type="range" min="0" max="1" step="0.1" value="0">
+</span>
+
+</body></html>
