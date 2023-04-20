@@ -124,7 +124,7 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
-    fromQuat( q: ConstQuat, v: ConstVec3 ): this{ return this.copy( v ).transformQuat( q ); }
+    fromQuat( q: ConstQuat, v: ConstVec3=[0,0,1] ): this{ return this.copy( v ).transformQuat( q ); }
     // #endregion
 
     // #region LOADING / CONVERSION
@@ -171,6 +171,13 @@ export default class Vec3 extends Array< number >{
         this[ 0 ] *= v;
         this[ 1 ] *= v;
         this[ 2 ] *= v;
+        return this;
+    }
+
+    addScaled( a: ConstVec3, s: number ): this{
+        this[ 0 ] += a[ 0 ] * s;
+        this[ 1 ] += a[ 1 ] * s;
+        this[ 2 ] += a[ 2 ] * s;
         return this;
     }
 

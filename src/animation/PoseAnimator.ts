@@ -16,6 +16,7 @@ export default class PoseAnimator{
     scale       : number                = 1;            // Scale the speed of the animation
     onEvent    ?: TOnEventHandler       = undefined;    //
     eventCache ?: Map<string, boolean>  = undefined;
+    placementMask   : TVec3             = [0,1,0];      // Used when inPlace is turned on. Set what to reset.
     // #endregion
     
     // #region SETTERS
@@ -109,12 +110,19 @@ export default class PoseAnimator{
     start(): this{ this.isRunning=true; return this; }
     stop(): this{ this.isRunning=false; return this; }
 
+    usePlacementReset( mask: TVec3 = [0,1,0] ): this{ this.placementMask = mask; return this; }
+
     updatePose( pose: Pose ): this{
         if( this.clip ){
             let t;
             for( t of this.clip.tracks ){
                 t.apply( pose, this.fInfo[ t.timeIndex ] );
             }
+        }
+
+        // If in place, reset root bone with placement mask
+        if( this.placementMask ){
+            pose.bones[ 0 ].local.pos.mul( this.placementMask );
         }
 
         return this;
