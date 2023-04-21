@@ -183,6 +183,29 @@ export default class Quat extends Array< number >{
         return this;
     }
 
+    fromNBlend( a: ConstQuat, b: ConstQuat, t: number ): this{
+        // https://physicsforgames.blogspot.com/2010/02/quaternions.html
+        const a_x = a[ 0 ];	// Quaternion From
+        const a_y = a[ 1 ];
+        const a_z = a[ 2 ];
+        const a_w = a[ 3 ];
+        const b_x = b[ 0 ];	// Quaternion To
+        const b_y = b[ 1 ];
+        const b_z = b[ 2 ];
+        const b_w = b[ 3 ];
+        const dot = a_x*b_x + a_y*b_y + a_z*b_z + a_w*b_w;
+        const ti  = 1 - t;
+
+        // if Rotations with a dot less then 0 causes artifacts when lerping,
+        // Can fix this by switching the sign of the To Quaternion.
+        const s   = ( dot < 0 )? -1 : 1;
+        this[ 0 ] = ti * a_x + t * b_x * s;
+        this[ 1 ] = ti * a_y + t * b_y * s;
+        this[ 2 ] = ti * a_z + t * b_z * s;
+        this[ 3 ] = ti * a_w + t * b_w * s;
+        return this.norm();
+    }
+
     /** Used to get data from a flat buffer */
     fromBuf( ary: Array<number> | Float32Array, idx: number ): this{
         this[ 0 ] = ary[ idx ];
@@ -417,12 +440,10 @@ export default class Quat extends Array< number >{
         // if Rotations with a dot less then 0 causes artifacts when lerping,
         // Can fix this by switching the sign of the To Quaternion.
         const s  = ( dot < 0 )? -1 : 1;
-
         out[ 0 ] = ti * a_x + t * b_x * s;
         out[ 1 ] = ti * a_y + t * b_y * s;
         out[ 2 ] = ti * a_z + t * b_z * s;
         out[ 3 ] = ti * a_w + t * b_w * s;
-
         return out.norm();
     }
 

@@ -23,14 +23,18 @@ window.addEventListener( 'load', async _=>{
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Ref.anim = await Promise.all([
-        Animation.fetch( 'Running', [-0.5,0,0] ),
-        Animation.fetch( 'Catwalk', [0.5,0,0] ),
+        Animation.fetch( 'Running', [-1.5,0,0] ),
+        Animation.fetch( 'Catwalk', [1.5,0,0] ),
     ]);
 
+    Ref.anim.push( new Blender( Ref.anim[0], Ref.anim[1] ) );
+    
     setWeight( 0 );
+    // onPreRender( 0.1 );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     App.createRenderLoop( onPreRender ).start();
+    // App.renderLoop( onPreRender );
 
     document.getElementById( 'rngFrames' ).addEventListener( 'input', e=>{
         const i = parseFloat( e.target.value );
@@ -48,14 +52,18 @@ function onPreRender( dt, et ){
 }
 
 function setWeight( t ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Set time scaling
     const a0    = Ref.anim[0];
     const a1    = Ref.anim[1];
+    const bp    = Ref.anim[2];
 
     const dur   = a0.clip.duration * ( 1.0 - t ) + 
                   a1.clip.duration * t;
 
     a0.animator.scale = a0.clip.duration / dur;
     a1.animator.scale = a1.clip.duration / dur;
+    bp.wgt            = t;
 }
 
 class Animation{
@@ -87,6 +95,31 @@ class Animation{
     }
 }
 
+class Blender{
+    constructor( a0, a1 ){
+        this.a0   = a0;
+        this.a1   = a1;
+        this.wgt  = 0;
+        this.pose = this.a0.arm.poses.opose.clone();
+        this.pose.offset.pos.xyz( 0,0,0 );
+    }
+
+    update(){
+        const a = this.a0.pose.bones;
+        const b = this.a1.pose.bones;
+
+        for( const i of this.pose.bones ){
+            i.local.rot.fromNBlend(
+                a[ i.index ].local.rot,
+                b[ i.index ].local.rot,
+                this.wgt
+            );
+        }
+
+        this.pose.updateWorld();
+        Util.debugBones( this.pose.bones, Debug, 0.08, 1, false, 0x00ff00, 0xffffff );
+    }
+}
 //#endregion
 </script>
 
