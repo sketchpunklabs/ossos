@@ -4,7 +4,8 @@ import Bone         from './armature/Bone';
 import Pose         from './armature/Pose';
 import BoneBindings from './armature/BoneBindings';
 import BoneSockets  from './armature/BoneSockets';
-export { Armature, Bone, Pose, BoneBindings, BoneSockets };
+import BoneMap      from './armature/BoneMap';
+export { Armature, Bone, Pose, BoneBindings, BoneSockets, BoneMap };
 // #endregion
 
 // #region SKINNING
@@ -40,9 +41,11 @@ import TrackVec3         from './animation/TrackVec3';
 import Clip              from './animation/Clip';
 import RootMotion        from './animation/RootMotion';
 import PoseAnimator      from './animation/PoseAnimator';
+import Retarget          from './animation/Retarget';
 
 export { 
     AnimationQueue, Easing, 
     PoseAnimator, Clip, RootMotion, LerpType, TrackQuat, TrackVec3,
+    Retarget,
 };
 // #endregion

@@ -108,6 +108,16 @@ class Blender{
         const a = this.a0.pose.bones;
         const b = this.a1.pose.bones;
 
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Blend position of root bone only
+        this.pose.bones[ 0 ].local.pos.fromLerp(
+            a[ 0 ].local.pos,
+            b[ 0 ].local.pos,
+            this.wgt,
+        );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Blend rotation of all the bones
         for( const i of this.pose.bones ){
             i.local.rot.fromNBlend(
                 a[ i.index ].local.rot,
@@ -116,6 +126,7 @@ class Blender{
             );
         }
 
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         this.pose.updateWorld();
         Util.debugBones( this.pose.bones, Debug, 0.08, 1, false, 0x00ff00, 0xffffff );
     }

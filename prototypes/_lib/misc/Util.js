@@ -3,7 +3,7 @@ import { Vec3 }     from '../../../src/index';
 
 export default class Util{
 
-    static debugBones( ary, debug, flen=0.2, pntSize=1, doReset=false ){
+    static debugBones( ary, debug, flen=0.2, pntSize=1, doReset=false, boneColor=0x00ffff, jntColor=0x00ff00 ){
         const up   = new Vec3();
         const fwd  = new Vec3();
 
@@ -21,9 +21,9 @@ export default class Util{
                 .scale( flen )
                 .add( b.world.pos );
 
-            debug.pnt.add( b.world.pos, 0x00ff00, pntSize, 1 );
-            debug.ln.add( b.world.pos, up, 0x00ffff );
-            debug.ln.add( b.world.pos, fwd, 0x00ff00 );
+            debug.pnt.add( b.world.pos, jntColor, pntSize, 1 );
+            debug.ln.add( b.world.pos, fwd, jntColor );
+            debug.ln.add( b.world.pos, up, boneColor );
         }
     }
 

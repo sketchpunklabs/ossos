@@ -1,0 +1,131 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import GltfUtil, { Gltf2 }              from '../_lib/misc/GltfUtil.js';
+import Util                             from '../_lib/misc/Util.js';
+
+import { Armature, Pose, PoseAnimator, TranMatrixSkin,
+    BoneMap, Retarget } 
+    from '../../src/index';
+
+import MatrixSkinMaterial               from '../_lib/customSkinning/MatrixSkinMaterial.js';
+//#endregion
+
+//#region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Debug = {};
+let Ref   = {};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 6 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.anim  = await Animation.fetch( 'Catwalk' );
+    Ref.char0 = await Character.fetch( '/prototypes/_res/models/pete/pete.gltf' );
+    Ref.char1 = await Character.fetch( '/prototypes/_res/models/nabba/nabba.gltf' );
+
+    Ref.char0.setPos( [1.5,0,0] );
+    Ref.char1.setPos( [-1.5,0,0] );
+
+    App.scene.add( Ref.char0.mesh );
+    App.scene.add( Ref.char1.mesh );;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.rt0 = new Retarget();
+    Ref.rt0
+        .bindTPoses(
+            Ref.anim.arm.poses.opose,   // Use Offset Pose because its a mixamo animation
+            Ref.char0.arm.bindPose,      // Character is in a TPose by default
+        )
+        .animator
+            .setClip( Ref.anim.clip )
+            .usePlacementReset( [0,0,1] ) // This animation uses Z for up.
+            .start();
+
+    Ref.rt1 = new Retarget();
+    Ref.rt1
+        .bindTPoses(
+            Ref.anim.arm.poses.opose,   // Use Offset Pose because its a mixamo animation
+            Ref.char1.arm.bindPose,      // Character is in a TPose by default
+        )
+        .animator
+            .setClip( Ref.anim.clip )
+            .usePlacementReset( [0,0,1] ) // This animation uses Z for up.
+            .start();
+
+    // onPreRender( 0.1 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( onPreRender ).start();
+    App.renderLoop( onPreRender );
+});
+
+function onPreRender( dt, et ){
+    Debug.pnt.reset();
+    Debug.ln.reset();
+    Util.debugBones( Ref.rt0.srcPose.bones, Debug, 0.08, 1, false, 0x00ff00, 0xffffff );
+
+    Ref.rt0.step( dt )
+    Ref.char0.arm.skin.updateFromPose( Ref.rt0.tarPose );
+
+    Ref.rt1.step( dt )
+    Ref.char1.arm.skin.updateFromPose( Ref.rt1.tarPose );
+}
+
+class Animation{
+    constructor( gltf ){
+        this.arm        = GltfUtil.parseArmature( gltf, true );
+        this.clip       = GltfUtil.loadAnimationClip( gltf, null, this.arm.bindPose );
+        // this.pose       = this.arm.poses.opose;
+        // this.animator   = new PoseAnimator()
+        //     .setClip( this.clip )
+        //     .usePlacementReset( [0,0,1] ) // This animation uses Z for up.
+        //     .start();
+    }
+
+    static async fetch( name, pos=[0,0,0] ){
+        const gltf = await Gltf2.fetch( `/prototypes/_res/anim/mixamo/${name}.gltf` );
+        return new Animation( gltf );//.setPos( pos );
+    }
+
+    // setPos( p ){ this.pose.offset.pos.copy( p ); return this; }
+
+    // update( dt ){
+    //     this.animator
+    //         .step( dt )
+    //         .updatePose( this.pose );
+
+    //     this.pose.updateWorld();
+    //     Util.debugBones( this.pose.bones, Debug, 0.08, 1, false );
+    // }
+}
+
+class Character{
+    static async fetch( url ){
+        const gltf = await Gltf2.fetch( url);
+        return new Character( gltf );
+    }
+
+    constructor( gltf ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Armature
+        this.arm = GltfUtil.parseArmature( gltf );
+        this.arm.useSkin( TranMatrixSkin );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Mesh
+        const geo  = GltfUtil.loadGeoBuffers( gltf )[0];
+        const mat  = MatrixSkinMaterial( 'cyan', this.arm.skin );
+        this.mesh  = new THREE.Mesh( geo, mat );
+    }
+
+    setPos( p ){ this.mesh.position.fromArray( p ); return this; }
+}
+
+//#endregion
+</script></body></html>

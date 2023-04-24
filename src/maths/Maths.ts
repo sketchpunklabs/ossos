@@ -38,10 +38,21 @@ export default class Maths{
         return ( v < 0 )? b + v : v;
     }
 
+    static lerp( a: number, b: number, t: number ): number{
+        return a * (1-t) + b * t;
+    }
+
+    // Logarithmic Interpolation
+    static eerp( a: number, b: number, t: number ): number{
+        // https://twitter.com/FreyaHolmer/status/1068280369886240768?s=20
+        // https://www.gamedeveloper.com/programming/logarithmic-interpolation
+        return a * ( ( b / a ) ** t );
+        // return 2 ** ( Math.log( a ) * (1-t) + Math.log( b ) * t );
+    }
+
     // Move value to the closest step
     static roundStep( value: number, step: number ): number{ return Math.round( value / step ) * step; }
     
-
     // https://docs.unity3d.com/ScriptReference/Mathf.SmoothDamp.html
     // https://github.com/Unity-Technologies/UnityCsReference/blob/a2bdfe9b3c4cd4476f44bf52f848063bfaf7b6b9/Runtime/Export/Math/Mathf.cs#L308
     static smoothDamp( cur: number, tar: number, vel: number, dt: number, smoothTime=0.0001, maxSpeed=Infinity ): [ number, number ]{

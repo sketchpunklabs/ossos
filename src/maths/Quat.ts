@@ -127,6 +127,14 @@ export default class Quat extends Array< number >{
         return this;
     }
 
+    fromNegate( q: ConstQuat ): this{
+        this[ 0 ] = -q[ 0 ];
+        this[ 1 ] = -q[ 1 ];
+        this[ 2 ] = -q[ 2 ];
+        this[ 3 ] = -q[ 3 ];
+        return this;
+    }
+
     fromLookDir( dir: ConstVec3, up: ConstVec3 = [0,1,0] ): this{
         // Ported to JS from C# example at https://pastebin.com/ubATCxJY
         // TODO, if Dir and Up are equal, a roll happends. Need to find a way to fix this.
@@ -416,6 +424,13 @@ export default class Quat extends Array< number >{
         this[ 1 ] = ay * bw + aw * by + az * bx - ax * bz;
         this[ 2 ] = az * bw + aw * bz + ax * by - ay * bx;
         this[ 3 ] = aw * bw - ax * bx - ay * by - az * bz;
+        return this;
+    }
+
+    dotNegate( q: ConstQuat, chk: ConstQuat ): this{
+        if( Quat.dot( q, chk ) < 0 ) this.fromNegate( q );
+        else                         this.copy( q );
+        
         return this;
     }
     // #endregion

@@ -125,6 +125,14 @@ export default class Vec3 extends Array< number >{
     }
 
     fromQuat( q: ConstQuat, v: ConstVec3=[0,0,1] ): this{ return this.copy( v ).transformQuat( q ); }
+
+    fromLerp( a: ConstVec3, b: ConstVec3, t: number ): this{
+        const ti  = 1 - t;
+        this[ 0 ] = a[ 0 ] * ti + b[ 0 ] * t;
+        this[ 1 ] = a[ 1 ] * ti + b[ 1 ] * t;
+        this[ 2 ] = a[ 2 ] * ti + b[ 2 ] * t;
+        return this;
+    }
     // #endregion
 
     // #region LOADING / CONVERSION
