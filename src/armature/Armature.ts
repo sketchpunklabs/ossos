@@ -18,7 +18,7 @@ export default class Armature{
     // #endregion
 
     // #region GETTERS
-    get bindPose():Readonly<Pose>{ return this.poses.bind; }
+    get bindPose():Readonly< Pose >{ return this.poses.bind; }
     
     newPose( saveAs ?: string ): Pose {
         const p = this.poses.bind.clone();
@@ -55,6 +55,32 @@ export default class Armature{
 
             return bone;
         }
+    }
+
+    getBone( o: string | number ): Bone | null {
+        switch( typeof o ){
+            case 'string':{
+                const idx = this.names.get( o );
+                return ( idx !== undefined )? this.poses.bind.bones[ idx ] : null;
+                break;
+            }
+
+            case 'number':
+                return this.poses.bind.bones[ o ];
+                break;
+        }
+        return null;
+    }
+
+    getBones( ary: Array< string | number > ): Array< Bone >{
+        const rtn: Array< Bone > = [];
+
+        let b: Bone | null;
+        for( const i of ary ){
+            if( ( b = this.getBone( i ) ) ) rtn.push( b );
+        }
+
+        return rtn;
     }
 
     bind( boneLen=0.2 ): this{

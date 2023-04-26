@@ -545,6 +545,14 @@ export default class Quat extends Array< number >{
         return out;
     }
 
+    static swing( a: ConstVec3, b: ConstVec3 ): Quat{
+        return new Quat().fromSwing( a, b ); 
+    }
+
+    static axisAngle(  axis: ConstVec3, rad: number ): Quat{
+        return new Quat().fromAxisAngle( axis, rad ); 
+    }
+
     // // https://pastebin.com/66qSCKcZ
     // // https://forum.unity.com/threads/manually-calculate-angular-velocity-of-gameobject.289462/#post-4302796
     // static angularVelocity( foreLastFrameRotation: ConstQuat, lastFrameRotation: ConstQuat): TVec3{

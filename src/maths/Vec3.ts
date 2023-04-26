@@ -207,6 +207,16 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
+    cross( b: ConstVec3 ): this{
+        const ax = this[0], ay = this[1], az = this[2],
+              bx = b[0],    by = b[1],    bz = b[2];
+
+        this[ 0 ] = ay * bz - az * by;
+        this[ 1 ] = az * bx - ax * bz;
+        this[ 2 ] = ax * by - ay * bx;
+        return this;
+    }
+
     abs(): this{ 
         this[ 0 ] = Math.abs( this[ 0 ] );
         this[ 1 ] = Math.abs( this[ 1 ] );
@@ -349,6 +359,8 @@ export default class Vec3 extends Array< number >{
         out[2] = a[2] * scale + b[2];
         return out;
     }
+
+    static fromQuat( q: ConstQuat, v: ConstVec3=[0,0,1] ): Vec3{ return new Vec3( v ).transformQuat( q ); }
 
     /*
     static smoothDamp( cur: ConstVec3, tar: ConstVec3, vel: TVec3, dt: number, smoothTime: number = 0.25, maxSpeed: number = Infinity ): TVec3{

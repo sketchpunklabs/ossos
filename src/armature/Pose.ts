@@ -3,7 +3,7 @@ import type Armature              from './Armature';
 import type Bone                  from './Bone';
 import Transform                  from '../maths/Transform';
 import Vec3, { TVec3, ConstVec3 } from '../maths/Vec3';
-import Quat                       from '../maths/Quat';
+import Quat, { ConstQuat }        from '../maths/Quat';
 // #endregion
 
 export default class Pose {
@@ -13,16 +13,28 @@ export default class Pose {
     linkedBone ?: Bone   = undefined;       // This skeleton extends another skeleton
     bones: Array< Bone > = new Array();     // Bone transformation heirarchy
 
-    constructor( arm: Armature ){ this.arm = arm; }
+    constructor( arm ?: Armature ){ 
+        if( arm ) this.arm = arm;
+
+        // If bindpose exists, then lets do an instant clone of it
+        if( arm?.poses?.bind ){
+            for( let i=0; i < arm.poses.bind.bones.length; i++ ){
+                this.bones.push( arm.poses.bind.bones[i].clone() );
+            }
+
+            this.offset.copy( arm.poses.bind.offset );
+        }
+    }
     // #endregion
 
     // #region GETTERS
     getBone( o: string | number ): Bone | null {
         switch( typeof o ){
-            case 'string':
+            case 'string':{
                 const idx = this.arm.names.get( o );
                 return ( idx !== undefined )? this.bones[ idx ] : null;
                 break;
+            }
 
             case 'number':
                 return this.bones[ o ];
@@ -35,7 +47,7 @@ export default class Pose {
         const rtn: Array< Bone > = [];
 
         let b: Bone | null;
-        for( let i of ary ){
+        for( const i of ary ){
             if( ( b = this.getBone( i ) ) ) rtn.push( b );
         }
 
@@ -43,28 +55,29 @@ export default class Pose {
     }
 
     clone(): Pose{ 
-        const p = new Pose( this.arm );
+        const p = new Pose();
+        p.arm = this.arm;
         p.offset.copy( this.offset );
 
-        for( let b of this.bones ) p.bones.push( b.clone() );
+        for( const b of this.bones ) p.bones.push( b.clone() );
         return p;
     }
     // #endregion
 
     // #region SETTERS
-    setLocalPos( boneId: string | number, v: vec3 ): this{
+    setLocalPos( boneId: string | number, v: ConstVec3 ): this{
         const bone = this.getBone( boneId );
         if( bone ) bone.local.pos.copy( v );
         return this;
     }
     
-    setLocalRot( boneId: string | number, v: quat ): this{
+    setLocalRot( boneId: string | number, v: ConstQuat ): this{
         const bone = this.getBone( boneId );
         if( bone ) bone.local.rot.copy( v );
         return this;
     }
 
-    copy( pose: ISkeleton ): this{
+    copy( pose: Pose ): this{
         const bLen = this.bones.length;
 
         for( let i=0; i < bLen; i++ ){
