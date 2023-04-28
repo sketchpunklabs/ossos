@@ -3,7 +3,7 @@
 <body><script type="module">
 // #region IMPORTS
 import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
-import useTransformControl          from '../_lib/useTransformControl.js';
+// import useTransformControl          from '../_lib/useTransformControl.js';
 import Util                         from '../_lib/misc/Util.js';
 
 import { 
@@ -37,9 +37,21 @@ window.addEventListener( 'load', async _=>{
     Ref.target = new IKTarget().setPos( [0.5,0.5,0.5] );
     Ref.chain  = new IKChain( arm.getBones( ['b0','b1'] ) );
 
-    boneAimSolver( Ref.target, Ref.chain, pose );
-    limbSolver( Ref.target, Ref.chain, pose );
+    // New API Idea : Composite IK Solvers
+    const limbSolver = ( target, chain, pose )=>{
+        chain.updateRootFromPose( pose );           // Get root world transform
+        aimChainSolver( target, chain, pose );      // Aim chain root bone at IK Target
 
+        if( chain.isReachable( target.pos ) ){
+            twoBoneSolver( target, chain, pose );   // Bend bones to reach target
+        }else{
+            chain.resetWorld( 1 );                  // Straighten remaining bones
+        }
+
+        chain.setLocalRotPose( pose );              // Convert to local space & save to pose
+    };
+
+    limbSolver( Ref.target, Ref.chain, pose );
     pose.updateWorld();
 
     Util.debugBones( pose.bones, Debug );
@@ -97,6 +109,7 @@ class IKLink{
     pindex    = -1;
     len       = 0;
     bind      = new Transform();
+    world     = new Transform();
 
     constructor( bone ){
         this.index  = bone.index;
@@ -110,9 +123,14 @@ class IKChain{
     links  = [];    // Link collection
     len    = 0;     // Total Length of chain
     axes   = new BoneAxes();
+    pworld = new Transform();
 
     constructor( bones=null ){
         if( bones ) this.addBones( bones );
+    }
+
+    isReachable( targetPos ){
+        return ( Vec3.distSqr( targetPos, this.links[0].world.pos ) < this.len**2 );
     }
 
     addBones( bones ){
@@ -120,6 +138,48 @@ class IKChain{
             this.links.push( new IKLink( b ) );
             this.len += b.len;
         }
+        return this;
+    }
+
+    updateRootFromPose( pose ){
+        // Get the World transform to the root's parent bone.
+        pose.getWorldTransform( this.links[0].pindex, this.pworld );
+
+        // Then compute the root using the parent & the local bind transform of the link
+        this.links[0].world.fromMul(
+            this.pworld,
+            this.links[ 0 ].bind
+        );
+    }
+
+    resetWorld( startIdx=-1, endIdx=-1 ){
+        if( startIdx < 0 ) startIdx = 0;
+        if( endIdx < 0 )   endIdx   = this.links.length-1;
+
+        let lnk;
+        let pWS;
+        for( let i=endIdx; i <= endIdx; i++ ){
+            lnk  = this.links[ i ];
+            pWS  = ( i === 0 )? this.pworld : this.links[ i-1 ].world;
+            lnk.world.fromMul( pWS, lnk.bind );
+        }
+
+        return this;
+    }
+
+    setLocalRotPose( pose ){
+        let lnk;
+        let pRot;
+
+        for( let i=0; i < this.links.length; i++ ){
+            lnk  = this.links[ i ];
+            pRot = ( i === 0 )? this.pworld.rot : this.links[ i-1 ].world.rot;
+            
+            pose.bones[ lnk.index ].local.rot
+                .copy( lnk.world.rot )
+                .pmulInvert( pRot );
+        }
+
         return this;
     }
 
@@ -133,12 +193,10 @@ class IKChain{
 
 // Debug.ln.add( cTran.pos, Vec3.scaleThenAdd( 3, twistDir, cTran.pos ), 0xff0000 );
 
-function boneAimSolver( tar, chain, pose ){
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Get bone's world transform using it's default local transform
-    const bone  = pose.getBone( chain.links[ 0 ].index );
-    const pTran = pose.getWorldTransform( bone.pindex );
-    const cTran = pTran.clone().mul( chain.links[ 0 ].bind );
+function aimChainSolver( tar, chain, pose ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    const pTran = chain.pworld;
+    const cTran = chain.links[0].world;
 
     // Get direction from bone to target
     const tarDir = new Vec3( tar.pos )
@@ -146,14 +204,11 @@ function boneAimSolver( tar, chain, pose ){
         .norm();
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Swing Rotation
-    
-    // Compute bone's currect pointing direction ( Y ).
+    // Swing Rotation - Compute bone's currect pointing direction ( Y ).
     const dir = new Vec3( chain.axes.y ).transformQuat( cTran.rot );
     const rot = new Quat()
         .fromSwing( dir, tarDir ) // Create Swing Rotation
         .mul( cTran.rot );        // Apply swing to current bone rotation
-
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Reset Twisting Rotation
@@ -195,98 +250,36 @@ function boneAimSolver( tar, chain, pose ){
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Create rotation that will reset the twisting so its axis aligned
-    rot .pmul( Quat.swing( swingTwistDir, twistDir ) )  // Apply Reset
-        .pmulInvert( pTran.rot )                        // Localspace
-        .copyTo( bone.local.rot );                      // Save
-
-    return;
+    cTran.rot.fromMul(
+        Quat.swing( swingTwistDir, twistDir ),
+        rot
+    );
 }
 
-function limbSolver( tar, chain, pose ){
+function twoBoneSolver( tar, chain, pose ){
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Compute the root transform of the chain
-    const l0    = chain.links[ 0 ];                     
-    const l1    = chain.links[ 1 ];
-    const pTran = pose.getWorldTransform( l0.pindex );
-    const cTran = pTran.clone();
-
-    // cTran.mul( l0.local );                   // Unmodified rotation
-    cTran.mul( pose.bones[ l0.index ].local );  // Get whats currently set in pose
+    // Get our two bones
+    const l0 = chain.links[ 0 ];  // aLen               
+    const l1 = chain.links[ 1 ];  // bLen
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // FIRST BONE
-    const bendAxis = Vec3.fromQuat( cTran.rot, chain.axes.x );  // X axis will act as our bending rotation
-    const rot      = new Quat( cTran.rot );                     // Start out with the first bone's rotation
-    const pRot     = new Quat();                                // Save first bone's WS rotation
-    const cLen     = Vec3.dist( cTran.pos, tar.pos );           // Compute the 3rd side of the triangle by using the distance between root & target
+    const bendAxis = Vec3.fromQuat( l0.world.rot, chain.axes.x );  // X axis will act as our bending rotation
+    const cLen     = Vec3.dist( l0.world.pos, tar.pos );           // Compute the 3rd side of the triangle by using the distance between root & target
     let   rad;
 
-    rad	= lawcos_sss( l0.len, cLen, l1.len );           // Get the Angle between First Bone and Target.
-    rot
-        .pmulAxisAngle( bendAxis, -rad )                // Apply Bending Rotation
-        .copyTo( pRot )                                 // Save as parent rotation for next bone
-        .pmulInvert( pTran.rot )                        // To local space
-        .copyTo( pose.bones[ l0.index ].local.rot );    // Save to pose
+    rad	= lawcos_sss( l0.len, cLen, l1.len );       // Get the Angle between First Bone and Target.
+    l0.world.rot.pmulAxisAngle( bendAxis, -rad );   // Apply Bending Rotation
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // SECOND BONE
     // Need to rotate from Right to Left, So take the angle and subtract it from 180 to rotate from 
     // the other direction. Ex. L->R 70 degrees == R->L 110 degrees
     rad	= Math.PI - lawcos_sss( l0.len, l1.len, cLen );
-    rot
-        .fromMul( pRot, l1.bind.rot )                  // Get bone's unmodified WS rotation
-        .pmulAxisAngle( bendAxis, rad )                 // Apply Bending Rotation
-        .pmulInvert( pRot )                             // To local space
-        .copyTo( pose.bones[ l1.index ].local.rot );    // Save to pose
+    l1.world.rot
+        .fromMul( l0.world.rot, l1.bind.rot )   // Create unmodified ws rotation for bone 2
+        .pmulAxisAngle( bendAxis, rad );        // Apply Bending Rotation
 }
-
-function lookSolverOrig( tar, chain, pose ){
-
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Get bone's world transform using it's default local transform
-    const bone  = pose.getBone( chain.links[ 0 ].index );
-    const pTran = pose.getWorldTransform( bone.pindex );
-    const cTran = pTran.clone().mul( chain.links[ 0 ].local );
-    
-    // Create worldspace directions of the bone
-    const axes  = chain.axes.getFromQuat( cTran.rot );
-    
-    // Get Direction from Bone to IK Target
-    const toTar = new Vec3( tar.targetPos )
-        .sub( cTran.pos )
-        .norm();
-
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Swing Rotation
-    const rot = new Quat()
-        .fromSwing( axes.z, toTar ) // Create Swing Rotation
-        .mul( cTran.rot );          // Apply swing to current bone rotation
-
-    // Get the current up direction after applying swing
-    const swingUp = new Vec3( chain.axes.y ).transformQuat( rot );
-
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Reset Twisting Rotation
-
-    // With swing rotation now aligned to the target direction,
-    // test to see if the target direction is pointing directly at a pole
-    // The reset direction will change depending on the pole.
-    const dot = Vec3.dot( toTar, Vec3.UP );
-    let resetDir;
-    if( dot >= 0.9999 )         resetDir = Vec3.BACK;       // Pointing Up
-    else if( dot <= -0.9999)    resetDir = Vec3.FORWARD;    // Pointing Down
-    else                        resetDir = Vec3.UP;         // Not pointing at a pole
-    
-    // Get axes using the reset direction as up
-    axes.look( toTar, resetDir );
-
-    // Create rotation that will reset the twisting so its axis aligned
-    const twistReset = new Quat().fromSwing( swingUp, axes.y );
-    rot .pmul( twistReset )          // Apply Reset
-        .pmulInvert( pTran.rot )     // Localspace
-        // .copyTo( bone.local.rot );   // Save
-}
-
 
 function lawcos_sss( aLen, bLen, cLen ){
     // Law of Cosines - SSS : cos(C) = (a^2 + b^2 - c^2) / 2ab
@@ -294,61 +287,5 @@ function lawcos_sss( aLen, bLen, cLen ){
     const v = ( aLen**2 + bLen**2 - cLen**2 ) / ( 2 * aLen * bLen );    
     return Math.acos( Math.min( 1, Math.max( -1, v ) ) );  // Clamp to prevent NaN Errors
 }
-
-class LimbSolver{
-    bendDir = 1;   // Switching to Negative will flip the rotation arc
-    invertBend(){ this.bendDir = -this.bendDir; return this; }
-
-    resolve( chain, pose, debug ){
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		// Start by Using SwingTwist to target the bone toward the EndEffector
-        const ST          = this._swingTwist
-        const [ rot, pt ] = ST.getWorldRot( chain, pose, debug );
-
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		let b0      = chain.links[ 0 ],
-            b1		= chain.links[ 1 ],
-            alen	= b0.len,
-            blen	= b1.len,
-            clen	= Vec3Util.len( ST.effectorPos, ST.originPos ),
-            prot     = [0,0,0,0],
-            rad     ;
-        // debug.pnt.add( ST.effectorPos, 0x00ff00, 2 );
-        // debug.pnt.add( ST.originPos, 0x00ffff, 2 );
-
-        // QuatUtil.pmulInvert( rot, rot, pt.rot );
-        // pose.setLocalRot( b0.idx, rot );
-        // return;
-
-		//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		// FIRST BONE
-		rad	= lawcos_sss( alen, clen, blen );                   // Get the Angle between First Bone and Target.
-
-        QuatUtil.pmulAxisAngle( rot, ST.orthoDir, -rad * this.bendDir, rot );  // Use the Axis X to rotate by Radian Angle
-        quat.copy( prot, rot );                                 // Save For Next Bone as Starting Point.
-        QuatUtil.pmulInvert( rot, rot, pt.rot );                // To Local
-
-		pose.setLocalRot( b0.idx, rot );				        // Save to Pose
-
-        // // pose.updateWorld();
-        // // debug.pnt.add( pose.bones[ b1.idx ].world.pos, 0x00ff00, 5 );
-        // return;
-
-        //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		// SECOND BONE
-		// Need to rotate from Right to Left, So take the angle and subtract it from 180 to rotate from 
-		// the other direction. Ex. L->R 70 degrees == R->L 110 degrees
-        rad	= Math.PI - lawcos_sss( alen, blen, clen );
-
-        quat.mul( rot, prot, b1.bind.rot );                     // Get the Bind WS Rotation for this bone
-        QuatUtil.pmulAxisAngle( rot, ST.orthoDir, rad * this.bendDir, rot );   // Rotation that needs to be applied to bone.
-        QuatUtil.pmulInvert( rot, rot, prot );                  // To Local Space
-
-        pose.setLocalRot( b1.idx, rot );                        // Save to Pose
-    }
-
-}
-
-
 
 </script></body></html>

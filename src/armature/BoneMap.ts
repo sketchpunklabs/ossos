@@ -5,12 +5,16 @@ import Pose     from './Pose';
 // #endregion
 
 export default class BoneMap{
-    bones: Map< string, BoneInfo  > = new Map();
+    bones : Map< string, BoneInfo  > = new Map();
+    obj  !: Armature | Pose;
+
     constructor( obj ?: Armature | Pose ){
         if( obj ) this.from( obj );
     }
 
     from( obj: Armature | Pose ){
+        this.obj = obj;
+
         const bAry = (obj instanceof Armature)? obj.bindPose.bones : obj.bones;
         let bp  : BoneParse;
         let bi  : BoneInfo | undefined;
@@ -31,6 +35,29 @@ export default class BoneMap{
                 break;
             }
         }
+    }
+
+    getBoneIndex( name:string ): number{
+        const bi = this.bones.get( name );
+        return ( bi )? bi.items[0].index : -1;
+    }
+
+    getBones( aryNames: Array<string> ): Array<Bone> | null{
+        const bAry = ( this.obj instanceof Armature)? this.obj.bindPose.bones : this.obj.bones;
+        const rtn : Array<Bone> = [];
+
+        let bi: BoneInfo | undefined;
+        let i : BoneInfoItem;
+        for( const name of aryNames ){
+            bi = this.bones.get( name );
+            if( bi ){
+                for( i of bi.items ) rtn.push( bAry[ i.index ] );
+            }else{
+                console.warn( 'Bonemap.getBones - Bone not found', name );
+            }
+        }
+        
+        return ( rtn.length >= aryNames.length )? rtn : null;
     }
 }
 

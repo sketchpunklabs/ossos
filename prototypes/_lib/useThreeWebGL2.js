@@ -46,6 +46,11 @@ export async function useVisualDebug( tjs ){
     const o = {};
     tjs.scene.add( ( o.ln  = new ary[ 0 ].default ) );
     tjs.scene.add( ( o.pnt = new ary[ 1 ].default ) );
+
+    o.reset = ()=>{
+        o.ln.reset();
+        o.pnt.reset();
+    };
     return o;
 }
 // #endregion

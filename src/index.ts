@@ -19,8 +19,17 @@ export { MatrixSkin, DQTSkin, TranMatrixSkin, DualQuatSkin };
 // #region KINEMATICS
 import IKTarget         from './kinematics/IKTarget';
 import IKChain          from './kinematics/IKChain';
-// import AimSolver       from './kinematics/solvers/AimSolver';
-export { IKTarget, IKChain };
+
+import aimChainSolver   from './kinematics/solvers/aimChainSolver';
+import twoBoneSolver   from './kinematics/solvers/twoBoneSolver';
+
+import limbSolver       from './kinematics/compose/limbSolver';
+
+export { 
+    IKTarget, IKChain,
+    aimChainSolver, twoBoneSolver,
+    limbSolver,
+};
 // #endregion
 
 // #region MATHS

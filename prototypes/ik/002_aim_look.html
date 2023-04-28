@@ -42,8 +42,8 @@ window.addEventListener( 'load', async _=>{
     Ref.target.setPosition( Ref.pos );
 
 
-    const chain = new IKChain( Ref.bot.arm.getBones( ['Eye'] ) )
-        .bindAxes( Ref.bot.arm );
+    const chain = new IKChain( Ref.bot.arm.bindPose.getBones( ['Eye'] ) )
+        .bindAxes( Ref.bot.arm.bindPose );
     Ref.chain = chain
 
     lookSolver( Ref.target, Ref.chain, Ref.bot.pose );
@@ -55,7 +55,7 @@ window.addEventListener( 'load', async _=>{
     // Ref.bot.updateSkin();
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Ref.rLoop = App.RenderLoop( onPreRender ).start(); // App.renderLoop();
+    Ref.rLoop = App.createRenderLoop( onPreRender ).start(); // App.renderLoop();
 });
 
 Ref.gizmo.onMove = p=>{
@@ -71,7 +71,7 @@ Ref.gizmo.onMove = p=>{
 function onPreRender( dt, et ){
     // let n3 = noise2.simplex2( et * 0.4 + 3, 0 ) * 0.5 + 0.5;
     // Ref.bot.setEyeLids( n3, n3 );
-    // Ref.bot.updateSkin();
+    Ref.bot.updateSkin();
 }
 
 // #endregion
@@ -343,7 +343,7 @@ class Axes{
 
 
 // #region IK BOT
-import { GltfUtil }             from '../_lib/misc/GltfUtil.js';
+import GltfUtil, { Gltf2 }       from '../_lib/misc/GltfUtil.js';
 import { TranMatrixSkin, Pose } from '../../src/index';
 
 const MAX_EYELID_ANG = 30;
@@ -352,16 +352,16 @@ const MAX_EYELID_RAD = MAX_EYELID_ANG * Math.PI / 180;
 class MK01{
     constructor( gltf ){
         this.arm    = GltfUtil.parseArmature( gltf );
-        this.skin   = new TranMatrixSkin( this.arm );
+        this.skin   = this.arm.useSkin( TranMatrixSkin );
         this.group  = new THREE.Group();
-        this.pose   = new Pose( this.arm );
+        this.pose   = this.arm.newPose();
 
-        const nList = GltfUtil.filterMeshNodes( gltf, true, 'MKB_' );
+        const nList = GltfUtil.filterNodes( gltf, { prefix: 'MKB_',  isMesh: true, hasSkin: false } );
         GltfUtil.loadNodeMeshes( gltf, nList, this.skin, this.group );
     }
 
     static async fetch( scene ){
-        const gltf  = await GltfUtil.fetch( '/prototypes/_res/models/MK01.gltf' );
+        const gltf  = await Gltf2.fetch( '/prototypes/_res/models/MK00.gltf' );
         const ikbot = new MK01( gltf );
         scene.add( ikbot.group );
         return ikbot;
@@ -378,13 +378,13 @@ class MK01{
         dn = Math.min( Math.max( dn, 0 ), 1 );
         
         // Top Eyelid
-        b = this.arm.getBone( 'EyelidUp' );
+        b = this.pose.getBone( 'EyelidUp' );
         quat.setAxisAngle( q, [1,0,0], -MAX_EYELID_RAD * up );
         quat.mul( q, q, b.local.rot );
         this.pose.setLocalRot( 'EyelidUp', q );
 
         // Bottom Eyelid
-        b = this.arm.getBone( 'EyelidDn' );
+        b = this.pose.getBone( 'EyelidDn' );
         quat.setAxisAngle( q, [1,0,0], MAX_EYELID_RAD * dn );
         quat.mul( q, q, b.local.rot );
         this.pose.setLocalRot( 'EyelidDn', q );
