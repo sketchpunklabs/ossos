@@ -12,9 +12,8 @@ export default function aimChainSolver( tar: IKTarget, chain: IKChain, pose: Pos
     const cTran = chain.links[0].world;
 
     // Get direction from bone to target
-    const tarDir = new Vec3( tar.pos )
-        .sub( cTran.pos )
-        .norm();
+    // const tarDir = new Vec3( tar.pos ).sub( cTran.pos ).norm();
+    const tarDir = tar.dir;
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Swing Rotation - Compute bone's currect pointing direction ( Y ).
@@ -33,6 +32,9 @@ export default function aimChainSolver( tar: IKTarget, chain: IKChain, pose: Pos
     const swingTwistDir = new Vec3();
     const orthDir       = new Vec3();
 
+    twistDir.copy( tar.poleDir );
+
+    /*
     // Get the twist dir from unmodifed bone rotation
     twistDir.fromQuat( cTran.rot, chain.axes.z );
 
@@ -51,6 +53,7 @@ export default function aimChainSolver( tar: IKTarget, chain: IKChain, pose: Pos
             Quat.axisAngle( orthDir, Math.PI * 0.5 * Math.sign( dot ) )
         );
     }
+    */
 
     // -----------------------------------------
     // Get the twist direction after swing rotation is applied

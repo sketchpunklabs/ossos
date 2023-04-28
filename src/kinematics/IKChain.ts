@@ -23,6 +23,15 @@ class IKLink{
     }
 }
 
+/*
+[[[ NOTES ]]]
+
+Default Bone Axes Directions
+Y : [0,1,0]     = (FWD) Effector Direction
+Z : [0,0,-1]    = (UP)  Pole Direction ( Elbow/Knee )
+X : [1,0,0]     = (RIT) Bending Axis, should be created using cross( Y, Z )
+*/
+
 export default class IKChain{
     // #region MAIN
     links: Array<IKLink>  = [];    // Link collection
@@ -106,5 +115,17 @@ export default class IKChain{
         return this;
     }
 
+    // #endregion
+
+    // #region DEBUGGING
+    debug( o: any ): void{
+        const t = this.links[ 0 ].world;
+        const v = new Vec3();
+        console.log( this.axes );
+        o.pnt.add( t.pos, 0x00ff00, 1 );
+        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.x ).add( t.pos ), 0xff0000 );
+        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.y ).add( t.pos ), 0x00ff00 );
+        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.z ).add( t.pos ), 0x0000ff );
+    }
     // #endregion
 }

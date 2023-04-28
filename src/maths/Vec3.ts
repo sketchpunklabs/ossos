@@ -44,6 +44,7 @@ export default class Vec3 extends Array< number >{
     // #region GETTERS
     get len(): number{ return Math.sqrt( this[ 0 ]**2 + this[ 1 ]**2 + this[ 2 ]**2 ); }
     get lenSqr(): number{ return  this[ 0 ]**2 + this[ 1 ]**2 + this[ 2 ]**2; }
+    get isZero(): boolean{ return ( this[0] === 0 && this[1] === 0 && this[2] === 0 ); }
     // #endregion
 
     // #region SETTERS
@@ -93,10 +94,17 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
-    fromMul( a: ConstVec3, b: ConstVec3 ): Vec3{
+    fromMul( a: ConstVec3, b: ConstVec3 ): this{
         this[ 0 ] = a[ 0 ] * b[ 0 ];
         this[ 1 ] = a[ 1 ] * b[ 1 ];
         this[ 2 ] = a[ 2 ] * b[ 2 ];
+        return this;
+    }
+
+    fromScale( a: ConstVec3, s:number ): this{
+        this[ 0 ] = a[ 0 ] * s;
+        this[ 1 ] = a[ 1 ] * s;
+        this[ 2 ] = a[ 2 ] * s;
         return this;
     }
 

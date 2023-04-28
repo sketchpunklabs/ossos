@@ -26,9 +26,9 @@ export default function useTransformControl( tjs ){
             return this;
         },
 
-        useAxes     : ()=>{
+        useAxes     : ( s=0.5 )=>{
             const axes = new AxesHelper();
-            axes.scale.setScalar( 0.5 );
+            axes.scale.setScalar( s );
             tjs.scene.add( axes );
             gizmo.attach( axes );
             return self;
