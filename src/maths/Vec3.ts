@@ -45,6 +45,8 @@ export default class Vec3 extends Array< number >{
     get len(): number{ return Math.sqrt( this[ 0 ]**2 + this[ 1 ]**2 + this[ 2 ]**2 ); }
     get lenSqr(): number{ return  this[ 0 ]**2 + this[ 1 ]**2 + this[ 2 ]**2; }
     get isZero(): boolean{ return ( this[0] === 0 && this[1] === 0 && this[2] === 0 ); }
+
+    clone(): Vec3{ return new Vec3( this ); }
     // #endregion
 
     // #region SETTERS
@@ -52,14 +54,21 @@ export default class Vec3 extends Array< number >{
         this[ 0 ] = x;
         this[ 1 ] = y;
         this[ 2 ] = z;
-        return this
+        return this;
     }
 
     copy( a: ConstVec3 ): this{
         this[ 0 ] = a[ 0 ];
         this[ 1 ] = a[ 1 ];
         this[ 2 ] = a[ 2 ];
-        return this
+        return this;
+    }
+
+    copyTo( a: TVec3 ): this{
+        a[ 0 ] = this[ 0 ];
+        a[ 1 ] = this[ 1 ];
+        a[ 2 ] = this[ 2 ];
+        return this;
     }
     
     setInfinite( sign:number=1 ): this{
@@ -187,6 +196,13 @@ export default class Vec3 extends Array< number >{
         this[ 0 ] *= v;
         this[ 1 ] *= v;
         this[ 2 ] *= v;
+        return this;
+    }
+
+    divScale( v: number ): this{
+        this[ 0 ] /= v;
+        this[ 1 ] /= v;
+        this[ 2 ] /= v;
         return this;
     }
 

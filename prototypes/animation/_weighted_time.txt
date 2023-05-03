@@ -1,0 +1,38 @@
+// Compute the initial blend weight based on the weights of the walk and run animations
+const blendWeight = 0.8; // Example value, can be changed to fit your needs
+
+function updateAnimationSpeeds() {
+  const walkDuration = walkAnimation.duration;
+  const runDuration = runAnimation.duration;
+  const totalDuration = walkDuration * (1 - blendWeight) + runDuration * blendWeight;
+  walkSpeed = totalDuration / walkDuration;
+  runSpeed = totalDuration / runDuration;
+}
+
+function update(deltaTime) {
+  // Calculate the time elapsed for the walk and run animations
+  // This is controlling the overall speed of each animation, like how I speed up or slow down animation
+  // by scaling DT. This is doing the same thing by using a blend weight to determine the speed up
+  // and speed down of the animation;
+  const walkTimeElapsed = deltaTime * walkSpeed;
+  const runTimeElapsed  = deltaTime * runSpeed;
+
+  // Update the animation times for the walk and run animations
+  // This is adding the scaled delta time to each individual animation
+  // so it moves in sync with eachother.
+  walkTime += walkTimeElapsed;
+  runTime += runTimeElapsed;
+
+  // Update the animation playback positions for the walk and run animations
+  const walkPosition = walkTime * walkSpeed;
+  const runPosition = runTime * runSpeed;
+
+  // Set the animation time and weight for each animation channel
+  walkAnimationChannel.time = walkPosition;
+  walkAnimationChannel.weight = 1 - blendWeight;
+  runAnimationChannel.time = runPosition;
+  runAnimationChannel.weight = blendWeight;
+
+  // Update the character mesh with the blended animation
+  mixer.update(deltaTime);
+}

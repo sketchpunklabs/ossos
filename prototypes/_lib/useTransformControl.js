@@ -16,7 +16,10 @@ export default function useTransformControl( tjs ){
         onStop   : null,
 
         attach      : o=>gizmo.attach( o ),
-        detach      : ()=>gizmo.attach( null ),
+        detach      : ()=>{
+            gizmo.detach();
+            if( self.axes ) self.axes.visible = false;
+        },
 
         toTranslate : ()=>gizmo.setMode( 'translate' ),
         toRotate    : ()=>gizmo.setMode( 'rotate' ),
@@ -27,16 +30,20 @@ export default function useTransformControl( tjs ){
         },
 
         useAxes     : ( s=0.5 )=>{
-            const axes = new AxesHelper();
-            axes.scale.setScalar( s );
-            tjs.scene.add( axes );
-            gizmo.attach( axes );
+            if( !self.axes ){
+                self.axes = new AxesHelper();
+                self.axes.scale.setScalar( s );
+                tjs.scene.add( self.axes );
+            }
+
+            self.axes.visible = true;
+            gizmo.attach( self.axes );
             return self;
         },
     };
 
     const onDragChange = e=>{
-        tjs.camCtrl.enabled = !e.value;
+        if( tjs.camCtrl ) tjs.camCtrl.enabled = !e.value;
 
         if( e.value && self.onStart )      self.onStart();
         else if( !e.value && self.onStop ) self.onStop();

@@ -1,0 +1,439 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import useTransformControl  from '../_lib/useTransformControl.js';
+import Util                 from '../_lib/misc/Util.js';
+import RayCasting, { nearPoint } from '../_lib/misc/RayCasting.js';
+
+import { 
+    Quat, Vec3, Transform, IKTarget,
+} from '../../src/index';
+
+// #endregion
+
+// #region MAIN
+let Debug;
+let App = useDarkScene( useThreeWebGL2(), { ambient:0xffffff } );
+let Ref = {
+    gizmo  : useTransformControl( App ).useAxes(),
+    target : new IKTarget().setPos( [1.5, 0.5, 0 ] ),
+    caster : new RayCasting( App.camera, App.renderer ).enable(),
+    selIdx : 0,
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 5, [ 0, 0.6, 0 ] );
+    Debug = await useVisualDebug( App );
+    Ref.gizmo.setPos( Ref.target.pos );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const rig   = new PointRig();
+    const p0    = rig.addPoint( 'root', [0,0,0] );
+    const p1    = rig.addPoint( 'mid',  [0.5,0,0], p0 );
+    const p2    = rig.addPoint( 'end',  [1.0,0,0], p1 );
+
+    p0.selectable = true;
+    p1.selectable = true;
+    p2.selectable = true;
+    
+
+    const chain = new PointChain( rig.points );
+    // debugPoints( chain );
+
+    Ref.rig     = rig;
+    Ref.chain   = chain;
+    
+    // fabrik( chain, Ref.target );
+    // fabrikRange( chain, Ref.target, 1 );
+    debugPoints( chain );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //App.createRenderLoop( onPreRender ).start();
+    App.renderLoop();
+});
+
+Ref.gizmo.onMove  = p=>{
+    Ref.target.setPos( p );
+
+    fabrikLeaf( Ref.chain, Ref.target, Ref.selIdx );
+    debugPoints(  Ref.chain, true, );
+};
+Ref.gizmo.onStart = ()=>{ Ref.caster.enabled = false; }
+Ref.gizmo.onStop  = ()=>{ Ref.caster.enabled = true; }
+
+Ref.caster.onMouseDown = ( e, caster )=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const [ rStart, rEnd ] = caster.getRaySegment();
+    const pnts  = Ref.rig.points;
+    let maxDist = 0.2 ** 2;
+    let minDist = Infinity;
+    let minIdx  = -1;
+    let dist;
+    let hit;
+    let p;
+    for( let i=0; i < pnts.length; i++ ){
+        p   = pnts[ i ];
+        if( !p.selectable ) continue;
+
+        hit = nearPoint( rStart, rEnd, p.pos );
+        if( hit === null ) continue;
+
+        dist = Vec3.distSqr( p.pos, hit );
+        if( dist <= maxDist && dist < minDist ){
+            minDist = dist;
+            minIdx  = i;
+        }
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if( minIdx === -1 ){
+        Ref.gizmo.detach();
+        return;
+    }
+
+    Ref.gizmo.useAxes().setPos( pnts[minIdx].pos );
+    Ref.selIdx = minIdx;
+
+    console.log( minDist, minIdx );
+};
+
+
+
+function onPreRender( dt, et ){
+
+}
+// #endregion
+
+/*
+Design an execution Graph
+If left arm updates, It runs its parent's solver, parent then run any of its children that HAS NOT been solved
+Then run the parent's parent, on & on.
+
+Each Target has a chain assigned to start the solver
+
+*/
+
+// PDF: Extending_FABRIK_with_Model_Cοnstraints
+// https://github.com/yamahigashi/fabric-fabrik-fullbody-ik/tree/master/Exts/Solvers
+// https://github.com/fire-archive/rtik
+
+function debugPoints( rig, doClear=false ){
+    if( doClear ) Debug.reset();
+
+    const tail = new Vec3();
+    for( let i=0; i < rig.points.length; i++ ){
+        Debug.pnt.add( rig.points[i].pos, 0x00ff00, 2 );
+        if( i !== 0 ){
+            tail
+                .fromSub( rig.points[i].pos, rig.points[i-1].pos )
+                .norm()
+                .scale( rig.points[i-1].len )
+                .add(  rig.points[i-1].pos );
+
+            Debug.ln.add( rig.points[i-1].pos, tail, 0x00ffff );
+        }
+    }
+}
+
+// #region POINT RIG
+class Point{
+    name        = '';
+    index       = -1;
+    pindex      = -1;
+    pos         = new Vec3();
+    len         = 0;
+    selectable  = false;
+    
+    constructor( p ){
+        this.pos.copy( p );
+    }
+}
+
+class PointRig{
+    // #region MAIN
+    points = [];
+    names  = new Map();
+    // #endregion
+
+    addPoint( name, pos, parent=null ){
+        const pnt = new Point( pos );
+        pnt.index = this.points.length;
+        pnt.name  = name;
+
+        // Attach to parent
+        if( parent ){
+            pnt.pindex = parent.index;
+            if( parent.len === 0 ){
+                parent.len = Vec3.dist( parent.pos, pnt.pos );
+            }
+        }
+
+        this.points.push( pnt );
+        this.names.set( name, pnt.idx );
+        return pnt;
+    }
+
+    getPoint( o ){
+        switch( typeof o ){
+            case 'number': return this.points[ o ]; break;
+            case 'string':
+                const idx = this.names.get( o );
+                return ( idx !== undefined )? this.points[ idx ] : null;
+                break;
+        }
+        return null;
+    }
+
+    getPoints( ary ){
+        const rtn = [];
+        let b;
+        for( const i of ary ){
+            if( ( b = this.getPoint( i ) ) ) rtn.push( b );
+        }
+
+        return rtn;
+    }
+}
+
+class PointChain{
+    points = [];
+    count  = 0;
+    length = 0;
+
+    constructor( ary ){
+        if( ary ) return this.addPoints( ary );
+    }
+
+    addPoints( ary ){
+        for( const p of ary ){
+            this.points.push( p );
+            this.length += p.len;
+        }
+
+        this.count = this.points.length;
+        return this;
+    }
+
+    findPoint( id ){
+        for( let i=0; i < this.count; i++ ){
+            if( this.points[i].index === id ) return i;
+        }
+        return -1;
+    }
+
+    lengthAt( idx ){
+        let len = 0;
+        for( let i=0; i <= idx; i++ ){
+            len += this.points[ i ].len;
+        }
+        return len;
+    }
+}
+// #endregion
+
+// #region SOLVER
+
+function fabrik( chain, target, maxIter=5 ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Test initial reach
+    // const anchor = new Vec3( chain.points[0].pos );
+    const anchor = new Vec3( 0, 0, 0 );
+    // if( Vec3.distSqr( anchor, target.pos ) >= chain.length**2 ){
+    //     straightenChain( chain, target );
+    //     console.log( 'Out of reach' );
+    //     return;
+    // }
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Iterate algorithm
+    const lastPnt   = chain.points[ chain.count-1 ];
+    const epsilon   = 1e-4 ** 2;
+    let i;
+    for( i=0; i < maxIter; i++ ){
+        fabrikBackward( chain, target );
+        fabrikTethered( chain, target, anchor );
+        fabrikForward( chain );
+
+        if( Vec3.distSqr( target.pos, lastPnt.pos ) <= epsilon ){
+            console.log( 'Reached' );
+            break;
+        }
+    }
+
+    console.log( 'Done, Total Iterations', i );
+}
+
+function fabrikBackward( chain, target ){
+    const diff = new Vec3();
+    let   p    = chain.points[ chain.count - 1 ];
+    let   t;
+
+    p.pos.copy( target.pos );
+    for( let i = chain.count-2; i >= 0; i-- ){
+        p = chain.points[ i ];      // Moving Point
+        t = chain.points[ i+1 ];    // Target Point
+
+        diff .fromSub( p.pos, t.pos )
+             .norm()
+             .scale( p.len )
+             .add( t.pos )
+             .copyTo( p.pos );
+    }
+}
+
+function fabrikForward( chain ){
+    const diff = new Vec3();
+    let   p;
+    let   t;
+
+    for( let i = 1; i < chain.count; i++ ){
+        p = chain.points[ i ];      // Moving Point
+        t = chain.points[ i-1 ];    // Target Point
+
+        diff .fromSub( p.pos, t.pos )
+             .norm()
+             .scale( t.len )
+             .add( t.pos )
+             .copyTo( p.pos );
+    }
+}
+
+function fabrikTethered( chain, target, anchor, damping=0.2, maxDist=0.3, chainLen=0 ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // If no damping or target is under chain length, lock root to anchor.
+    const root = chain.points[ 0 ];
+    const cLen = chainLen | chain.length;
+    if( damping >= 1.0 || Vec3.distSqr( target.pos, anchor ) < cLen**2 ){
+        root.pos.copy( anchor );
+        return;
+    }
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Allow the root to move away from the anchor
+    const diff  = new Vec3().fromSub( root.pos, anchor );
+    const dist  = diff.len;
+    diff.norm()
+        .scale( Math.min( dist * damping, maxDist ) );
+    
+    root.pos.fromAdd( anchor, diff );
+}
+
+function straightenChain( chain, target ){
+    const diff = new Vec3();
+    let   p;
+    let   t;
+    for( let i = 1; i < chain.count; i++ ){
+        p = chain.points[ i ];      // Moving Point
+        t = chain.points[ i-1 ];    // Target Point
+
+        diff .fromSub( target.pos, t.pos )
+             .norm()
+             .scale( t.len )
+             .add( t.pos )
+             .copyTo( p.pos );
+    }
+}
+
+
+function fabrikLeaf( chain, target, pntId, maxIter=5 ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Splitting the chain in half from the effector point
+    const effIdx = chain.findPoint( pntId );    // Find the effector point
+    const effLen = chain.lengthAt( effIdx );    // Length from root to effector
+    const topIdx = effIdx + 1;                  // Start index for top half 
+    const topLen = chain.count - 1 - topIdx;    // How many points to move up
+    const botIdx = effIdx - 1;                  // Start index for bot half
+    const botLen = botIdx;                      // How many points to move down
+
+    // console.log( pntId, effIdx, 'TOP', topIdx, topLen, 'BOT', botIdx, botLen );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Iterate algorithm
+    const anchor   = new Vec3( 0, 0, 0 );
+    const rootPnt  = chain.points[ 0 ];
+    const effPnt   = chain.points[ effIdx ];
+    const rng      = chain.count - 2;
+    const epsilon  = 1e-4 ** 2;
+    let i;
+
+    for( i=0; i < maxIter; i++ ){
+        // Move effector point at target
+        effPnt.pos.copy( target.pos );
+
+        // With chain split, move both sides toward effector
+        if( topLen >= 0 ) fabrikBakFwdRange( chain, target, topIdx, topLen,  1, -1 );
+        if( botLen >= 0 ) fabrikBakFwdRange( chain, target, botIdx, botLen, -1,  1 );
+
+        // Move all points back toward anchor
+        // rootPnt.pos.copy( anchor );
+        fabrikTethered( chain, target, anchor, 0.2, 0.3, effLen );
+        fabrikBakFwdRange( chain, target, 1, rng, 1, -1 );
+
+        if( Vec3.distSqr( target.pos, effPnt.pos ) <= epsilon ){
+            console.log( 'Reached' );
+            break;
+        }
+    }
+
+    console.log( 'Done, Total Iterations', i );
+}
+
+function fabrikBakFwdRange( chain, target, iStart, iLen, iInc=-1, iTarStep=1 ){
+    const dir = new Vec3();
+    let ii;
+    let p;
+    let t;
+
+    for( let i=0; i <= iLen; i++ ){
+        ii = iStart + ( i * iInc );         // Index to moving point
+        p  = chain.points[ ii ];            // Moving Point
+        t  = chain.points[ ii + iTarStep ]; // Move Point toward this point
+
+        // console.log( i, ii, 'move', p.index, 'tar', t.index, 'dir', iTarStep );
+
+        dir.fromSub( p.pos, t.pos )
+            .norm()
+            .scale( ( iTarStep === 1 )  
+                ? p.len     // If moving torward target, use moving point distance        
+                : t.len     // If moving away from target, use target's distance
+            );
+
+        p.pos.fromAdd( t.pos, dir );
+    }
+}
+
+// #endregion
+
+function distanceConstraint( a, b, atLen, aAnchored=false, bAnchored=false ){
+    if( aAnchored && bAnchored ) return true;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const dir    = vec3.sub( [0,0,0], a, b );
+    const curLen = vec3.len( dir );
+    if( Math.abs( curLen - atLen ) < 0.0001 ) return true;
+    
+    // Normalize LenConstraint in relation to current distance of DIR
+    const delta = ( curLen == 0 )? atLen : ( atLen - curLen ) / curLen;  
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    let aScl = 0.5
+    let bScl = 0.5;
+    if( aAnchored ){        aScl = 0; bScl = 1;
+    }else if( bAnchored ){  aScl = 1; bScl = 0; }
+
+    a[ 0 ] += dir[ 0 ] * aScl * delta;
+    a[ 1 ] += dir[ 1 ] * aScl * delta;
+    a[ 2 ] += dir[ 2 ] * aScl * delta;
+    
+    b[ 0 ] -= dir[ 0 ] * bScl * delta;
+    b[ 1 ] -= dir[ 1 ] * bScl * delta;
+    b[ 2 ] -= dir[ 2 ] * bScl * delta;
+
+    return false;
+}
+
+</script></body></html>

@@ -304,6 +304,25 @@ class FootPhaseSync{
     }
 }
 
+
+class BlendedDuration{
+    scale0 = 1;
+    scale1 = 1;
+    duration = 0;
+
+    set( duration0, duration1, wgt ){
+        duration = duration0 * (1-wgt) + duration1 * wgt;
+        scale0   = duration / duration0;
+        scale1   = duration / duration1;
+    }
+
+    updateClock( dt ){
+        clock = clock + dt % duration;
+        time0 = clock * scale0;
+        time1 = clock * scale1;
+    }
+}
+
 </script>
 
 <div style="position:fixed; bottom:10px; left:10px;">
