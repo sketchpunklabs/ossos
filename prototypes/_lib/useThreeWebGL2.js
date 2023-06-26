@@ -20,7 +20,7 @@ App
 
 // #region OPTIONS
 export function useDarkScene( tjs, props={} ){
-    const pp = Object.assign( { ambient:0x404040 }, props );
+    const pp = Object.assign( { ambient:0x404040, grid:true, }, props );
 
     // Light
     const light = new THREE.DirectionalLight( 0xffffff, 1.0 );
@@ -30,7 +30,7 @@ export function useDarkScene( tjs, props={} ){
     tjs.scene.add( new THREE.AmbientLight( pp.ambient ) );
     
     // Floor
-    tjs.scene.add( new THREE.GridHelper( 20, 20, 0x0c610c, 0x444444 ) );
+    if( pp.grid ) tjs.scene.add( new THREE.GridHelper( 20, 20, 0x0c610c, 0x444444 ) );
 
     // Renderer
     tjs.renderer.setClearColor( 0x3a3a3a, 1 );
@@ -60,25 +60,37 @@ export default function useThreeWebGL2( props={} ){
     props = Object.assign( {
         colorMode : false,
         shadows   : false,
+        preserverBuffer : false,
+        power           : '',
     }, props );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // RENDERER
     const options = { 
-        antialias : true, 
-        alpha     : true,
+        antialias               : true, 
+        alpha                   : true,
+        stencil                 : true,
+        depth                   : true,
+        preserveDrawingBuffer   : props.preserverBuffer,
+        powerPreference         : ( props.power === '')      ? 'default' : 
+                                  ( props.power === 'high' ) ? 'high-performance' : 'low-power',
     };
 
     const canvas    = document.createElement( 'canvas' );
     options.canvas  = canvas;
-    options.context = canvas.getContext( 'webgl2' );
+    options.context = canvas.getContext( 'webgl2',  { preserveDrawingBuffer: props.preserverBuffer } );
 
     const renderer = new THREE.WebGLRenderer( options );
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setClearColor( 0x3a3a3a, 1 );
+    //if( props.preserveDrawingBuffer ){
+    // renderer.autoClearColor = false;
+    // renderer.autoClearDepth = false;
+    // Manual clearing : r.clearColor(); r.clearDepth();
+    //}
 
     if( props.colorMode ){
-        // React-Fiber changes the default settings which causes big issues trying to map colors 1:1
+        // React-Fiber changes the default settings, the defaults can cause issues trying to map colors 1:1
         // https://docs.pmnd.rs/react-three-fiber/api/canvas#render-defaults
         // https://threejs.org/docs/#manual/en/introduction/Color-management
 
@@ -102,6 +114,11 @@ export default function useThreeWebGL2( props={} ){
 
     const camera  = new THREE.PerspectiveCamera( 45, 1.0, 0.01, 5000 );
     camera.position.set( 0, 5, 20 );
+
+    // const ratio = window.innerWidth / window.innerHeight;
+    // let height  = boxHeight / 2;
+    // let width   = boxHeight * ratio / 2;
+    // this.camera = new THREE.OrthographicCamera( -width, width, height, -height, -1, 2500 );
 
     const camCtrl = new OrbitControls( camera, renderer.domElement );
 
@@ -157,10 +174,19 @@ export default function useThreeWebGL2( props={} ){
     const resize = ( w=0, h=0 )=>{
         const W = w || window.innerWidth;
         const H = h || window.innerHeight;
-
         renderer.setSize( W, H );           // Update Renderer
 
-        camera.aspect = W / H;              // Update Camera
+        if( !camera.isOrthographicCamera ){
+            camera.aspect = W / H;              
+        }else{
+            const h = camera.top;
+            const w = h * ( W / H );
+            camera.left    = -w;
+            camera.right   =  w;
+            camera.top     =  h;
+            camera.bottom  = -h;
+        }
+
         camera.updateProjectionMatrix();
         return self;
     };

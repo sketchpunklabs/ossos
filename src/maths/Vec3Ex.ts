@@ -33,7 +33,7 @@ export default class Vec3Ex{
     static project( out: vec3, from: vec3, to: vec3 ) : vec3{
         // TO can be a unit vector to project
         // Modified from https://github.com/Unity-Technologies/UnityCsReference/blob/master/Runtime/Export/Math/Vector3.cs#L265
-        // dot( a, b ) / dot( b, b ) * b
+        // dot( a, b ) / dot( b, b ) 
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         const denom = vec3.dot( to, to );
         if( denom < 0.000001 ){

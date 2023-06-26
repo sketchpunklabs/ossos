@@ -1,11 +1,11 @@
 // #region IMPORTS
 import type Armature        from '../armature/Armature';
 import type Bone            from '../armature/Bone';
-import type ISkeleton       from '../armature/ISkeleton';
-import Vec4               from '../maths/Vec4';
+import type Pose            from '../armature/Pose';
 import { quat2 }            from 'gl-matrix';
 // #endregion
 
+// TODO Remove dependancy on GLMatrix's DualQuat
 export default class DQTSkin{
     // #region MAIN
     bind            !: Array< quat2 >;
@@ -16,7 +16,7 @@ export default class DQTSkin{
     offsetPBuffer !: Float32Array;  // DualQuat : Translation
 
     constructor( arm: Armature ){
-        const bCnt                      = arm.bones.length;
+        const bCnt                      = arm.boneCount;
         const world : Array< quat2 >    = new Array( bCnt );    // World space matrices
         const bind  : Array< quat2 >    = new Array( bCnt );    // bind pose matrices
         
@@ -32,17 +32,18 @@ export default class DQTSkin{
             bind[ i ]  = [ 0,0,0,1, 0,0,0,0 ];
 
             // Fill Buffers with Identity Data
-            Vec4Ex.toBuf( [0,0,0,1], this.offsetQBuffer, i * 4 );        // Init Offsets : Quat Identity
-            Vec4Ex.toBuf( [0,0,0,0], this.offsetPBuffer, i * 4 );        // ...No Translation
+            // Vec4Ex.toBuf( [0,0,0,1], this.offsetQBuffer, i * 4 );        // Init Offsets : Quat Identity
+            // Vec4Ex.toBuf( [0,0,0,0], this.offsetPBuffer, i * 4 );        // ...No Translation
         }
         
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        let b  : Bone;
+        const pose = arm.bindPose;
+        let b: Bone;
         for( let i=0; i < bCnt; i++ ){
-            b = arm.bones[ i ];
+            b = pose.bones[ i ];
 
             // Compute Bone's world space dual quaternion
-            quat2.fromRotationTranslation( world[ i ], b.local.rot, b.local.pos );          // Local Space
+            quat2.fromRotationTranslation( world[ i ], ( b.local.rot as any), ( b.local.pos as any ) );          // Local Space
             if( b.pindex !== -1 ) quat2.mul( world[ i ], world[ b.pindex ], world[ i ] );   // Add Parent if available
 
             // Inverting it to create a Bind Dual Quaternion
@@ -58,9 +59,9 @@ export default class DQTSkin{
 
     // #region METHODS
 
-    updateFromPose( pose: ISkeleton ): this{
+    updateFromPose( pose: Pose ): this{
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        const offset    = quat2.fromRotationTranslation( [ 0,0,0,1, 0,0,0,0 ], pose.offset.rot, pose.offset.pos ); 
+        const offset    = quat2.fromRotationTranslation( [ 0,0,0,1, 0,0,0,0 ], (pose.offset.rot as any), (pose.offset.pos as any) ); 
         const dq: quat2 = [ 0,0,0,1, 0,0,0,0 ];
         const w         = this.world;
         let b: Bone;
@@ -71,7 +72,7 @@ export default class DQTSkin{
 
             // ----------------------------------------
             // Compute Bone's world space DQ
-            quat2.fromRotationTranslation( dq, b.local.rot, b.local.pos ); 
+            quat2.fromRotationTranslation( dq, (b.local.rot as any), (b.local.pos as any) ); 
 
             if( b.pindex !== -1 ) quat2.mul( w[ i ], w[ b.pindex ], dq );
             else                  quat2.mul( w[ i ], offset,        dq );

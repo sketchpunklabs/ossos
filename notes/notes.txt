@@ -2,6 +2,7 @@ https://montreal.ubisoft.com/en/introducing-learned-motion-matching/
 https://theorangeduck.com/page/inertialization-transition-cost
 interesting information on blending animations using damped springs
 
+https://twitter.com/FreyaHolmer/status/1667893994955902976?s=20  about apply rotation on spline
 
 https://rapier.rs/docs/user_guides/rust/joints
 

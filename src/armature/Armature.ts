@@ -19,6 +19,8 @@ export default class Armature{
 
     // #region GETTERS
     get bindPose():Readonly< Pose >{ return this.poses.bind; }
+
+    get boneCount(): number{ return this.poses.bind.bones.length; }
     
     newPose( saveAs ?: string ): Pose {
         const p = this.poses.bind.clone();

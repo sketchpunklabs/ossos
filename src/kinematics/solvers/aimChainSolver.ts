@@ -7,7 +7,8 @@ import Vec3              from '../../maths/Vec3';
 import Quat              from '../../maths/Quat';
 // #endregion
 
-export default function aimChainSolver( tar: IKTarget, chain: IKChain, pose: Pose ): void{
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function aimChainSolver( tar: IKTarget, chain: IKChain, _pose: Pose ): void{
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
     const cTran = chain.links[0].world;
 
@@ -17,7 +18,7 @@ export default function aimChainSolver( tar: IKTarget, chain: IKChain, pose: Pos
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Swing Rotation - Compute bone's currect pointing direction ( Y ).
-    const dir = new Vec3( chain.axes.y ).transformQuat( cTran.rot );
+    const dir = new Vec3( chain.axes.swing ).transformQuat( cTran.rot );
     const rot = new Quat()
         .fromSwing( dir, tarDir ) // Create Swing Rotation
         .mul( cTran.rot );        // Apply swing to current bone rotation
@@ -57,7 +58,7 @@ export default function aimChainSolver( tar: IKTarget, chain: IKChain, pose: Pos
 
     // -----------------------------------------
     // Get the twist direction after swing rotation is applied
-    swingTwistDir.fromQuat( rot, chain.axes.z );
+    swingTwistDir.fromQuat( rot, chain.axes.twist );
 
     // With our swing pointing dir matching our target dir, we can use it instead of 
     // generating it to help realign our twist direction by finding the orthogonal dir

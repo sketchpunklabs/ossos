@@ -37,6 +37,8 @@ export default class BoneMap{
         }
     }
 
+    getBoneMap( name: string ): BoneInfo | undefined{ return this.bones.get( name ); }
+
     getBoneIndex( name:string ): number{
         const bi = this.bones.get( name );
         return ( bi )? bi.items[0].index : -1;
@@ -58,6 +60,18 @@ export default class BoneMap{
         }
         
         return ( rtn.length >= aryNames.length )? rtn : null;
+    }
+
+    getChestBone(): Array<Bone> | null {
+        const bAry = ( this.obj instanceof Armature)? this.obj.bindPose.bones : this.obj.bones;
+        const rtn : Array<Bone> = [];
+
+        const bi   = this.bones.get( 'spine' );
+        if( bi ){
+            rtn.push( bAry[ bi.lastIndex ] );
+        }
+
+        return ( rtn.length > 0 )? rtn : null;
     }
 }
 
@@ -82,6 +96,7 @@ export class BoneInfo{
     get isChain(): boolean{ return ( this.items.length > 1 ); }
     get count(): number{ return this.items.length; }
     get index(): number{ return this.items[0].index; }
+    get lastIndex(): number{ return this.items[ this.items.length-1 ].index; }
 }
 // #endregion
 

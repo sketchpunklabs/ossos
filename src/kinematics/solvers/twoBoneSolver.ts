@@ -13,7 +13,8 @@ function lawcos_sss( aLen: number, bLen: number, cLen: number ): number{
     return Math.acos( Math.min( 1, Math.max( -1, v ) ) );  // Clamp to prevent NaN Errors
 }
 
-export default function twoBoneSolver( tar: IKTarget, chain: IKChain, pose: Pose ): void{
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function twoBoneSolver( tar: IKTarget, chain: IKChain, _pose: Pose ): void{
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Get our two bones
     const l0 = chain.links[ 0 ];  // aLen               
@@ -21,10 +22,10 @@ export default function twoBoneSolver( tar: IKTarget, chain: IKChain, pose: Pose
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // FIRST BONE
-    const bendAxis = Vec3.fromQuat( l0.world.rot, chain.axes.x );  // X axis will act as our bending rotation
+    const bendAxis = Vec3.fromQuat( l0.world.rot, chain.axes.ortho );  // X axis will act as our bending rotation
     const cLen     = Vec3.dist( l0.world.pos, tar.pos );           // Compute the 3rd side of the triangle by using the distance between root & target
     let   rad      = lawcos_sss( l0.len, cLen, l1.len );           // Get the Angle between First Bone and Target.
-    l0.world.rot.pmulAxisAngle( bendAxis, rad );                   // Apply Bending Rotation
+    l0.world.rot.pmulAxisAngle( bendAxis, -rad );                   // Apply Bending Rotation
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // SECOND BONE
@@ -33,6 +34,6 @@ export default function twoBoneSolver( tar: IKTarget, chain: IKChain, pose: Pose
     rad	= Math.PI - lawcos_sss( l0.len, l1.len, cLen );
     l1.world.rot
         .fromMul( l0.world.rot, l1.bind.rot )   // Create unmodified ws rotation for bone 2
-        .pmulAxisAngle( bendAxis, -rad );       // Apply Bending Rotation
+        .pmulAxisAngle( bendAxis, rad );       // Apply Bending Rotation
 }
 

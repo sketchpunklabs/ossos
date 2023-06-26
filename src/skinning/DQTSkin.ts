@@ -1,15 +1,15 @@
 // #region IMPORTS
 import type Armature        from '../armature/Armature';
 import type Bone            from '../armature/Bone';
-import type ISkeleton       from '../armature/ISkeleton';
+import type Pose            from '../armature/Pose';
 import type { vec3, quat }  from 'gl-matrix';
+
 import Vec3Ex               from '../maths/Vec3Ex';
-import Vec4               from '../maths/Vec4';
 import Transform            from '../maths/Transform';
 import { quat2 }            from 'gl-matrix';
 // #endregion
 
-
+// TODO Remove dependancy on GLMatrix's DualQuat
 export default class DQTSkin{
     // #region MAIN
     bind            !: Array< Transform >;
@@ -23,7 +23,7 @@ export default class DQTSkin{
     offsetSBuffer !: Float32Array;  // Scale
 
     constructor( arm: Armature ){
-        const bCnt                          = arm.bones.length;
+        const bCnt                          = arm.boneCount;
         const world : Array< Transform >    = new Array( bCnt );    // World space matrices
         const bind  : Array< Transform >    = new Array( bCnt );    // bind pose matrices
         
@@ -40,15 +40,16 @@ export default class DQTSkin{
             bind[ i ]  = new Transform();
 
             // Fill Buffers with Identity Data
-            Vec4Ex.toBuf( [0,0,0,1], this.offsetQBuffer, i * 4 );        // Init Offsets : Quat Identity
-            Vec4Ex.toBuf( [0,0,0,0], this.offsetPBuffer, i * 4 );        // ...No Translation
+            // Vec4Ex.toBuf( [0,0,0,1], this.offsetQBuffer, i * 4 );        // Init Offsets : Quat Identity
+            // Vec4Ex.toBuf( [0,0,0,0], this.offsetPBuffer, i * 4 );        // ...No Translation
             Vec3Ex.toBuf( [1,1,1],   this.offsetSBuffer, i * 3 );        // ...No Scale
         }
         
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const pose = arm.bindPose;
         let b: Bone;
         for( let i=0; i < bCnt; i++ ){
-            b = arm.bones[ i ];
+            b = pose.bones[ i ];
 
             // Compute Bone's world space transform
             if( b.pindex !== -1 ) world[ i ].fromMul( world[ b.pindex ], b.local );
@@ -67,7 +68,7 @@ export default class DQTSkin{
 
     // #region METHODS
 
-    updateFromPose( pose: ISkeleton ): this{
+    updateFromPose( pose: Pose ): this{
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         const bOffset = new Transform();
         const w       = this.world;

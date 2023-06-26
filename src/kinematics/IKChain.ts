@@ -34,11 +34,11 @@ X : [1,0,0]     = (RIT) Bending Axis, should be created using cross( Y, Z )
 
 export default class IKChain{
     // #region MAIN
-    links: Array<IKLink>  = [];    // Link collection
-    len                   = 0;     // Total Length of chain
-    count                 = 0;
-    axes                  = new BoneAxes();
-    pworld                = new Transform();
+    links: Array<IKLink>  = [];                 // Link collection
+    len                   = 0;                  // Total Length of chain
+    count                 = 0;                  // How many links in the chain
+    axes                  = new BoneAxes();     // Axes Direction related to Root's WS Rotation
+    pworld                = new Transform();    // Parent WS Transform when updating root
 
     constructor( bones ?: Array<Bone> ){
         if( bones ) this.addBones( bones );
@@ -68,7 +68,7 @@ export default class IKChain{
 
     // #region METHODS IK COMPOSITION
 
-    // Compute the worldspace transfrom of the ROOT bone from a pose
+    // Compute the worldspace transform of the ROOT bone from a pose
     updateRootFromPose( pose: Pose ): this{
         // Get the World transform to the root's parent bone.
         pose.getWorldTransform( this.links[0].pindex, this.pworld );
@@ -98,7 +98,7 @@ export default class IKChain{
         return this;
     }
 
-    // Update pose's bone using the chain's world transforms by converting to local space.
+    // Update pose's bones using the chain's world transforms by converting to local space.
     setLocalRotPose( pose: Pose ): this{
         let lnk  : IKLink;
         let pRot : TQuat;
@@ -123,9 +123,9 @@ export default class IKChain{
         const v = new Vec3();
         console.log( this.axes );
         o.pnt.add( t.pos, 0x00ff00, 1 );
-        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.x ).add( t.pos ), 0xff0000 );
-        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.y ).add( t.pos ), 0x00ff00 );
-        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.z ).add( t.pos ), 0x0000ff );
+        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.ortho ).add( t.pos ), 0xff0000 );
+        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.swing ).add( t.pos ), 0x00ff00 );
+        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.twist ).add( t.pos ), 0x0000ff );
     }
     // #endregion
 }
