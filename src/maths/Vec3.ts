@@ -127,6 +127,21 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
+    fromNorm( a: ConstVec3 ): this{
+        let mag = Math.sqrt( a[0]**2 + a[1]**2 + a[2]**2 );
+        if( mag != 0 ){
+            mag       = 1 / mag;
+            this[ 0 ] = a[0] * mag;
+            this[ 1 ] = a[1] * mag;
+            this[ 2 ] = a[2] * mag;
+        }else{
+            this[ 0 ] = 0;
+            this[ 1 ] = 0;
+            this[ 2 ] = 0;
+        }
+        return this;
+    }
+
     fromNegate( a: ConstVec3 ): this{
         this[ 0 ] = -a[ 0 ]; 
         this[ 1 ] = -a[ 1 ];
@@ -148,6 +163,18 @@ export default class Vec3 extends Array< number >{
         this[ 0 ] = a[ 0 ] * ti + b[ 0 ] * t;
         this[ 1 ] = a[ 1 ] * ti + b[ 1 ] * t;
         this[ 2 ] = a[ 2 ] * ti + b[ 2 ] * t;
+        return this;
+    }
+
+    fromSlerp( a: TVec3, b: TVec3, t: number ): this {
+        const angle  = Math.acos( Math.min( Math.max( Vec3.dot( a, b ), -1 ), 1 ) );
+        const sin    = Math.sin( angle);
+        const ta     = Math.sin(( 1 - t ) * angle ) / sin;
+        const tb     = Math.sin( t * angle ) / sin;
+        
+        this[ 0 ] = ta * a[ 0 ] + tb * b[ 0 ];
+        this[ 1 ] = ta * a[ 1 ] + tb * b[ 1 ];
+        this[ 2 ] = ta * a[ 2 ] + tb * b[ 2 ];
         return this;
     }
     // #endregion
@@ -385,6 +412,57 @@ export default class Vec3 extends Array< number >{
     }
 
     static fromQuat( q: ConstQuat, v: ConstVec3=[0,0,1] ): Vec3{ return new Vec3( v ).transformQuat( q ); }
+
+    static angle( a: ConstVec3, b: ConstVec3 ): number{
+        //acos(dot(a,b)/(len(a)*len(b))) 
+        // const theta = this.dot( a, b ) / ( Math.sqrt( Vec3.lenSqr(a) * Vec3.lenSqr(b) ) );
+        // return Math.acos( Math.max( -1, Math.min( 1, theta ) ) ); // clamp ( t, -1, 1 )
+
+        // atan2(len(cross(a,b)),dot(a,b))  
+        const d = this.dot( a, b ),
+              c = new Vec3().fromCross( a, b );
+        return Math.atan2( Vec3.len(c), d ); 
+
+        // This also works, but requires more LEN / SQRT Calls
+        // 2 * atan2( ( u * v.len - v * u.len ).len, ( u * v.len + v * u.len ).len );
+
+        //https://math.stackexchange.com/questions/1143354/numerically-stable-method-for-angle-between-3d-vectors/1782769
+        // θ=2 atan2(|| ||v||u−||u||v ||, || ||v||u+||u||v ||)
+
+        //let cosine = this.dot( a, b );
+        //if(cosine > 1.0) return 0;
+        //else if(cosine < -1.0) return Math.PI;
+        //else return Math.acos( cosine / ( Math.sqrt( a.lenSqr * b.lenSqr() ) ) );
+    }
+
+    /*
+    static angleTo( from: ConstVec3, to: ConstVec3 ): number{
+        // NOTE ORIG code doesn't work all the time
+        // const denom = Math.sqrt( Vec3.lenSqr(from) * Vec3.lenSqr(to) );
+        // if( denom < 0.00001 ) return 0;
+        
+        // const dot  = Math.min( 1, Math.max( -1, Vec3.dot( from, to ) / denom ));
+        // const rad  = Math.acos( dot );
+        // const sign = Math.sign( // Cross Product
+        //     ( from[1] * to[2] - from[2] * to[1] ) + 
+        //     ( from[2] * to[0] - from[0] * to[2] ) +
+        //     ( from[0] * to[1] - from[1] * to[0] )
+        // );
+
+        const d    = Vec3.dot( from, to );
+
+        console.log( 'dot', d );
+
+        const c    = Vec3.cross( from, to );
+        const rad  = Math.atan2( Vec3.len( c ), d );
+        // c.norm();
+        const sign = Math.sign( c[0] + c[1] + c[2] );// || 1;
+        // const sign = Math.sign( to[0] * c[0] + to[1] * c[1] + to[2] * c[2] ) || 1;
+        console.log( 'sign', sign );
+        
+        return rad * sign;
+    }
+    */
 
     /*
     static smoothDamp( cur: ConstVec3, tar: ConstVec3, vel: TVec3, dt: number, smoothTime: number = 0.25, maxSpeed: number = Infinity ): TVec3{

@@ -24,13 +24,19 @@ export default class IKTarget{
         // Handle target position / direction
 
         switch( this.tarMode ){
+            // ------------------------------
+            // Point Target
             case 0:
                 // Direction from root to target
                 this.dir.fromSub( this.pos, t.pos )
                 this.sqDistance = this.dir.lenSqr;
                 this.dir.norm();
                 break;
+            
+            // ------------------------------
+            // Direction Target
             case 1:
+                console.warn( 'Direction target not implemented' );
                 // pos = dir * scl + t.pos
                 break;
         }
@@ -43,20 +49,20 @@ export default class IKTarget{
             // ------------------------------
             // Pole Direction
             case 0:
-                this.poleDir.fromCross( 
-                    this.tmp.fromCross( this.dir, this.poleDir ), 
-                    this.dir
-                );
+                // this.poleDir.fromCross( 
+                //     this.tmp.fromCross( this.dir, this.poleDir ), 
+                //     this.dir
+                // ).norm();
             break;
 
             // ------------------------------
             // Pole Position
             case 1:
-                this.poleDir.fromSub( this.polePos, t.pos );
-                this.poleDir.fromCross( 
-                    this.tmp.fromCross( this.dir, this.poleDir ), 
-                    this.dir
-                ).norm();
+                // this.poleDir.fromSub( this.polePos, t.pos );
+                // this.poleDir.fromCross( 
+                //     this.tmp.fromCross( this.dir, this.poleDir ), 
+                //     this.dir
+                // ).norm();
             break;
         }
 

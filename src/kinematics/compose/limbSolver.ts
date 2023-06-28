@@ -1,6 +1,6 @@
 // #region IMPORT
 import type Pose        from '../../armature/Pose';
-import type IKChain     from '../IKChain';
+import type { IKChain } from '../IKChain';
 import type IKTarget    from '../IKTarget';
 
 import aimChainSolver   from '../solvers/aimChainSolver';

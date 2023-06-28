@@ -8,7 +8,7 @@ import Transform            from '../maths/Transform';
 import Vec3, { ConstVec3 }  from '../maths/Vec3';
 // #endregion
 
-class IKLink{
+export class IKLink{
     index     = -1;
     pindex    = -1;
     len       = 0;
@@ -32,13 +32,13 @@ Z : [0,0,-1]    = (UP)  Pole Direction ( Elbow/Knee )
 X : [1,0,0]     = (RIT) Bending Axis, should be created using cross( Y, Z )
 */
 
-export default class IKChain{
+export class IKChain{
     // #region MAIN
     links: Array<IKLink>  = [];                 // Link collection
     len                   = 0;                  // Total Length of chain
     count                 = 0;                  // How many links in the chain
     axes                  = new BoneAxes();     // Axes Direction related to Root's WS Rotation
-    pworld                = new Transform();    // Parent WS Transform when updating root
+    pworld                = new Transform();    // Parent WS Transform when updating root bone
 
     constructor( bones ?: Array<Bone> ){
         if( bones ) this.addBones( bones );
