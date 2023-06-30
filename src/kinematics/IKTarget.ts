@@ -12,7 +12,7 @@ export default class IKTarget{
     poleDir    : Vec3      = new Vec3();
     poleMode   : number    = -1;
 
-    setDir( v: ConstVec3 ): this{ this.dir.copy( v ); this.tarMode = 1; return this;}
+    setDir( v: ConstVec3 ): this{ this.dir.copy( v ); this.tarMode = 1; return this; }
     setPos( v: ConstVec3 ): this{ this.pos.copy( v ); this.tarMode = 0; return this; }
     setPolePos( v: ConstVec3 ): this{ this.polePos.copy( v ); this.poleMode = 1; return this; }
     setPoleDir( v: ConstVec3 ): this{ this.poleDir.copy( v ); this.poleMode = 0; return this; }
@@ -36,7 +36,7 @@ export default class IKTarget{
             // ------------------------------
             // Direction Target
             case 1:
-                console.warn( 'Direction target not implemented' );
+                // console.warn( 'Direction target not implemented' );
                 // pos = dir * scl + t.pos
                 break;
         }
@@ -49,20 +49,20 @@ export default class IKTarget{
             // ------------------------------
             // Pole Direction
             case 0:
-                // this.poleDir.fromCross( 
-                //     this.tmp.fromCross( this.dir, this.poleDir ), 
-                //     this.dir
-                // ).norm();
+                this.poleDir.fromCross( 
+                    this.tmp.fromCross( this.dir, this.poleDir ), 
+                    this.dir
+                ).norm();
             break;
 
             // ------------------------------
             // Pole Position
             case 1:
-                // this.poleDir.fromSub( this.polePos, t.pos );
-                // this.poleDir.fromCross( 
-                //     this.tmp.fromCross( this.dir, this.poleDir ), 
-                //     this.dir
-                // ).norm();
+                this.poleDir.fromSub( this.polePos, t.pos );
+                this.poleDir.fromCross( 
+                    this.tmp.fromCross( this.dir, this.poleDir ), 
+                    this.dir
+                ).norm();
             break;
         }
 

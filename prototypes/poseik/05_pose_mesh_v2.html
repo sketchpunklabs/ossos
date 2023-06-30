@@ -14,7 +14,7 @@ import {
     BoneMap,
     Vec3, Quat, Transform,
 
-    IKTarget, IKChain, limbSolver,
+    IKTarget, IKChain, limbSolver, Fabrik, fabrikSolver,
     aimChainSolver,
 } from '../../src/index';
 // #endregion
@@ -40,15 +40,33 @@ window.addEventListener( 'load', async _=>{
     App.scene.add( char.mesh );
     Ref.char = char;
 
-    const pntRig = new PointRig();
-    genPointRig( char.arm.bindPose, pntRig );
-    genIKRig( char.arm.bindPose );
+    const rigPoint = new PointRig();
+    genPointRig( char.arm.bindPose, rigPoint );
+    debugPointRig( rigPoint, false );
 
-    debugRig( pntRig );
+    Ref.rigPoint = rigPoint;
 
-    Ref.pntRig = pntRig;
+    Ref.rig = new IKRig( char.arm );
 
-    updatePose();
+    // Ref.selIdx = 3;
+    // testSolver( [0.11417064183184, 1.2476061276567059, -0.06841574806553333] );
+
+    // computeIKPointData( Ref.rigPoint, Ref.rig );
+    // Ref.rig.runSolvers().updateSkin();
+
+    // Ref.rigPoint.updatePointsFromPose( Ref.rig.pose );
+    // debugPointRig( Ref.rigPoint, true );
+
+
+    // testSolver( [0.11417064183184, 1.2476061276567059, -0.06841574806553333] );
+
+    // genIKRig( char.arm.bindPose );
+
+    // debugRig( pntRig );
+
+    // Ref.pntRig = pntRig;
+
+    // updatePose();
 
     // Ref.gizmo.setPos( Ref.target.pos );
 
@@ -81,11 +99,20 @@ Ref.gizmo.onStart = ()=>{ Ref.caster.enabled = false; }
 Ref.gizmo.onStop  = ()=>{ Ref.caster.enabled = true; }
 Ref.gizmo.onMove  = p=>{
     // Ref.target.setPos( p );
-    // console.log( p );
 
-    Ref.pntRig.runSolvers( Ref.selIdx, p );
-    debugRig( Ref.pntRig, true );
-    updatePose();
+    Debug.reset();
+
+    testSolver( p );
+    computeIKPointData( Ref.rigPoint, Ref.rig );
+    Ref.rig.runSolvers().updateSkin();
+
+    Ref.rigPoint.updatePointsFromPose( Ref.rig.pose );
+    debugPointRig( Ref.rigPoint, false );
+
+
+    // Ref.pntRig.runSolvers( Ref.selIdx, p );
+    // debugRig( Ref.pntRig, true );
+    // updatePose();
     // ikData( Ref.pntRig );
 
     // fabrikLoop( Ref.chain, Ref.target, Ref.selIdx );
@@ -95,7 +122,7 @@ Ref.gizmo.onMove  = p=>{
 Ref.caster.onMouseDown = ( e, caster )=>{
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     const [ rStart, rEnd ] = caster.getRaySegment();
-    const pnts  = Ref.pntRig.points;
+    const pnts  = Ref.rigPoint.points;
     let maxDist = 0.1 ** 2;
     let minDist = Infinity;
     let minIdx  = -1;
@@ -119,17 +146,114 @@ Ref.caster.onMouseDown = ( e, caster )=>{
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if( minIdx === -1 ){
         Ref.gizmo.detach();
+        Ref.selIdx = -1;
         return;
     }
 
     Ref.gizmo.useAxes().setPos( pnts[minIdx].pos );
     Ref.selIdx = minIdx;
-    console.log( "Selected Point", minIdx, minDist, pnts[ minIdx ].pos );
+    console.log( "Selected Point:", minIdx, "minDist", minDist, pnts[ minIdx ].pos );
 };
 
 function onPreRender( dt, et ){}
 // #endregion
 
+function testSolver( pos ){
+    let chain;
+    const pName = Ref.rigPoint.getPoint( Ref.selIdx ).name;
+    console.log( pName );
+
+    switch( pName ){
+
+        case 'shoulderR':
+            chain = Ref.rigPoint.getChain( 'upperSideR' );
+            PFabrik.leafSolver( chain, pos, { effIndex: chain.findPoint( Ref.selIdx ), damping:1.0 } );
+
+            chain = Ref.rigPoint.getChain( 'spine' );
+            PFabrik.distanceConstraint( chain.points[0], chain.points[1], chain.length, true, false, false );
+
+            chain = Ref.rigPoint.getChain( 'upperSideR' );
+            PFabrik.forward( chain );
+
+            chain = Ref.rigPoint.getChain( 'chest' );
+            PFabrik.loopCornerClamp( chain, 1 );
+
+            break;
+
+        case 'chest':
+            chain = Ref.rigPoint.getChain( 'upperBody' );
+            const v = new Vec3().fromSub(  pos, chain.points[0].pos );
+
+            for( let p of chain.points ){
+                p.pos.add( v );
+            }
+            break;
+
+        case 'shoulderL':
+        case 'handL':
+            chain = Ref.rigPoint.getChain( 'upperSideL' );
+            PFabrik.leafSolver( chain, pos, { effIndex: chain.findPoint( Ref.selIdx ), damping:1.0 } );
+
+            chain = Ref.rigPoint.getChain( 'spine' );
+            PFabrik.distanceConstraint( chain.points[0], chain.points[1], chain.length, true, false, false );
+
+            chain = Ref.rigPoint.getChain( 'upperSideL' );
+            PFabrik.forward( chain );
+
+            chain = Ref.rigPoint.getChain( 'chest' );
+            PFabrik.loopCornerClamp( chain, 2 );
+
+            break;
+
+        case 'elbowL':
+            chain = Ref.rigPoint.getChain( 'armL' );
+            PFabrik.leafSolver( chain, pos, { effIndex: 1, damping:0.0 } );
+            break;
+
+    }
+    
+
+    // chain = Ref.rigPoint.getChain( 'chest' );
+    // PFabrik.loopSolver( chain, pos, { effIndex:1, damping:1.0 } );
+
+    // chain = Ref.rigPoint.getChain( 'spine' );
+    // PFabrik.distanceConstraint( chain.points[0], chain.points[1], chain.length, true, false, false );
+
+    // chain = Ref.rigPoint.getChain( 'chest' );
+    // PFabrik.loopSolver( chain, chain.points[1].pos.clone(), { effIndex:1 } );
+
+    //debugPointRig( Ref.rigPoint, true );
+}
+
+function computeIKPointData( pRig, iRig ){
+    let chain;
+    let q = new Quat();
+    let t = new Vec3();
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Chest
+    chain = pRig.chains.chest;
+    IKData.getOrientation( chain, q );
+
+    let tarPos  = new Vec3();
+    tarPos.fromQuat( q, chain.data.tarDir ).add( chain.points[0].pos );
+
+    let poleDir = new Vec3();
+    poleDir.fromQuat( q, chain.data.qiFwd );
+
+    Debug.ln.add( chain.points[0].pos, t.fromScale( poleDir, 0.3 ).add( chain.points[0].pos ), 0xff00ff );
+    Debug.pnt.add( tarPos, 0xff00ff, 1 );
+
+    iRig.spine.target.setPos( tarPos );
+
+    iRig.spine.endTwist.copy( poleDir );
+    iRig.spine.startTwist.copy( Vec3.FORWARD );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    chain = pRig.chains.armL;
+    IKData.getLimb( chain, iRig.armL.target );
+}
 
 class Character{
     static async fetch( url ){
@@ -158,14 +282,21 @@ class Character{
 }
 
 
+// #region POINT RIG
 function genPointRig( pose, rig ){
     const map = new BoneMap( pose );
     let b;
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Populate Points
+    // Populate Points : name, pos, bone, isSelectable=false
+    b = pose.getBone( map.getBoneIndex( 'hip' ) );
+    rig.addPoint( 'hip', null, b, false );
+
     b = pose.getBone( map.getBoneMap( 'spine' ).lastIndex );
-    rig.addPoint( 'chest', null, b );
+    let chestTailDir = pose.getWorldTailPos( b.index ).sub( b.world.pos );
+    // Debug.pnt.add( pose.getWorldTailPos( b.index ), 0xff00ff, 2 );
+    // Debug.pnt.add( new Vec3().fromAdd( b.world.pos, chestTailDir ), 0xffffff, 1 );
+    rig.addPoint( 'chest', null, b, true );
 
     b = pose.getBone( map.getBoneIndex( 'upperarm_r' ) );
     rig.addPoint( 'shoulderR', null, b, true );
@@ -179,34 +310,189 @@ function genPointRig( pose, rig ){
     b = pose.getBone( map.getBoneIndex( 'hand_l' ) );
     rig.addPoint( 'handL', null, b, true );
 
+    b = pose.getBone( map.getBoneIndex( 'thigh_r' ) );
+    rig.addPoint( 'thigh_r', null, b, false );
+
+    b = pose.getBone( map.getBoneIndex( 'thigh_l' ) );
+    rig.addPoint( 'thigh_l', null, b, false );
+
+    b = pose.getBone( map.getBoneIndex( 'shin_l' ) );
+    rig.addPoint( 'shin_l', null, b, false );
+
+    b = pose.getBone( map.getBoneIndex( 'foot_l' ) );
+    rig.addPoint( 'foot_l', null, b, false );
+
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Build chains
-    rig.addChain( 'armL', ['shoulderL','elbowL','handL'], false, { poleDir: new Vec3(0,0,-1), targetPos: new Vec3() } );
-    rig.addChain( 'chest', ['chest','shoulderL','shoulderR'], true );
+    rig.addChain( 'hip',   [ 'hip', 'thigh_l', 'thigh_r' ], true );
+    rig.addChain( 'spine', [ 'hip', 'chest' ], false );
+    rig.addChain( 'chest', [ 'chest', 'shoulderL', 'shoulderR' ], true );
+    rig.addChain( 'armL',  [ 'shoulderL', 'elbowL', 'handL' ], false, { poleDir: new Vec3(0,0,-1) } );
+    rig.addChain( 'legL',  [ 'thigh_l', 'shin_l', 'foot_l' ], false );
 
-    IKData.createOrientation( rig.chains.chest );
+    rig.addChain( 'upperSideL', [ 'chest', 'shoulderL', 'elbowL', 'handL' ], false );
+    rig.addChain( 'upperSideR', [ 'chest', 'shoulderR' ], false );
+    rig.addChain( 'upperBody', [ 'chest', 'shoulderR', 'shoulderL', 'elbowL', 'handL' ], false );
+
+    IKData.createOrientation( rig.chains.chest, chestTailDir );
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Build Solver Execution
     
     // Left arm plans
-    rig.addSolver( 'handL',  'armL',  Fabrik.solver,     { damping:0.2 } );
-    rig.addSolver( 'chestL', 'chest', Fabrik.loopSolver, { effIndex:1, maxIter:1, damping:0, innerTarget:1 } );
-    rig.addSolver( 'armL',   'armL',  Fabrik.solver,     { damping:0, innerTarget:2 } );
-    rig.addPlan( 'handL', [ 'handL', 'chestL', 'armL' ]);
+    // rig.addSolver( 'handL',  'armL',  PFabrik.solver,     { damping:0.2 } );
+    // rig.addSolver( 'chestL', 'chest', PFabrik.loopSolver, { effIndex:1, maxIter:1, damping:0, innerTarget:1 } );
+    // rig.addSolver( 'armL',   'armL',  PFabrik.solver,     { damping:0, innerTarget:2 } );
+    // rig.addPlan( 'handL', [ 'handL', 'chestL', 'armL' ]);
 
-    rig.addSolver( 'elbowL', 'armL', Fabrik.leafSolver, { effIndex:1, damping:0.2 } );
-    rig.addPlan( 'elbowL', [ 'elbowL', 'chestL', 'armL' ]);
+    // rig.addSolver( 'elbowL', 'armL', PFabrik.leafSolver, { effIndex:1, damping:0.2 } );
+    // rig.addPlan( 'elbowL', [ 'elbowL', 'chestL', 'armL' ]);
 
     // Chest plans
-    rig.addSolver( 'shoulderL', 'chest', Fabrik.loopSolver, { effIndex:1, maxIter:1, damping:0 } );
-    rig.addPlan( 'shoulderL', [ 'shoulderL', 'armL' ] );
+    // rig.addSolver( 'shoulderL', 'chest', PFabrik.loopSolver, { effIndex:1, maxIter:1, damping:0 } );
+    // rig.addPlan( 'shoulderL', [ 'shoulderL' ] ); //, 'armL'
 
-    rig.addSolver( 'shoulderR', 'chest', Fabrik.loopSolver, { effIndex:2, maxIter:1, damping:0 } );
-    rig.addPlan( 'shoulderR', [ 'shoulderR', 'armL' ] );
+    // rig.addSolver( 'shoulderR', 'chest', PFabrik.loopSolver, { effIndex:2, maxIter:1, damping:0 } );
+    // rig.addPlan( 'shoulderR', [ 'shoulderR' ] ); //, 'armL'
+}
+
+class IKData{
+    static getOrientationDir( chain ){
+        const fwd = new Vec3().fromCross(
+            new Vec3( chain.points[1].pos ).sub( chain.points[0].pos ),
+            new Vec3( chain.points[2].pos ).sub( chain.points[0].pos ),
+        );
+
+        const up  = new Vec3().fromLerp(
+            chain.points[1].pos,
+            chain.points[2].pos,
+            0.5,
+        ).sub( chain.points[0].pos );
+
+        return [ fwd, up ];
+    }
+
+    static getOrientation( chain, out=new Quat() ){
+        const fwd = new Vec3().fromCross(
+            new Vec3( chain.points[1].pos ).sub( chain.points[0].pos ),
+            new Vec3( chain.points[2].pos ).sub( chain.points[0].pos ),
+        );
+
+        const up  = new Vec3().fromLerp(
+            chain.points[1].pos,
+            chain.points[2].pos,
+            0.5,
+        ).sub( chain.points[0].pos );
+        
+        return out.fromLookDir( fwd, up );
+    }
+
+    static createOrientation( chain, tarDir=null ){
+        const fwd   = new Vec3();
+        const v0    = new Vec3();
+        const v1    = new Vec3();
+        const v2    = new Vec3();
+
+        const q     = IKData.getOrientation( chain );
+        const qi    = q.clone().invert();
+
+        // v1.fromQuat( q, Vec3.FORWARD ).add( chain.points[0].pos );
+        // v2.fromQuat( q, Vec3.UP ).add( chain.points[0].pos );
+        // Debug.ln.add( chain.points[0].pos, v1, 0xffff00 );
+        // Debug.ln.add( chain.points[0].pos, v2, 0xffff00 );
+
+        chain.data.orient = q;
+        chain.data.qiFwd  = new Vec3().fromQuat( qi, Vec3.FORWARD );
+        chain.data.qiUp   = new Vec3().fromQuat( qi, Vec3.UP );
+        
+        // Localspace target direction, create a inverted direction of it
+        // When using it with new orientation will create the IK target
+        // fro this loop chain
+        if( tarDir ) chain.data.tarDir = new Vec3().fromQuat( qi, tarDir );
+
+        // v1.fromQuat( q, chain.data.qiFwd ).add( chain.points[0].pos );
+        // v2.fromQuat( q, chain.data.qiUp ).add( chain.points[0].pos );
+        // Debug.ln.add( chain.points[0].pos, v1, 0x00ff00 );
+        // Debug.ln.add( chain.points[0].pos, v2, 0x00ff00 );
+    }
+
+    static getLimb( chain, target ){
+
+        // chain.data.targetPos.copy( chain.points[2].pos );
+        Debug.pnt.add( chain.points[2].pos, 0xff00ff, 2 );
+
+        const v1 = new Vec3();
+        const v2 = new Vec3();
+
+        v1.fromSub( chain.points[0].pos, chain.points[1].pos ).norm();
+        v2.fromSub( chain.points[2].pos, chain.points[1].pos ).norm();
+
+        if( Math.abs( Vec3.dot( v1, v2 ) ) < 0.99 ){
+            const v0 = new Vec3();
+
+            // vector projection : dot( a, b ) / bLen**2, can skip divide if b is a unit vector.
+            v1.fromSub( chain.points[1].pos, chain.points[0].pos );
+            v2.fromSub( chain.points[2].pos, chain.points[0].pos ).norm();
+            
+            v0  .fromScale( v2, Vec3.dot( v1, v2 ) )
+                .add( chain.points[0].pos );
+
+            chain.data.poleDir
+                .fromSub( chain.points[1].pos, v0 )
+                .norm();
+
+            Debug.ln.add( chain.points[1].pos, new Vec3().fromScale( chain.data.poleDir, 0.3 ).add(chain.points[1].pos), 0xff00ff );
+        }
+
+        target.setPoleDir( chain.data.poleDir );
+        target.setPos( chain.points[2].pos );
+    }
+}
+// #endregion
+
+
+class IKRig{
+    constructor( arm ){
+        const pose  = arm.bindPose;
+        const map   = new BoneMap( pose );
+
+        this.arm    = arm;
+        this.pose   = arm.newPose();
+    
+        this.spine  = {
+            chain       : new IKChain( map.getBones( [ 'spine' ] ) ).qiDirectionFromPose( pose, 0 ),
+            target      : new IKTarget(),
+            startTwist  : new Vec3(),
+            endTwist    : new Vec3(),
+        };
+        
+        this.armL   = {
+            chain   : new IKChain( map.getBones( [ 'upperarm_l', 'forearm_l' ] ) ).qiDirectionFromPose( pose, 1 ),
+            target  : new IKTarget(),
+        };
+    }
+
+    runSolvers(){
+        // Fabrik.solve( this.spine.target, this.spine.chain, this.pose );
+        fabrikSolver( this.spine.target, this.spine.chain, this.pose, {
+            startTwistDir : this.spine.startTwist,
+            endTwistDir   : this.spine.endTwist,
+        });
+
+        limbSolver( this.armL.target, this.armL.chain, this.pose );
+
+        return this;
+    }
+
+    updateSkin(){
+        this.pose.updateWorld();
+        this.arm.skin.updateFromPose( this.pose );
+        return this;
+    }
 }
 
 
+// #region IK RIG
 function ikItem( bones, solver ){
     const chain  = new IKChain( bones );
     const target = new IKTarget();
@@ -233,7 +519,7 @@ function ikItem( bones, solver ){
 
 function genIKRig( pose ){
     const map   = new BoneMap( pose );
-    const armL  = ikItem( map.getBones( ['upperarm_l','forearm_l'] ), limbSolver );
+    // const armL  = ikItem( map.getBones( ['upperarm_l','forearm_l'] ), limbSolver );
     const chest = ikItem( map.getChestBone(), aimSolver );
     
     const p   = pose.bones[ chest.chain.links[0].index ].world.pos;
@@ -250,193 +536,14 @@ function genIKRig( pose ){
     // Debug.pnt.add( pose.bones[ chest.chain.links[0].index ].world.pos, 0xffff00, 5 );
     
     Ref.ikRig  = {
-        armL,
+        // armL,
         chest,
 
         runSolvers: ( pose )=>{
             chest.apply( pose );
-            armL.apply( pose );
+            // armL.apply( pose );
         },
     };
-}
-
-function updatePose(){
-    const pRig  = Ref.pntRig;
-    let   chain = pRig.chains.chest;
-    const pnt   = pRig.getPoint( 'chest' );
-    const pose  = Ref.char.pose;
-    const bind  = Ref.char.arm.bindPose;
-
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // const q   = IKData.getOrientation( chain );
-    // const qo  = chain.data.orient.clone();    
-    // const rot = new Quat().fromMul( qo.invert(), q );
-    
-    // const b     = pose.getBone( pnt.boneIdx );
-    // const pTran = pose.getWorldTransform( b.pindex );
-    // const cTran = new Transform().fromMul( pTran, bind.bones[ b.index ].local );
-
-    // b.local.rot
-    //     .fromMul( rot, cTran.rot )
-    //     .pmulInvert( pTran.rot );
-    const q   = IKData.getOrientation( chain );
-    const fwd = new Vec3( chain.data.qiFwd ).transformQuat( q );
-    const up  = new Vec3( chain.data.qiUp ).transformQuat( q );
-
-    // Debug.ln.add( chain.points[0].pos, fwd.add( chain.points[0].pos ), 0xffff00 );
-    // Debug.ln.add( chain.points[0].pos, up.add( chain.points[0].pos ), 0xffff00 );
-
-    Ref.ikRig.chest.setDirections( fwd, up );
-    // Ref.ikRig.runSolvers( pose );
-    
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    chain = pRig.chains.armL;
-    IKData.getLimb( chain );
-
-    Ref.ikRig.armL.setTarget( chain.data.targetPos, chain.data.poleDir );
-    Ref.ikRig.runSolvers( pose );
-
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Ref.char.updateSkin();
-    // pRig.updatePointsFromPose( pose );
-
-}
-
-function ikData( rig ){
-    const v0    = new Vec3();
-    const v1    = new Vec3();
-    const v2    = new Vec3();
-    let chain;
-
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Chest Normal Direction
-    chain = rig.chains.chest;
-    
-    chain.vector.fromCross(
-        v1.fromSub( chain.points[1].pos, chain.points[0].pos ),
-        v2.fromSub( chain.points[2].pos, chain.points[0].pos ),
-    ).norm();
-
-    v0.fromScale( chain.vector, 0.5 ).add( chain.points[0].pos );
-    Debug.ln.add( chain.points[0].pos, v0, 0xffff00 );
-
-    v0.fromLerp( chain.points[1].pos, chain.points[2].pos, 0.5 );
-    Debug.pnt.add( v0, 0xffff00, 2 );
-    
-    v0.sub( chain.points[0].pos ).norm();
-    Debug.ln.add( chain.points[0].pos, v1.fromScale( v0, 0.7 ).add(chain.points[0].pos), 0xffff00 );
-
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Arm Pole Direction
-    // chain = rig.chains.armL;
-
-    // v1.fromSub( chain.points[0].pos, chain.points[1].pos ).norm();
-    // v2.fromSub( chain.points[2].pos, chain.points[1].pos ).norm();
-
-    // if( Math.abs( Vec3.dot( v1, v2 ) ) < 0.99 ){
-    //     // vector projection : dot( a, b ) / bLen**2, can skip divide if b is a unit vector.
-    //     v1.fromSub( chain.points[1].pos, chain.points[0].pos );
-    //     v2.fromSub( chain.points[2].pos, chain.points[0].pos ).norm();
-        
-    //     v0  .fromScale( v2, Vec3.dot( v1, v2 ) )
-    //         .add( chain.points[0].pos );
-
-    //     chain.vector
-    //         .fromSub( chain.points[1].pos, v0 )
-    //         .norm();
-
-    //     Debug.pnt.add( v0, 0xffff00, 2 );
-    //     Debug.ln.add( v0, v1.fromScale( chain.vector, 0.5 ).add(v0), 0xffff00 );
-    // }else{
-    //     Debug.ln.add( chain.points[1].pos, v0.fromScale( chain.vector, 0.5 ).add(chain.points[1].pos), 0xffff00 );
-    // }
-
-    // Debug.ln.add( chain.points[0].pos, chain.points[2].pos, 0x00ff00, null, true );    
-}
-
-class IKData{
-
-    static getOrientationDir( chain ){
-        const fwd = new Vec3().fromCross(
-            new Vec3( chain.points[1].pos ).sub( chain.points[0].pos ),
-            new Vec3( chain.points[2].pos ).sub( chain.points[0].pos ),
-        );
-
-        const up  = new Vec3().fromLerp(
-            chain.points[1].pos,
-            chain.points[2].pos,
-            0.5,
-        ).sub( chain.points[0].pos );
-
-        return [ fwd, up ];
-    }
-
-    static getOrientation( chain ){
-        const fwd = new Vec3().fromCross(
-            new Vec3( chain.points[1].pos ).sub( chain.points[0].pos ),
-            new Vec3( chain.points[2].pos ).sub( chain.points[0].pos ),
-        );
-
-        const up  = new Vec3().fromLerp(
-            chain.points[1].pos,
-            chain.points[2].pos,
-            0.5,
-        ).sub( chain.points[0].pos );
-        
-        return new Quat().fromLookDir( fwd, up );
-    }
-
-    static createOrientation( chain ){
-        // const fwd   = new Vec3();
-        // const v0    = new Vec3();
-        // const v1    = new Vec3();
-        // const v2    = new Vec3();
-
-        const q     = IKData.getOrientation( chain );
-        const qi    = q.clone().invert();
-
-        // v1.fromQuat( q, Vec3.FORWARD ).add( chain.points[0].pos );
-        // v2.fromQuat( q, Vec3.UP ).add( chain.points[0].pos );
-        // Debug.ln.add( chain.points[0].pos, v1, 0xffff00 );
-        // Debug.ln.add( chain.points[0].pos, v2, 0xffff00 );
-
-        chain.data.orient = q;
-        chain.data.qiFwd  = new Vec3().fromQuat( qi, Vec3.FORWARD );
-        chain.data.qiUp   = new Vec3().fromQuat( qi, Vec3.UP );
-
-        // v1.fromQuat( q, chain.data.qiFwd ).add( chain.points[0].pos );
-        // v2.fromQuat( q, chain.data.qiUp ).add( chain.points[0].pos );
-        // Debug.ln.add( chain.points[0].pos, v1, 0x00ff00 );
-        // Debug.ln.add( chain.points[0].pos, v2, 0x00ff00 );
-    }
-
-    static getLimb( chain ){
-        console.log( chain );
-
-        chain.data.targetPos.copy( chain.points[2].pos );
-
-        const v1 = new Vec3();
-        const v2 = new Vec3();
-
-        v1.fromSub( chain.points[0].pos, chain.points[1].pos ).norm();
-        v2.fromSub( chain.points[2].pos, chain.points[1].pos ).norm();
-
-        if( Math.abs( Vec3.dot( v1, v2 ) ) < 0.99 ){
-            const v0 = new Vec3();
-
-            // vector projection : dot( a, b ) / bLen**2, can skip divide if b is a unit vector.
-            v1.fromSub( chain.points[1].pos, chain.points[0].pos );
-            v2.fromSub( chain.points[2].pos, chain.points[0].pos ).norm();
-            
-            v0  .fromScale( v2, Vec3.dot( v1, v2 ) )
-                .add( chain.points[0].pos );
-
-            chain.data.poleDir
-                .fromSub( chain.points[1].pos, v0 )
-                .norm();
-        }
- 
-    }
 }
 
 function aimSolver ( target, chain, pose ){
@@ -446,7 +553,6 @@ function aimSolver ( target, chain, pose ){
     aimChainSolver2( target, chain, pose );              // Aim chain root bone at IK Target
     chain.setLocalRotPose( pose );                      // Convert to local space & save to pose
 }
-
 
 function aimChainSolver2( tar, chain, pose ){
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
@@ -527,9 +633,106 @@ function aimChainSolver2( tar, chain, pose ){
         rot
     );
 }
+// #endregion
+
+
+function updatePose(){
+    const pRig  = Ref.pntRig;
+    let   chain = pRig.chains.chest;
+    const pnt   = pRig.getPoint( 'chest' );
+    const pose  = Ref.char.pose;
+    const bind  = Ref.char.arm.bindPose;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // const q   = IKData.getOrientation( chain );
+    // const qo  = chain.data.orient.clone();    
+    // const rot = new Quat().fromMul( qo.invert(), q );
+    
+    // const b     = pose.getBone( pnt.boneIdx );
+    // const pTran = pose.getWorldTransform( b.pindex );
+    // const cTran = new Transform().fromMul( pTran, bind.bones[ b.index ].local );
+
+    // b.local.rot
+    //     .fromMul( rot, cTran.rot )
+    //     .pmulInvert( pTran.rot );
+    const q   = IKData.getOrientation( chain );
+    const fwd = new Vec3( chain.data.qiFwd ).transformQuat( q );
+    const up  = new Vec3( chain.data.qiUp ).transformQuat( q );
+
+    // Debug.ln.add( chain.points[0].pos, fwd.clone().add( chain.points[0].pos ), 0xffff00 );
+    // Debug.ln.add( chain.points[0].pos, up.clone().add( chain.points[0].pos ), 0xffff00 );
+
+    Ref.ikRig.chest.setDirections( fwd, up );
+    Ref.ikRig.runSolvers( pose );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // chain = pRig.chains.armL;
+    // IKData.getLimb( chain );
+
+    // Ref.ikRig.armL.setTarget( chain.data.targetPos, chain.data.poleDir );
+    // Ref.ikRig.runSolvers( pose );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.char.updateSkin();
+    // pRig.updatePointsFromPose( pose );
+
+}
+
+function ikData( rig ){
+    const v0    = new Vec3();
+    const v1    = new Vec3();
+    const v2    = new Vec3();
+    let chain;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Chest Normal Direction
+    chain = rig.chains.chest;
+    
+    chain.vector.fromCross(
+        v1.fromSub( chain.points[1].pos, chain.points[0].pos ),
+        v2.fromSub( chain.points[2].pos, chain.points[0].pos ),
+    ).norm();
+
+    v0.fromScale( chain.vector, 0.5 ).add( chain.points[0].pos );
+    Debug.ln.add( chain.points[0].pos, v0, 0xffff00 );
+
+    v0.fromLerp( chain.points[1].pos, chain.points[2].pos, 0.5 );
+    Debug.pnt.add( v0, 0xffff00, 2 );
+    
+    v0.sub( chain.points[0].pos ).norm();
+    Debug.ln.add( chain.points[0].pos, v1.fromScale( v0, 0.7 ).add(chain.points[0].pos), 0xffff00 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Arm Pole Direction
+    // chain = rig.chains.armL;
+
+    // v1.fromSub( chain.points[0].pos, chain.points[1].pos ).norm();
+    // v2.fromSub( chain.points[2].pos, chain.points[1].pos ).norm();
+
+    // if( Math.abs( Vec3.dot( v1, v2 ) ) < 0.99 ){
+    //     // vector projection : dot( a, b ) / bLen**2, can skip divide if b is a unit vector.
+    //     v1.fromSub( chain.points[1].pos, chain.points[0].pos );
+    //     v2.fromSub( chain.points[2].pos, chain.points[0].pos ).norm();
+        
+    //     v0  .fromScale( v2, Vec3.dot( v1, v2 ) )
+    //         .add( chain.points[0].pos );
+
+    //     chain.vector
+    //         .fromSub( chain.points[1].pos, v0 )
+    //         .norm();
+
+    //     Debug.pnt.add( v0, 0xffff00, 2 );
+    //     Debug.ln.add( v0, v1.fromScale( chain.vector, 0.5 ).add(v0), 0xffff00 );
+    // }else{
+    //     Debug.ln.add( chain.points[1].pos, v0.fromScale( chain.vector, 0.5 ).add(chain.points[1].pos), 0xffff00 );
+    // }
+
+    // Debug.ln.add( chain.points[0].pos, chain.points[2].pos, 0x00ff00, null, true );    
+}
+
 
 // #region VISUAL DEBUGGING
-function debugRig( rig, doClear=false ){
+function debugPointRig( rig, doClear=false ){
     if( doClear ) Debug.reset();
     for( const ch of Object.values( rig.chains ) ) debugPoints( ch );
 }
@@ -654,7 +857,7 @@ class PointRig{
     }
 
     getPoint( o ){
-        console.log( o, this.names.get( o ) );
+        // console.log( o, this.names.get( o ) );
         switch( typeof o ){
             case 'number': return this.points[ o ]; break;
             case 'string':
@@ -683,6 +886,8 @@ class PointRig{
     // #endregion
 
     // #region MANAGE CHAINS
+    getChain( name ){ return this.chains[ name ]; }
+
     addChain( name, aryPntNames, isLoop=false, data=null ){
         const ch = new PointChain( this.getPoints( aryPntNames ), isLoop );
         this.chains[ name ] = ch;
@@ -754,7 +959,7 @@ class SolverExecutor{
 * Maths.mod( -1, 5 ) = 4 */
 function mod( a, b ){ const v = a % b; return ( v < 0 )? b + v : v; }
 
-class Fabrik{
+class PFabrik{
 
     // #region BASIC SOLVER
     static solver( chain, target, props={} ){
@@ -775,9 +980,9 @@ class Fabrik{
         const epsilon   = 1e-4 ** 2;
         let i;
         for( i=0; i < maxIter; i++ ){
-            Fabrik.backward( chain, target );
-            Fabrik.tethered( chain, target, anchor, props );
-            Fabrik.forward( chain );
+            PFabrik.backward( chain, target );
+            PFabrik.tethered( chain, target, anchor, props );
+            PFabrik.forward( chain );
 
             if( Vec3.distSqr( target, lastPnt.pos ) <= epsilon ){
                 console.log( 'Reached' );
@@ -823,7 +1028,13 @@ class Fabrik{
         }
     }
 
+    // props: { chainLen, damping, maxDistance }
     static tethered( chain, target, anchor, props ){
+        props = Object.assign({
+            damping     : 0,    // Zero means to clamp to anchor
+            maxDistance : 1,    // Mac distance move away
+        }, props );
+
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // If no damping or target is under chain length, lock root to anchor.
         const root = chain.points[ 0 ];
@@ -846,6 +1057,8 @@ class Fabrik{
     // #endregion
 
     // #region LEAF SOLVER
+
+    // props: { effIndex, maxIter, maxDistance } + Tether props
     static leafSolver( chain, target, props={} ){
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Splitting the chain in half from the effector point
@@ -854,7 +1067,9 @@ class Fabrik{
         const topLen    = chain.count - 1 - topIdx;    // How many points to move up
         const botIdx    = effIdx - 1;                  // Start index for bot half
         const botLen    = botIdx;                      // How many points to move down
-        props.chainLen  = chain.lengthAt( effIdx );    // Length from root to effector
+        props.chainLen  = chain.lengthAt( effIdx );    // Length from root to effector, tether prop
+
+        console.log( "effIdx", effIdx );
         
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Iterate algorithm
@@ -871,12 +1086,14 @@ class Fabrik{
             effPnt.pos.copy( target );
 
             // With chain split, move both sides toward effector
-            if( topLen >= 0 ) Fabrik.bakFwdRange( chain, topIdx, topLen,  1, -1 );
-            if( botLen >= 0 ) Fabrik.bakFwdRange( chain, botIdx, botLen, -1,  1 );
+            if( topLen >= 0 ) PFabrik.bakFwdRange( chain, topIdx, topLen,  1, -1 );
+            if( botLen >= 0 ) PFabrik.bakFwdRange( chain, botIdx, botLen, -1,  1 );
 
+            // Can not tether chain if effector is root.
+            if( effIdx !== 0 ) PFabrik.tethered( chain, target, anchor, props );
+            
             // Move all points back toward anchor
-            Fabrik.tethered( chain, target, anchor, props );
-            Fabrik.bakFwdRange( chain, 1, rng, 1, -1 );
+            PFabrik.bakFwdRange( chain, 1, rng, 1, -1 );
 
             if( Vec3.distSqr( target, effPnt.pos ) <= epsilon ){
                 console.log( 'Reached' );
@@ -912,11 +1129,12 @@ class Fabrik{
     // #endregion
 
     // #region LOOP SOLVER
+    // props { effIndex, maxIter:1 } + tethered props 
     static loopSolver( chain, target, props={} ){
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Splitting the chain in half from the effector point
         const effIdx    = props.effIndex;
-        props.chainLen  = ( effIdx === 2 )
+        props.chainLen  = ( effIdx === 2 ) // Tether Prop
             ? chain.distances[ 2 ] 
             : chain.distances[ 0 ];
         
@@ -934,29 +1152,29 @@ class Fabrik{
 
         for( i=0; i < maxIter; i++ ){
             // --------------------------------------
-            effPnt.pos.copy( target );                       // Move effector point at target
-            Fabrik.bakFwdLoop( chain, effIdx+1, 2, 1, -1 );  // Backward Op
+            effPnt.pos.copy( target );                        // Move effector point at target
 
-            Fabrik.tethered( chain, target, anchor, props ); // Clamp or drag root
-            
+            PFabrik.bakFwdLoop( chain, effIdx+1, 2, 1, -1 );  // Backward Op
+            PFabrik.tethered( chain, target, anchor, props ); // Clamp or drag root
+
             // --------------------------------------
             // Close Loop
 
             // Snap two segments back toward the root
-            Fabrik.distanceConstraint( chain.points[0], chain.points[1], chain.distances[0], true, false );
-            Fabrik.distanceConstraint( chain.points[0], chain.points[2], chain.distances[2], true, false );
+            PFabrik.distanceConstraint( chain.points[0], chain.points[1], chain.distances[0], true, false );
+            PFabrik.distanceConstraint( chain.points[0], chain.points[2], chain.distances[2], true, false );
             
             // Make best effort to close loop, last point reaches root
             for( h=0; h < 5; h++ ){
                 if( effIdx === 1 ){
                     isClosed = Math.min( 1,
-                        Fabrik.distanceConstraint( chain.points[2], chain.points[0], chain.distances[2], false, true ),
-                        Fabrik.distanceConstraint( chain.points[2], chain.points[1], chain.distances[1], false, true ),
+                        PFabrik.distanceConstraint( chain.points[2], chain.points[0], chain.distances[2], false, true ),
+                        PFabrik.distanceConstraint( chain.points[2], chain.points[1], chain.distances[1], false, true ),
                     );
                 }else{
                     isClosed = Math.min( 1,
-                        Fabrik.distanceConstraint( chain.points[1], chain.points[0], chain.distances[0], false, true ),
-                        Fabrik.distanceConstraint( chain.points[1], chain.points[2], chain.distances[1], false, true ),
+                        PFabrik.distanceConstraint( chain.points[1], chain.points[0], chain.distances[0], false, true ),
+                        PFabrik.distanceConstraint( chain.points[1], chain.points[2], chain.distances[1], false, true ),
                     );
                 }
 
@@ -968,7 +1186,7 @@ class Fabrik{
             //     for( j=0; j <= 2; j++ ){
             //         jj       = mod( j + 1, 3 );
             //         isClosed = Math.min( 
-            //             Fabrik.distanceConstraint( chain.points[j], chain.points[jj], chain.distances[j] 
+            //             PFabrik.distanceConstraint( chain.points[j], chain.points[jj], chain.distances[j] 
             //                 ,( j  == effIdx || j  == 0 )
             //                 ,( jj == effIdx || jj == 0 )
             //             ),
@@ -1013,15 +1231,19 @@ class Fabrik{
         }
     }
 
-    static distanceConstraint( a, b, dist, aAnchored=false, bAnchored=false ){
+    static distanceConstraint( a, b, dist, aAnchored=false, bAnchored=false, isRigid=true ){
         if( aAnchored && bAnchored ) return 1;
 
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Get direction & test if already at distance
+        // If not rigid, can be 0 to dist in length
         const dir       = new Vec3().fromSub( a.pos, b.pos );
         const curDist   = dir.len;
         const epsilon   = 1e-3;
-        if( Math.abs( curDist - dist ) < epsilon ) return 1;
+        if( 
+            ( !isRigid && curDist <= dist ) ||
+            Math.abs( curDist - dist ) < epsilon
+        ) return 1;
 
         // Normalize relation of the distance to set with the current distance
         const delta = ( curDist === 0 )? dist : ( dist - curDist ) / curDist;
@@ -1044,6 +1266,23 @@ class Fabrik{
 
         return 0;
     }
+    
+    static loopCornerClamp( chain, clampIdx ){
+        const ai = ( clampIdx + 1 ) % chain.count;
+        const bi = ( clampIdx + 2 ) % chain.count;
+
+        const a  = chain.points[ ai ];
+        const b  = chain.points[ bi ];
+        const c  = chain.points[ clampIdx ];
+        
+        for( let i=0; i < 10; i++ ){
+            if( 1 === Math.min( 1, 
+                this.distanceConstraint( a, c, chain.distances[ clampIdx ], true, false ),
+                this.distanceConstraint( b, c, chain.distances[ bi ], true, false ),
+            )) break;
+        }
+    }
+
     // #endregion
 
     // #region EXTRA

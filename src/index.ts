@@ -22,15 +22,16 @@ import { IKChain }      from './kinematics/IKChain';
 
 import aimChainSolver   from './kinematics/solvers/aimChainSolver';
 import twoBoneSolver    from './kinematics/solvers/twoBoneSolver';
+import Fabrik           from './kinematics/solvers/Fabrik';
 
 import limbSolver       from './kinematics/compose/limbSolver';
+import fabrikSolver     from './kinematics/compose/fabrikSolver';
 
-import Fabrik           from './kinematics/solvers/Fabrik';
 
 export { 
     IKTarget, IKChain,
     Fabrik, aimChainSolver, twoBoneSolver,
-    limbSolver,
+    limbSolver, fabrikSolver,
 };
 // #endregion
 

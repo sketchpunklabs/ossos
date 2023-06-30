@@ -3,17 +3,19 @@ import type Bone            from '../armature/Bone';
 import type Pose            from '../armature/Pose';
 import { TQuat }            from '../maths/Quat';
 
-import BoneAxes             from './BoneAxes';
+import { BoneAxes }         from './BoneAxes';
 import Transform            from '../maths/Transform';
 import Vec3, { ConstVec3 }  from '../maths/Vec3';
+import Quat, { ConstQuat }  from '../maths/Quat';
 // #endregion
 
 export class IKLink{
     index     = -1;
     pindex    = -1;
     len       = 0;
+    axes      = new BoneAxes();     // WorldSpace Axis Directions, My contain qi-Directions
     bind      = new Transform();
-    world     = new Transform();
+    world     = new Transform();    // Temporary working transform used in IK Solvers
 
     constructor( bone: Bone ){
         this.index  = bone.index;
@@ -37,8 +39,9 @@ export class IKChain{
     links: Array<IKLink>  = [];                 // Link collection
     len                   = 0;                  // Total Length of chain
     count                 = 0;                  // How many links in the chain
-    axes                  = new BoneAxes();     // Axes Direction related to Root's WS Rotation
-    pworld                = new Transform();    // Parent WS Transform when updating root bone
+    // axes                  = new BoneAxes();  // Axes Direction related to Root's WS Rotation
+    pworld                = new Transform();    // Parent WS Transform of the root bone
+    data : any            = null;               // Any user data can be stored here
 
     constructor( bones ?: Array<Bone> ){
         if( bones ) this.addBones( bones );
@@ -46,6 +49,8 @@ export class IKChain{
     // #endregion
 
     // #region GETTERS
+
+    get axes(): BoneAxes{ return this.links[0].axes; }
 
     isReachable( targetPos: ConstVec3 ): boolean{
         return ( Vec3.distSqr( targetPos, this.links[0].world.pos ) < this.len**2 );
@@ -64,6 +69,18 @@ export class IKChain{
         return this;
     }
 
+    qiDirectionFromPose( pose: Pose, iAxes: number ): this{
+        const qi = new Quat();
+        let b: Bone;
+
+        for( const i of this.links ){
+            b = pose.bones[ i.index ];
+            qi.fromInvert( b.world.rot );
+            i.axes.setQuatDirections( qi, iAxes );
+        }
+
+        return this;
+    }
     // #endregion
 
     // #region METHODS IK COMPOSITION
@@ -98,7 +115,7 @@ export class IKChain{
         return this;
     }
 
-    // Update pose's bones using the chain's world transforms by converting to local space.
+    // Update pose's bones using the chain's world transforms converted to local space.
     setLocalRotPose( pose: Pose ): this{
         let lnk  : IKLink;
         let pRot : TQuat;
@@ -118,14 +135,14 @@ export class IKChain{
     // #endregion
 
     // #region DEBUGGING
-    debug( o: any ): void{
-        const t = this.links[ 0 ].world;
-        const v = new Vec3();
-        console.log( this.axes );
-        o.pnt.add( t.pos, 0x00ff00, 1 );
-        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.ortho ).add( t.pos ), 0xff0000 );
-        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.swing ).add( t.pos ), 0x00ff00 );
-        o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.twist ).add( t.pos ), 0x0000ff );
-    }
+    // debug( o: any ): void{
+    //     const t = this.links[ 0 ].world;
+    //     const v = new Vec3();
+    //     console.log( this.axes );
+    //     o.pnt.add( t.pos, 0x00ff00, 1 );
+    //     o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.ortho ).add( t.pos ), 0xff0000 );
+    //     o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.swing ).add( t.pos ), 0x00ff00 );
+    //     o.ln.add( t.pos, v.fromQuat( t.rot, this.axes.twist ).add( t.pos ), 0x0000ff );
+    // }
     // #endregion
 }

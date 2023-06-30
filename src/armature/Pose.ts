@@ -62,6 +62,12 @@ export default class Pose {
         for( const b of this.bones ) p.bones.push( b.clone() );
         return p;
     }
+
+    getWorldTailPos( o: string | number, out: Vec3 = new Vec3() ): TVec3{
+        const b = this.getBone( o );
+        if( b ) b.world.transformVec3( out.xyz( 0, b.len, 0 ) );
+        return out;
+    }
     // #endregion
 
     // #region SETTERS

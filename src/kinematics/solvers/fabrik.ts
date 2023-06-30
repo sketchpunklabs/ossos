@@ -3,7 +3,7 @@ import type Pose                from '../../armature/Pose';
 import type { IKChain, IKLink } from '../IKChain';
 import type IKTarget            from '../IKTarget';
 
-import Vec3              from '../../maths/Vec3';
+import Vec3, { ConstVec3 }   from '../../maths/Vec3';
 import Quat              from '../../maths/Quat';
 // #endregion
 
@@ -87,7 +87,7 @@ export default class Fabric{
 
     // #endregion
 
-    // #region HERPERS
+    // #region HELPERS
     static initPointsFromBindpose( chain: IKChain ): Array<Vec3>{
         const pnts = new Array( chain.count + 1 );
         pnts[0] = chain.links[ 0 ].world.pos.clone();   // First link should already been updated
@@ -137,8 +137,42 @@ export default class Fabric{
         // Then save results back to pose
         chain.setLocalRotPose( pose );
     }
-    // #endregion
 
+    static applyTwistLerp( chain: IKChain, startDir: ConstVec3, endDir: ConstVec3 ): void{
+        const aim   = new Vec3();
+        const twist = new Vec3();
+        const pole  = new Vec3();
+        const rot   = new Quat();
+        const dir   = new Vec3();
+        
+        let lnk : IKLink;
+        let t   : number;
+    
+        for( let i=0; i < chain.count; i++ ){
+            t   = i / ( chain.count - 1 );
+            lnk = chain.links[ i ];
+    
+            dir.fromLerp( startDir, endDir, t );            // Lerp Direction
+            // dir.fromSlerp( aDir, bDir, t );
+    
+            // pole.fromQuat( lnk.world.rot, Vec3.FORWARD );   // Natural Twist Direction
+            // aim.fromQuat( lnk.world.rot, Vec3.UP );         // Bone Pointing Direction
+
+            pole.fromQuat( lnk.world.rot, lnk.axes.twist ); // Natural Twist Direction
+            aim.fromQuat(  lnk.world.rot, lnk.axes.swing ); // Bone Pointing Direction
+
+            twist.fromCross( aim, dir );                    // Orth Dir
+            dir.fromCross( twist, aim ).norm();             // Realign dir to be Orth, new Twist Dir
+    
+            // Skip rotation if the two vectors are about equal.
+            if( Math.abs( Vec3.dot( pole, dir ) ) >= 0.999 ) continue;
+    
+            rot.fromSwing( pole, dir );                     // Create twist rotation
+            lnk.world.rot.pmul( rot );                      // Twist bone to align to lerped direction    
+        }
+    }
+
+    // #endregion
 }
 
 

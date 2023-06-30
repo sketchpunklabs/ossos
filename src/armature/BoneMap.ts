@@ -63,7 +63,7 @@ export default class BoneMap{
     }
 
     getChestBone(): Array<Bone> | null {
-        const bAry = ( this.obj instanceof Armature)? this.obj.bindPose.bones : this.obj.bones;
+        const bAry = ( this.obj instanceof Armature )? this.obj.bindPose.bones : this.obj.bones;
         const rtn : Array<Bone> = [];
 
         const bi   = this.bones.get( 'spine' );
