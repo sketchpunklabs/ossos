@@ -22,6 +22,7 @@ export class IKLink{
         this.pindex = bone.pindex;
         this.len    = bone.len;
         this.bind.copy( bone.local );
+        // this.world.copy( bone.world );
     }
 }
 
@@ -39,7 +40,6 @@ export class IKChain{
     links: Array<IKLink>  = [];                 // Link collection
     len                   = 0;                  // Total Length of chain
     count                 = 0;                  // How many links in the chain
-    // axes                  = new BoneAxes();  // Axes Direction related to Root's WS Rotation
     pworld                = new Transform();    // Parent WS Transform of the root bone
     data : any            = null;               // Any user data can be stored here
 
@@ -99,6 +99,14 @@ export class IKChain{
         return this;
     }
 
+    // Compute the tail of the chain
+    computeTrailTransform( pose: Pose, out:Transform = new Transform() ): Transform{
+        const lnk = this.links[ this.count-1 ];     // Get Final Link
+        pose.getWorldTransform( lnk.index, out );   // Get its WS Tranaform
+        out.addPos( [0,lnk.len,0] );                // Add Tail Length, normally UP * BoneLen
+        return out;
+    }
+
     // World transform of each bone using the link's bind transform
     resetWorld( startIdx=-1, endIdx=-1 ): this{
         if( startIdx < 0 ) startIdx = 0;
@@ -106,7 +114,7 @@ export class IKChain{
 
         let lnk: IKLink;
         let pWS: Transform;
-        for( let i=endIdx; i <= endIdx; i++ ){
+        for( let i=startIdx; i <= endIdx; i++ ){
             lnk  = this.links[ i ];
             pWS  = ( i === 0 )? this.pworld : this.links[ i-1 ].world;
             lnk.world.fromMul( pWS, lnk.bind );

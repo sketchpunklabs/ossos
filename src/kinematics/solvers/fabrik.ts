@@ -48,7 +48,6 @@ export default class Fabric{
     }
 
     // #region ITERATIONS
-
     static iterateBackward( chain: IKChain, target: IKTarget, pnts: Array<Vec3> ): void {
         const dir = new Vec3();
         let pTar  = pnts[ chain.count ].copy( target.pos );
@@ -58,7 +57,7 @@ export default class Fabric{
             lnk = chain.links[ i ]; 
             dir .fromSub( pnts[i], pTar ) // Direction from Target Pos to Bone pos
                 .norm()
-                .scale( lnk.len );         // Resize to bone's length
+                .scale( lnk.len );        // Resize to bone's length
             
             pnts[i].fromAdd( dir, pTar ); // Add to target pos for bone's position
             pTar = pnts[i];               // Target Pos for next iteration
@@ -68,9 +67,9 @@ export default class Fabric{
     static iterateForward( chain: IKChain, pnts: Array<Vec3> ): void {
         // Move all the points back toward root
         const dir = new Vec3();
-        let lnk : IKLink;
-        let p   : Vec3;
-        let c   : Vec3;
+        let lnk   : IKLink;
+        let p     : Vec3;
+        let c     : Vec3;
     
         for( let i = 1; i <= chain.count; i++ ){
             lnk  = chain.links[ i-1 ];
@@ -85,9 +84,64 @@ export default class Fabric{
         }
     }
 
+    static iterateBackwardWDir( chain: IKChain, target: IKTarget, pnts: Array<Vec3>, sigK:number=0, doLerp: boolean = false ){
+        const cnt   = chain.count-1;
+        const dir   = new Vec3();
+        const iDir  = new Vec3( target.bSwingDir ).negate();
+        let pTar    = pnts[ chain.count ].copy( target.pos );
+        let lnk     : IKLink;
+        let t       : number;
+    
+        for( let i=cnt; i >=0; i-- ){
+            lnk = chain.links[ i ];
+    
+            dir.fromSub( pnts[i], pTar ); // Direction from Target Pos to Bone pos
+    
+            // Lerp direction & target direction on all bones or just first one
+            if( doLerp || i === cnt ){
+                t = i / cnt;
+                t = sigmoid( t, sigK );
+                dir.fromLerp( dir, iDir, t );
+            }
+    
+            dir.norm().scale( lnk.len )     // Resize to bone's length
+
+            pnts[i].fromAdd( dir, pTar );   // Add to target pos for bone's position
+            pTar = pnts[i];                 // Target Pos for next iteration
+        }
+    }
+    
+    static iterateForwardWDir( chain: IKChain, target: IKTarget, pnts: Array<Vec3> ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Move all the points back toward root except last point
+        const dir = new Vec3();
+        let lnk   : IKLink;
+        let p     : Vec3;
+        let c     : Vec3;
+    
+        for( let i = 1; i < chain.count; i++ ){
+            lnk  = chain.links[ i-1 ];
+            c    = pnts[ i ];
+            p    = pnts[ i - 1 ];
+    
+            dir .fromSub( c, p )    // Direction
+                .norm()
+                .scale( lnk.len );  // Scale to bone length
+
+            c.fromAdd( dir, p );    // Move away from prev pos
+        }
+    
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Last point has a direction constraint that must be honored.
+        lnk  = chain.links[ chain.count-1 ];
+        pnts[ chain.count ]
+            .fromScale( target.bSwingDir, lnk.len )
+            .add( pnts[ chain.count-1 ] );
+    }
     // #endregion
 
     // #region HELPERS
+
     static initPointsFromBindpose( chain: IKChain ): Array<Vec3>{
         const pnts = new Array( chain.count + 1 );
         pnts[0] = chain.links[ 0 ].world.pos.clone();   // First link should already been updated
@@ -129,6 +183,7 @@ export default class Fabric{
             bDir.fromSub( pnts[i+1], lnk.world.pos ).norm();    // Direction from IK Position
             
             swing.fromSwing( aDir, bDir );                      // Swing rotation
+            // if( Quat.dot( swing, lnk.world.rot ) < 0 ) swing.negate();
             lnk.world.rot.pmul( swing );                        // Apply swing to world bind
         }
 
@@ -139,9 +194,9 @@ export default class Fabric{
     }
 
     static applyTwistLerp( chain: IKChain, startDir: ConstVec3, endDir: ConstVec3 ): void{
-        const aim   = new Vec3();
+        const swing = new Vec3();
         const twist = new Vec3();
-        const pole  = new Vec3();
+        const orth  = new Vec3();
         const rot   = new Quat();
         const dir   = new Vec3();
         
@@ -153,21 +208,19 @@ export default class Fabric{
             lnk = chain.links[ i ];
     
             dir.fromLerp( startDir, endDir, t );            // Lerp Direction
-            // dir.fromSlerp( aDir, bDir, t );
+            // dir.fromSlerp( startDir, endDir, t );
     
-            // pole.fromQuat( lnk.world.rot, Vec3.FORWARD );   // Natural Twist Direction
-            // aim.fromQuat( lnk.world.rot, Vec3.UP );         // Bone Pointing Direction
-
-            pole.fromQuat( lnk.world.rot, lnk.axes.twist ); // Natural Twist Direction
-            aim.fromQuat(  lnk.world.rot, lnk.axes.swing ); // Bone Pointing Direction
-
-            twist.fromCross( aim, dir );                    // Orth Dir
-            dir.fromCross( twist, aim ).norm();             // Realign dir to be Orth, new Twist Dir
+            swing.fromQuat( lnk.world.rot, lnk.axes.swing ); // Natural Swing Direction
+            twist.fromQuat( lnk.world.rot, lnk.axes.twist ); // Natural Twist Direction
+            orth.fromCross( swing, dir );                    // Orth Dir
+            dir.fromCross( orth, swing ).norm();             // Realign dir to be Orth, new Twist Dir
     
             // Skip rotation if the two vectors are about equal.
-            if( Math.abs( Vec3.dot( pole, dir ) ) >= 0.999 ) continue;
+            if( Math.abs( Vec3.dot( twist, dir ) ) >= 0.999 ) continue;
     
-            rot.fromSwing( pole, dir );                     // Create twist rotation
+            rot.fromSwing( twist, dir );                    // Create twist rotation
+
+            // if( Quat.dot( rot, lnk.world.rot ) < 0 ) rot.negate();
             lnk.world.rot.pmul( rot );                      // Twist bone to align to lerped direction    
         }
     }
@@ -175,6 +228,16 @@ export default class Fabric{
     // #endregion
 }
 
+
+// #region EXTRA
+function sigmoid( t: number, k: number=0 ): number{ // Over 0, Eases in the middle, under eases in-out
+    // this uses the -1 to 1 value of sigmoid which allows to create easing at 
+    // start and finish. Can pass in range 0:1 and it'll return that range.
+    // https://dhemery.github.io/DHE-Modules/technical/sigmoid/
+    // https://www.desmos.com/calculator/q6ukniiqwn
+    return ( t - k*t ) / ( k - 2*k*Math.abs(t) + 1 );
+}
+// #endregion
 
 
 // #region Angle Constraint 

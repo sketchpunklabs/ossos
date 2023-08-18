@@ -63,7 +63,7 @@ export default class Pose {
         return p;
     }
 
-    getWorldTailPos( o: string | number, out: Vec3 = new Vec3() ): TVec3{
+    getWorldTailPos( o: string | number, out: Vec3 = new Vec3() ): Vec3{
         const b = this.getBone( o );
         if( b ) b.world.transformVec3( out.xyz( 0, b.len, 0 ) );
         return out;

@@ -1,0 +1,439 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+
+import GltfUtil, { Gltf2 }              from '../_lib/misc/GltfUtil.js';
+import Util                             from '../_lib/misc/Util.js';
+import MatrixSkinMaterial               from '../_lib/customSkinning/MatrixSkinMaterial.js';
+import { 
+    Armature, Pose, TranMatrixSkin,
+    BoneMap, Bone, AxesDirections,
+    Vec3, Quat, Transform,
+
+    IKTarget, IKChain, limbSolver,
+} from '../../src/index';
+
+import {
+    Gizmos,
+    PointsGizmo, 
+    TranslateGizmo,
+    TwistGizmo,
+} from '../_lib/gizmos.js';
+// #endregion
+
+// #region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Debug = {};
+let Ref   = {
+    gizmos: new Gizmos( App.renderer, App.camera, App.scene ),
+};
+
+Ref.gizmos.events.on( 'dragStart', ()=>{ App.camCtrl.enabled = false; });
+Ref.gizmos.events.on( 'dragStop',  ()=>{ App.camCtrl.enabled = true; });
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 30, 4, [0,0.8,0] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const char = await Character.fetch( '/prototypes/_res/models/nabba/nabba.gltf' );
+    App.scene.add( char.mesh );
+    Ref.char = char;
+
+    Ref.rig = new IKRig( char.arm );
+    Ref.ctr = new ControlRig( Ref.rig );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // App.createRenderLoop( onPreRender ).start();
+    App.renderLoop( onPreRender );
+});
+
+function onPreRender( dt, et ){}
+// #endregion
+
+// #region CHARACTER
+class Character{
+    static async fetch( url ){
+        const gltf = await Gltf2.fetch( url );
+        return new Character( gltf );
+    }
+
+    constructor( gltf ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Armature
+        this.arm = GltfUtil.parseArmature( gltf );      // Armature
+        this.arm.useSkin( TranMatrixSkin );             // Create Skin
+        this.pose = this.arm.newPose();                 // Main Pose
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Mesh
+        const geo = GltfUtil.loadGeoBuffers( gltf )[0];
+        const mat = MatrixSkinMaterial( '#606060', this.arm.skin );
+        this.mesh = new THREE.Mesh( geo, mat );
+    }
+
+    updateSkin(){
+        this.pose.updateWorld();
+        this.arm.skin.updateFromPose( this.pose );
+    }
+}
+// #endregion
+
+
+
+
+// #region POINT RIG
+
+function fromHumanPose( pose ){
+    const map = new BoneMap( pose );
+    // console.log( map );
+
+    /*
+    const color = 0x00ffff;
+    const size  = 1.2;
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'hip' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneMap( 'spine' ).lastIndex ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'neck' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'head' ) ).world.pos, color, size );
+
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'upperarm_r' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'forearm_r' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'hand_r' ) ).world.pos, color, size );
+
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'upperarm_l' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'forearm_l' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'hand_l' ) ).world.pos, color, size );
+
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'thigh_l' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'shin_l' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'foot_l' ) ).world.pos, color, size );
+
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'thigh_r' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'shin_r' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'foot_r' ) ).world.pos, color, size );
+    */
+
+    const rig = new PointRig();
+
+    const x   = [
+        { bone:'hip' },
+        { bone:'spine', parent:'hip', index:-1, name:'chest' },
+        { bone:'neck',  parent:'chest' },
+        { bone:'head',  parent:'neck' },
+
+        { bone:'upperarm_r', parent:'chest' },
+        { bone:'forearm_r',  parent:'upperarm_r' },
+        { bone:'hand_r',     parent:'forearm_r' },
+
+        { bone:'upperarm_l', parent:'chest' },
+        { bone:'forearm_l',  parent:'upperarm_l' },
+        { bone:'hand_l',     parent:'forearm_l' },
+
+        { bone:'upperarm_r', parent:'chest' },
+        { bone:'forearm_r',  parent:'upperarm_r' },
+        { bone:'hand_r',     parent:'forearm_r' },
+
+        { bone:'thigh_r', parent:'hip' },
+        { bone:'shin_r',  parent:'thigh_r' },
+        { bone:'foot_r',  parent:'shin_r' },
+
+        { bone:'thigh_l', parent:'hip' },
+        { bone:'shin_l',  parent:'thigh_l' },
+        { bone:'foot_l',  parent:'shin_l' },
+    ];
+
+    let b;
+    let m;
+    let o;
+    for( let i of x ){
+        if( i.index === undefined ){
+            b = pose.getBone( map.getBoneIndex( i.bone ) );
+        }else{
+            m = map.getBoneMap( i.bone );
+            b = ( i.index === -1 )
+                ? pose.getBone( m.lastIndex )
+                : pose.getBone( m.items[ i.index ] );
+        }
+
+        rig.add( { 
+            name    : i.name || i.bone, 
+            pos     : b.world.pos,
+            parent  : i.parent,
+            boneIdx : i.index,
+        } );
+    }
+
+    for( let p of rig.points ){
+        Debug.pnt.add( p.pos, 0xffffff, 1.3 );
+        for( let i of p.children ){
+            let c = rig.points[ i ];
+            Debug.ln.add( p.pos, c.pos, 0xffffff, 0x777777 );
+        }
+    }
+}
+
+class Point{
+    index    = -1;
+    pindex   = -1;
+    boneIdx  = -1;
+    name     = '';
+    pos      = new Vec3();
+    children = [];
+    
+    setParent( p ){
+        this.pindex = p.index;          // Save parent index
+        p.children.push( this.index );  // Save as child 
+        return this;
+    }
+}
+
+class PointRig{
+    points = [];
+    names  = new Map();
+
+    add( props={} ){
+        const pnt = new Point();
+        pnt.index = this.points.length;
+        pnt.name  = props.name || '_point_' + pnt.index;
+
+        if( props.boneIdx !== undefined ) pnt.boneIdx = props.boneIdx;
+
+        if( props.pos )    pnt.pos.copy( props.pos );
+        if( props.parent ){
+            const pi = this.names.get( props.parent );
+            if( pi !== undefined ) pnt.setParent( this.points[ pi ] );
+            else                   console.log( 'Parent not found: ', props.parent );
+        }
+        
+        this.points.push( pnt );
+        this.names.set( pnt.name, pnt.index );
+        return pnt;
+    }
+}
+
+// #endregion
+
+function distanceConstraint( a, b, dist, aAnchored=false, bAnchored=false, isRigid=true ){
+        if( aAnchored && bAnchored ) return 1;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Get direction & test if already at distance
+        // If not rigid, can be 0 to dist in length
+        const dir       = new Vec3().fromSub( a.pos, b.pos );
+        const curDist   = dir.len;
+        const epsilon   = 1e-3;
+        if( 
+            ( !isRigid && curDist <= dist ) ||
+            Math.abs( curDist - dist ) < epsilon
+        ) return 1;
+
+        // Normalize relation of the distance to set with the current distance
+        const delta = ( curDist === 0 )? dist : ( dist - curDist ) / curDist;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Determine the ratio in which how much each point will
+        // move toward eachother, changes if a point is anchored
+        let aScl = 0.5;
+        let bScl = 0.5;
+        if( aAnchored ){        aScl = 0; bScl = 1; }
+        else if( bAnchored ){   aScl = 1; bScl = 0; }
+
+        a.pos[ 0 ] += dir[ 0 ] * aScl * delta;
+        a.pos[ 1 ] += dir[ 1 ] * aScl * delta;
+        a.pos[ 2 ] += dir[ 2 ] * aScl * delta;
+        
+        b.pos[ 0 ] -= dir[ 0 ] * bScl * delta;
+        b.pos[ 1 ] -= dir[ 1 ] * bScl * delta;
+        b.pos[ 2 ] -= dir[ 2 ] * bScl * delta;
+
+        return 0;
+    }
+
+
+// #region IK RIG
+class IKRig{
+    constructor( arm ){
+        const pose  = arm.bindPose; // Should be a TPose, sometimes the bindpose is a TPose
+        const map   = new BoneMap( pose );
+
+        this.arm    = arm;
+        this.pose   = arm.newPose();
+
+        this.armL   = {
+            target  : new IKTarget(),
+            chain   : new IKChain( map.getBones( [ 'upperarm_l', 'forearm_l' ] ) )
+                        .qiDirectionFromPose( pose, AxesDirections.RBD ),
+        };
+    }
+
+    runSolvers(){
+        limbSolver( this.armL.target, this.armL.chain, this.pose );
+        return this;
+    }
+
+    updateSkin(){
+        this.pose.updateWorld();
+        this.arm.skin.updateFromPose( this.pose );
+        return this;
+    }
+}
+// #endregion
+
+// #region CONTROL RIG
+class ControlRig{
+    constructor( ikRig ){
+        this.rig      = ikRig;
+        this.twistRad = -Math.PI * 0.5;
+        this.pole     = new Vec3();
+        Ref.gizmos.events.on( 'activeGizmo', this.onActiveGizmo );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // POINTS
+        this.pnts  = new PointsGizmo();
+        this.pnts.state.color = 0xcccccc;
+        
+        const t = ikRig.armL.chain.computeTrailTransform( ikRig.pose );
+        this.lhand = this.pnts.addPoint( t.pos );
+
+        this.pnts.update();
+
+        Ref.gizmos.add( this.pnts );
+        Ref.gizmos.events.on( 'pointSelected', this.onPointSelected );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.tran = new TranslateGizmo();
+        // this.tran.visible = false;
+        this.tran.forceScale( 0.5 );
+        
+        Ref.gizmos.add( this.tran );
+        Ref.gizmos.events.on( 'translate', this.onTranslate );
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.twist = new TwistGizmo();
+        this.twist.state.scale = 0.10;
+        Ref.gizmos.add( this.twist );
+        Ref.gizmos.events.on( 'twist',  this.onTwist );
+
+        // ikRig.armL.chain.updateRootFromPose( ikRig.pose );
+        // Debug.pnt.add( ikRig.armL.chain.links[0].world.pos, 0x00ff00, 1 );
+
+        // Debug.pnt.add( t.pos, 0x00ff00, 1 );
+
+        this.render();
+    }
+
+    onTranslate = e=>{
+        if( e.detail.isDone ){
+            const i = this.pnts.selectedIndex;
+            if( i !== -1 ){
+                this.pnts.setPosition( i, e.detail.position, true );
+                // Ref.limb.updateTarget( e.detail.position );
+                this.render();
+            }
+        }
+    };
+
+    onPointSelected = e=>{
+        // console.log( e.detail );
+        if( e.detail.index !== -1 ){
+            this.tran.visible = true;
+            this.tran.state.position = e.detail.point.pos.slice();
+        }else{
+            this.tran.visible = false;
+        }
+    };
+
+    onTwist = e=>{
+        if( !e.detail.isDone ) return;
+
+        const b     = this.rig.pose.getBone( this.rig.armL.chain.links[0].index );
+        const tUp   = e.detail.yaxis;
+
+        const zAxis = new Vec3().fromSub( this.lhand.pos, b.world.pos ).norm();
+
+        const dot = Vec3.dot( zAxis, [0,1,0] );
+        const up  = ( dot > 0.999 )
+            ? [-1,0,0]
+            : ( dot < -0.999 )
+                ? [1,0,0]
+                : [0,1,0];
+
+        const xAxis = new Vec3().fromCross( up, zAxis ).norm();
+        const yAxis = new Vec3().fromCross( zAxis, xAxis ).norm();
+        
+        this.twistRad = Vec3.angle( yAxis, tUp );
+        if( Vec3.dot( tUp, xAxis ) > 0 ) this.twistRad = -this.twistRad;
+
+        this.render();
+    };
+
+    onActiveGizmo = e=>{
+        // console.log( 'Active Gizmo', e.detail.name );
+        if( e.detail.name === 'TwistGizmo' ){
+            this.tran.visible = false;
+            this.pnts.deselect();
+        }
+    };
+
+
+    render(){
+        Debug.reset();
+
+        const b = this.rig.pose.getBone( this.rig.armL.chain.links[0].index );
+
+        Debug.pnt.add( b.world.pos, 0xaaaaaa, 2 );
+        Debug.ln.add( b.world.pos, this.lhand.pos, 0xcccccc );
+
+        this.calcTwistDir( b.world.pos, this.lhand.pos );
+
+        this.rig.armL.target.setPoleDir( this.pole );
+        this.rig.armL.target.setPos(  this.lhand.pos );
+        this.rig.runSolvers().updateSkin();
+    }
+
+    calcTwistDir( a, b ){
+        const mid = new Vec3();
+        mid.fromLerp( a, b, 0.5 );
+
+        const dir = new Vec3();
+        dir.fromSub( b, a ).norm();
+
+        const dot = Vec3.dot( dir, [0,1,0] );
+        const up  = ( dot > 0.999 )
+            ? [-1,0,0]
+            : ( dot < -0.999 )
+                ? [1,0,0]
+                : [0,1,0];
+
+        const q = new Quat();
+        q.fromLookDir( dir, up );
+        q.pmulAxisAngle( dir, this.twistRad );
+
+        this.pole.fromQuat( q, [0,1,0]  );
+        Debug.ln.add( mid, dir.fromAdd( mid, this.pole ), 0x00ffff );
+
+        this.twist.state.position = mid;
+        this.twist.state.rotation = q;
+    }
+}
+
+/*
+Manage all gizmos??
+
+on Translate
+- Update Target
+- Redraw Limb Control
+- Get Current Pole Direction
+- Get Target Position
+- Set Pos + Pole to IK Target
+- Run Solvers
+- Update Skin
+*/
+
+// #endregion
+
+</script></body></html>

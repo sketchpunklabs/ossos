@@ -19,6 +19,7 @@ export default class Bone{
     len     = 0;                // Length of Bone
     local   = new Transform();  // Local space transform
     world   = new Transform();  // World space transform
+    constraint : any = null;
 
     constructor( props ?: BoneProps ){
         this.name  = ( props?.name )? props.name : 'bone' + Math.random();
@@ -36,11 +37,12 @@ export default class Bone{
 
     // #region METHODS
     clone(): Bone{
-        const b     = new Bone();
-        b.name      = this.name;
-        b.index     = this.index;
-        b.pindex    = this.pindex;
-        b.len       = this.len;
+        const b         = new Bone();
+        b.name          = this.name;
+        b.index         = this.index;
+        b.pindex        = this.pindex;
+        b.len           = this.len;
+        b.constraint    = this.constraint;
 
         b.local.copy( this.local );
         b.world.copy( this.world );

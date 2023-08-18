@@ -1,0 +1,359 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import useTransformControl          from '../_lib/useTransformControl.js';
+import Util                         from '../_lib/misc/Util.js';
+
+import { 
+    Armature,
+    Quat, Vec3, Transform,
+    IKChain, IKTarget,
+} from '../../src/index';
+
+// #endregion
+
+// #region MAIN
+let Debug;
+let App = useDarkScene( useThreeWebGL2(), { ambient:0xffffff } );
+let Ref = {
+    gizmo : useTransformControl( App ).useAxes(),
+
+    pos   : [0.5,0.5,0.0],
+    pole  : [1,0,0],
+    dir   : [0,1,0],
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 5, [ 0, 0.6, 0 ] );
+    Debug = await useVisualDebug( App );
+    
+    Ref.gizmo.setPos( Ref.pos );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const arm = new Armature();
+    const b0  = arm.addBone( { name:'b0', pos:[0,0,0],   parent:undefined } );
+    const b1  = arm.addBone( { name:'b1', pos:[0,0.3,0], parent:b0 } );
+    const b2  = arm.addBone( { name:'b2', pos:[0,0.3,0], parent:b1 } );
+    const b3  = arm.addBone( { name:'b3', pos:[0,0.3,0], parent:b2 } );
+    arm.bind( 0.3 );
+
+    const pose = arm.newPose();
+    Ref.target = new IKTarget();
+    Ref.chain  = new IKChain( arm.getBones( ['b0','b1','b2','b3'] ) );
+    Ref.pose   = pose;
+
+    // testSolver();
+    // fabrikSolver( Ref.target, Ref.chain, pose );
+    // pose.updateWorld();
+    Util.debugBones( pose.bones, Debug );
+
+    // console.log( Ref.target.dir );
+    // Debug.pnt.add( Ref.target.pos, 0x00ff00, 2 );
+    // Debug.ln.add( Ref.target.pos, new Vec3().fromScale( Ref.target.poleDir, 0.2 ).add( Ref.target.pos ), 0x00ff00 );
+    // Debug.ln.add( Ref.target.pos, new Vec3().fromScale( Ref.target.pointDir, 0.4 ).add( Ref.target.pos ), 0x00ff00 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //App.createRenderLoop( onPreRender ).start();
+    App.renderLoop();
+
+    // const a = new Vec3( 0,1,-0.0 ).norm();
+    // const b = new Vec3( 0.01,2,0.1 ).norm();
+
+    // console.log( 'yo',  Vec3.angleTo( a, b ) * 180 / Math.PI,  Vec3.angle( a, b ) * 180 / Math.PI );
+
+    // Debug.ln.add( [0,0,0], a.scale( 10 ), 0x00ff00 );
+    // Debug.ln.add( [0,0,0], b.scale( 10 ), 0xffff00 );
+});
+
+// function onPreRender( dt, et ){}
+
+Ref.gizmo.onMove = p=>{
+    console.log( p );
+
+    Ref.target.setPos( p );
+    Ref.target.setEndOrientation( Ref.dir, Ref.pole );
+    Ref.target.setStartOrientation( [0,1,0], [0,0,1] );
+
+    testSolver();
+
+    Debug.ln.add( p, new Vec3().fromScale( Ref.pole, 1.0 ).add( p ), 0xffff00 );
+    Debug.ln.add( p, new Vec3().fromScale( Ref.dir, 1.0 ).add( p ), 0xffff00 );
+};
+
+function testSolver(){
+    Debug.reset();
+    fabrikSolver( Ref.target, Ref.chain, Ref.pose );
+    Ref.pose.updateWorld();
+    Util.debugBones( Ref.pose.bones, Debug );
+}
+// #endregion
+
+
+function fabrikSolver( tar, chain, pose ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Initial
+    const epsilon  = 0.01;
+    const rootPos  = new Vec3();
+    chain.updateRootFromPose( pose );               // Get root world transform
+    tar.useRootTransform( chain.links[0].world );   // Align Target data to root
+
+    rootPos.copy( chain.links[0].world.pos );       // Save root position for later
+
+    // Debug.pnt.add( rootPos, 0xffff00, 3 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Compute all the points from world root & bind links
+    const pnts = new Array( chain.count + 1 );
+    initPointsFromBindpose( chain, pnts );
+
+    const effector = pnts[ chain.count ];
+    // for( let i of pnts ) Debug.pnt.add( i, 0xffffff, 3 );
+
+    // iterateBackwardWDir( chain, tar, pnts, true );
+    // return;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Perform Main Solver Steps
+    for( let i=0; i < 10; i++ ){
+
+        // iterateBackward( chain, tar, pnts );
+        // iterateForward( chain, pnts, rootPos );
+
+        iterateBackwardWDir( chain, tar, pnts, i===0 );
+        iterateForwardWDir( chain, pnts, rootPos, tar );
+
+        if( Vec3.dist( tar.pos, effector ) <= epsilon ){
+            console.log( 'Done', i );
+            break;
+        }
+
+        // break;
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    applyWithBindPose( chain, tar, pnts, pose );
+}
+
+function initPointsFromBindpose( chain, pnts ){
+    let lnk;
+    pnts[0] = chain.links[ 0 ].world.pos.clone();
+    
+    for( let i=1; i < chain.count; i++ ){
+        lnk = chain.links[ i ]
+        lnk.world.fromMul( chain.links[ i-1 ].world, lnk.bind );
+        pnts[ i ] = lnk.world.pos.clone();
+    }
+
+    pnts[chain.count] = new Vec3()
+        .fromQuat( lnk.world.rot, Vec3.UP )
+        .scale( lnk.len )
+        .add( lnk.world.pos );
+}
+
+
+function iterateBackwardWDir( chain, target, pnts, doLerp=false ){
+    const diff = new Vec3();
+    let cnt    = chain.count-1;
+    let pTar   = pnts[ chain.count ].copy( target.pos );
+    let lnk;
+    let dir    = new Vec3();
+    let iDir   = new Vec3( target.bSwingDir ).negate();
+    let t;
+
+    for( let i=cnt; i >=0; i-- ){
+        lnk = chain.links[ i ];
+
+        dir.fromSub( pnts[i], pTar ); // Direction from Target Pos to Bone pos
+
+        // Lerp direction & target direction on all bones or just first one
+        if( doLerp || i === cnt ){
+            t = i / cnt;
+            t = sigmoid( t, 0.15 );
+            dir.fromLerp( dir, iDir, t );
+        }
+
+        dir .norm()
+            .scale( lnk.len )       // Resize to bone's length
+            .add( pTar )            // Add to target pos for bone's position
+            .copyTo( pnts[i] );
+
+        pTar = pnts[i];             // Target Pos for next iteration
+    }
+}
+
+function iterateForwardWDir( chain, pnts, rootPos, target ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Move root back to starting position
+    pnts[0].copy( rootPos );
+
+    // Debug.pnt.add( pnts[0], 0xffffff, 2 );
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Move all the points back toward root except last point
+    const dir = new Vec3();
+    let lnk;
+    let p, c;
+
+    for( let i = 1; i < chain.count; i++ ){
+        lnk  = chain.links[ i-1 ];
+        c    = pnts[ i ];
+        p    = pnts[ i - 1 ];
+
+        dir .fromSub( c, p )    // Direction
+            .norm()
+            .scale( lnk.len )   // Scale to bone length
+            .add( p )           // Move away from prev pos
+            .copyTo( c );       // Save
+
+        // Debug.pnt.add( c, 0xffffff, 3 );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Last point has a direction constraint that must be honored.
+    lnk  = chain.links[ chain.count-1 ];
+    pnts[ chain.count ]
+        .fromScale( target.bSwingDir, lnk.len )
+        .add( pnts[ chain.count-1 ] );
+
+    // Debug.pnt.add( pnts[ chain.count ], 0xffffff, 3 );
+}
+
+
+function iterateBackward( chain, target, pnts ){
+    const diff = new Vec3();
+    let pTar   = pnts[ chain.count ].copy( target.pos );
+    let lnk;
+
+    for( let i=chain.count-1; i >=0; i-- ){
+        lnk = chain.links[ i ]; 
+        diff    .fromSub( pnts[i], pTar ) // Direction from Target Pos to Bone pos
+                .norm()
+                .scale( lnk.len )         // Resize to bone's length
+                .add( pTar )              // Add to target pos for bone's position
+                .copyTo( pnts[i] );       // Save results
+        
+        pTar = pnts[i];                   // Target Pos for next iteration
+        Debug.pnt.add( pTar, 0xff00ff, 3 );
+    }
+}
+
+function iterateForward( chain, pnts, rootPos ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Move root back to starting position
+    pnts[0].copy( rootPos );
+
+    // Debug.pnt.add( pnts[0], 0xffffff, 2 );
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Move all the points back toward rootm
+    const diff = new Vec3();
+    let lnk;
+    let p, c;
+
+    for( let i = 1; i <= chain.count; i++ ){
+        lnk  = chain.links[ i-1 ];
+        c    = pnts[ i ];
+        p    = pnts[ i - 1 ];
+
+        diff    .fromSub( c, p )    // Direction
+                .norm()
+                .scale( lnk.len )   // Scale to bone length
+                .add( p )           // Move away from prev pos
+                .copyTo( c );       // Save
+
+        Debug.pnt.add( c, 0xffffff, 3 );
+    }
+}
+
+
+function applyWithBindPose( chain, target, pnts, pose ){
+    const swing = new Quat();    
+    const aDir  = new Vec3();
+    const bDir  = new Vec3();
+    const t = new Vec3(); // TODO Remove, used for debug
+
+    // tangentsFromPoints( pnts );
+
+    let lnk;
+    for( let i=0; i < chain.count; i++ ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Compute Worldspace Bind Transform
+        lnk = chain.links[ i ];
+        lnk.world.fromMul(
+            ( i===0 )? chain.pworld : chain.links[ i-1 ].world,
+            lnk.bind,
+        );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Compute bone rotation
+        aDir.fromQuat( lnk.world.rot, Vec3.UP );            // Direction from worldspace bind
+        bDir.fromSub( pnts[i+1], lnk.world.pos ).norm();    // Direction from IK Position
+        
+        swing.fromSwing( aDir, bDir );                      // Swing rotation
+        lnk.world.rot.pmul( swing );                        // Apply swing to world bind
+
+        Debug.pnt.add( pnts[i], 0xffffff, 2 );
+        // Debug.pnt.add( t.fromScale( aDir, lnk.len ).add( lnk.world.pos ), 0xff00ff, 2 );
+
+        // if( i == 2 )
+        // transport( lnk.world );
+        // t.fromQuat( lnk.world.rot, Vec3.FORWARD ).add( lnk.world.pos );
+        // Debug.ln.add( lnk.world.pos, t, 0xff00ff );
+    }
+
+    applyTwist( chain, target );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Convert all WorldSpace Rot to LocalSpace
+    // Then save results back to pose
+    chain.setLocalRotPose( pose );
+
+    // rmfDoubleReflection( pnts, chain );
+}
+
+function applyTwist( chain, target ){
+    const orth  = new Vec3();
+    const swing = new Vec3();
+    const twist = new Vec3();
+    const dir   = new Vec3();
+    const rot   = new Quat();
+
+    let lnk;
+    let t;
+
+    for( let i=0; i < chain.count; i++ ){
+        t   = i / ( chain.count - 1 );
+        lnk = chain.links[ i ];
+
+        dir.fromLerp( target.aTwistDir, target.bTwistDir, t ); // Lerp Direction
+        // dir.fromSlerp( target.aTwistDir, target.bTwistDir, t );
+
+        swing.fromQuat( lnk.world.rot, Vec3.UP );        // Naturla Swing Direction
+        twist.fromQuat( lnk.world.rot, Vec3.FORWARD );   // Natural Twist Direction
+        orth.fromCross( swing, dir );                    // Orth Dir
+        dir.fromCross( orth, swing ).norm();             // Realign dir to be Orth, new Twist Dir
+
+        // Skip rotation if the two vectors are about equal.
+        if( Math.abs( Vec3.dot( twist, dir ) ) >= 0.999 ) continue;
+
+        rot.fromSwing( twist, dir );                     // Create twist rotation
+        lnk.world.rot.pmul( rot );                       // Twist bone to align to lerped direction
+
+        // Debug.ln.add( lnk.world.pos, new Vec3().fromAdd( aim, lnk.world.pos ), 0xffffff );
+        Debug.ln.add( lnk.world.pos, new Vec3().fromScale( dir, 0.4 ).add( lnk.world.pos ), 0xffff00 );
+        // Debug.ln.add( lnk.world.pos, new Vec3().fromScale( pole, 0.4 ).add( lnk.world.pos ), 0xff0000 );
+    }
+}
+
+
+function sigmoid( t, k=0 ){ // Over 0, Eases in the middle, under eases in-out
+    // this uses the -1 to 1 value of sigmoid which allows to create easing at 
+    // start and finish. Can pass in range 0:1 and it'll return that range.
+    // https://dhemery.github.io/DHE-Modules/technical/sigmoid/
+    // https://www.desmos.com/calculator/q6ukniiqwn
+    return ( t - k*t ) / ( k - 2*k*Math.abs(t) + 1 );
+}
+
+</script></body></html>
