@@ -32,7 +32,7 @@ export default class Armature{
     // #region METHODS
 	addBone( obj ?: BoneProps | Bone ): Bone{
         const bones = this.poses.bind.bones;
-		const idx   = bones.length;
+        const idx   = bones.length;
 
         if( obj instanceof Bone ){
             

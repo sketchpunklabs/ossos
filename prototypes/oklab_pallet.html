@@ -1,0 +1,297 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body>
+
+<style>
+    html, body{ padding:0px; margin:0px; width:100%; height:100%; }
+    body{ display: flex; justify-content:center; align-items: center; }
+
+    .svgView{ border:4px solid black; width:500px; height:500px; border-radius:255px; margin:10px; }
+    .container{
+        display: flex; flex-direction:row;
+    };
+
+    /* .svgView path{ cursor: grab; }
+    .svgView path:hover{ 
+        fill:#ff0000
+        filter: drop-shadow( 0px 0px 5px rgba( 0,0,0,1 ) );
+     } */
+</style>
+
+<div class="container">
+
+    <svg class="svgView" id="pgSvg">
+        <defs>
+            <!-- <filter id="shadow">
+                <feDropShadow dx="0.0" dy="0.0" stdDeviation="5.5" flood-color="black" />
+            </filter> -->
+            <style type="text/css">
+                path { cursor: pointer; transition: 0.3s ease-in-out; }
+                path:hover{  opacity:0.9; filter: drop-shadow( 0px 0px 2px rgba(0,0,0,0.8) ); }
+                <!--  -->
+            </style>
+        </defs>
+    </svg>
+
+    <div>
+        <label>Lightness</label>
+        <input type="range" id="inpLightness" data-param="lightness" min="0" max="1" value="0.8" step="0.01"><br>
+
+        <label>Chroma</label>
+        <input type="range" id="inpChroma" data-param="chroma" min="0.01" max="0.5" value="0.5" step="0.01"><br>
+
+        <label>Slices</label>
+        <input type="range" id="inpSlices" data-param="slices" min="2" max="50" value="4" step="1"><br>
+
+        <label>Rings</label>
+        <input type="range" id="inpRings" data-param="rings" min="2" max="10" value="4" step="1" ><br>
+    </div>
+</div>
+
+<script type="module">
+
+import Svg from './Svg.js';
+
+let wheel;
+
+// use this to help style UI
+// https://codepen.io/jkantner/pen/gOjNdog
+
+window.addEventListener( 'load', async _=>{
+
+    wheel = new OKLabColorWheel( pgSvg );
+    initUI();
+    // setTimeout( ()=>{
+    //     wheel.lightness = 0.5;
+    //     wheel.resetColors();
+    // }, 1000 );
+
+    /*
+    const s = new Svg( 'pgSvg' ).useCenterOrigin();
+
+    let steps = 24;
+    let inc   = 360 / steps;
+    let degGap   = 0.5;
+    let thick    = 30;
+    let cornerRadius = 6;
+
+    const props = {
+        fill: '#000000',
+    }
+
+    for( let i=0; i < steps; i++ ){
+        let deg = i * inc; // Deg is hue
+        let rng = 0.5; // chroma
+        
+        var c   = oklch( 0.5, rng, deg );
+        props.fill = rgbToHex( c[0], c[1], c[2] );
+        
+        // s.sweepArc( 0, 0, 200, deg, inc-0.5, { 'stroke-width':40, stroke:hex } );
+        s.roundedArc( 0, 0, 200, deg+degGap, deg+inc-degGap, thick, cornerRadius, props );
+
+        var c   = oklch( 0.5, 0.333, deg );
+        props.fill = rgbToHex( c[0], c[1], c[2] );
+
+        s.roundedArc( 0, 0, 200 - (thick+3)*1, deg+degGap, deg+inc-degGap, thick, cornerRadius, props );
+        
+        var c   = oklch( 0.5, 0.167, deg );
+        props.fill = rgbToHex( c[0], c[1], c[2] );
+        s.roundedArc( 0, 0, 200 - (thick+3)*2, deg+degGap, deg+inc-degGap, thick, cornerRadius, props );
+
+        var c   = oklch( 0.5, 0.0, deg );
+        props.fill = rgbToHex( c[0], c[1], c[2] );
+        s.roundedArc( 0, 0, 200 - (thick+3)*3, deg+degGap, deg+inc-degGap, thick, cornerRadius, props );
+    }
+
+    s.elm.addEventListener( 'click', e=>{
+        console.log( e.target );
+    });
+    */
+});
+
+function initUI(){
+    document.getElementById( 'inpLightness' ).addEventListener( 'change', (e)=>{
+        wheel.lightness = parseFloat( e.target.value );
+        wheel.resetColors();
+    });
+
+    document.getElementById( 'inpChroma' ).addEventListener( 'change', (e)=>{
+        wheel.chroma = parseFloat( e.target.value );
+        wheel.resetColors();
+    });
+
+    document.getElementById( 'inpSlices' ).addEventListener( 'change', (e)=>{
+        wheel.slices = parseInt( e.target.value );
+        wheel.render();
+    });
+
+    document.getElementById( 'inpRings' ).addEventListener( 'change', (e)=>{
+        wheel.rings = parseInt( e.target.value );
+        wheel.render();
+    });
+}
+
+
+
+class OKLabColorWheel{
+    constructor( elmId ){
+        this.svg        = new Svg( elmId ).useCenterOrigin();
+        this.grpColors  = this.svg.group();
+        this.colCircle  = this.svg.circle( 0, 0, 60 );
+
+        this.svg.append( this.grpColors, this.colCircle );
+
+        this.lightness = 0.8; // 0 > 1
+        this.chroma    = 0.5; // 0 > 0.5
+        this.rings     = 4;
+        this.slices    = 4;
+
+        this.cornerRadius = 6;
+
+        this.maxRadius    = 240;
+        this.minRadius    = 60;
+        this.ringSpace    = 3;
+        this.sliceSpace   = 0.5;
+
+        this.render();
+
+        this.svg.on( 'click', this.onClick );
+    }
+
+    onClick = e=>{
+        if( e.target.nodeName !== 'path' ) return;
+
+        const col = e.target.getAttribute( 'fill' );
+        this.colCircle.setAttributeNS( null, 'fill', col );
+    };
+
+    render(){
+        const degInc    = 360 / this.slices;
+        const props     = { fill: '#000000' };
+        const incRadius = ( this.maxRadius - this.minRadius ) / this.rings;
+        const thick     = incRadius - this.ringSpace;
+
+        let deg;
+        let col;
+        let rng;
+        let radius;
+        let t;
+        let elm;
+        let chroma;
+
+        this.svg.clear( this.grpColors );
+        for( let i=0; i < this.slices; i++ ){
+            deg = i * degInc; // Hue is degrees
+
+            for( let j=0; j < this.rings; j++ ){
+                t          = j / ( this.rings - 1 );
+                radius     = this.maxRadius - ( j * incRadius );
+                chroma     = this.chroma * ( 1 - t );
+
+                col        = oklch( this.lightness, chroma, deg );
+                props.fill = rgbToHex( col[0], col[1], col[2] );
+
+                elm = this.svg.roundedArc( 0, 0, radius, deg+this.sliceSpace, deg+degInc-this.sliceSpace, thick, this.cornerRadius, props );
+                elm.setAttribute( "data-deg", deg );
+                elm.setAttribute( "data-chroma", 1 - t );
+                this.grpColors.appendChild( elm );
+            }
+        }
+    }
+
+    resetColors(){
+        const items = this.grpColors.childNodes;
+
+        let chroma;
+        let deg;
+        let col;
+
+        for( let i of items ){
+            deg    = i.getAttribute( 'data-deg' );
+            chroma = this.chroma * i.getAttribute( 'data-chroma' );
+            col    = oklch( this.lightness, chroma, deg );
+            i.setAttributeNS( null, 'fill', rgbToHex( col[0], col[1], col[2] ) );
+        }
+    }
+}
+
+
+// https://bottosson.github.io/posts/oklab/
+// https://bottosson.github.io/posts/colorpicker/
+// https://observablehq.com/@fil/oklab-color-space
+// https://observablehq.com/@shan/oklab-color-wheel
+// https://oklch.com/
+// https://github.com/holbrookdev/ok-color-picker
+
+// https://coolors.co/fa5729
+
+// L: 0 > 1, a: -0.5 > 0.5, b: -0.5 > 0.5
+// Basic Color Ramp : oklab( 0.5, .5 * Math.sin(PI2 * t), .5 * Math.cos(PI2 * t) )
+function oklab( L, a, b ){
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const l  = l_ * l_ * l_;
+  const m  = m_ * m_ * m_;
+  const s  = s_ * s_ * s_;
+  return [
+    rgbClampRound( 255 * gamma( +4.0767245293 * l - 3.3072168827 * m + 0.2307590544 * s ) ),
+    rgbClampRound( 255 * gamma( -1.2681437731 * l + 2.6093323231 * m - 0.3411344290 * s ) ),
+    rgbClampRound( 255 * gamma( -0.0041119885 * l - 0.7034763098 * m + 1.7068625689 * s ) ),
+  ];
+}
+
+// lightness: 0 > 1, chroma: 0.01 > 0.5, hue: 0 > 6.28
+// chroma just controls the max distance for A & B which has a -+ range of 0.5
+// hue is just the degree angle that gets mapped to radians
+function oklch( lightness, chroma, hue ) {
+    const h = 2 * Math.PI * ( hue / 360 );
+    const a = chroma * Math.cos( h )
+    const b = chroma * Math.sin( h )
+    return oklab( lightness, a, b );
+}
+
+function gamma( x ){ return (x >= 0.0031308 ? 1.055 * Math.pow(x, 1 / 2.4) - 0.055 : 12.92 * x); }
+function gammaInv( x ){ return x >= 0.04045 ? Math.pow((x + 0.055) / (1 + 0.055), 2.4) : x / 12.92; }
+function rgbClampRound( v ){ return Math.min( Math.max( 0, Math.round( v ) ), 255 ); }
+
+function rgbToHex( r, g, b ){
+    const rh = '0' + r.toString( 16 );
+    const gh = '0' + g.toString( 16 );
+    const bh = '0' + b.toString( 16 );
+    return ( '#' + rh.slice( -2 ) + gh.slice( -2 ) + bh.slice( -2 ) ).toUpperCase();
+}
+
+
+
+function oklabInverse(c){
+  c = d3.rgb(c);
+  const r = gammaInv(c.r / 255);
+  const g = gammaInv(c.g / 255);
+  const b = gammaInv(c.b / 255);
+  const l = 0.4121656120 * r + 0.5362752080 * g + 0.0514575653 * b;
+  const m = 0.2118591070 * r + 0.6807189584 * g + 0.1074065790 * b;
+  const s = 0.0883097947 * r + 0.2818474174 * g + 0.6302613616 * b;
+
+  const l_ = Math.cbrt(l);
+  const m_ = Math.cbrt(m);
+  const s_ = Math.cbrt(s);
+
+  return {
+    L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+    a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+    b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+  };
+}
+
+
+function hexToRgb( hex ){
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec( hex );
+    return result ? [
+        parseInt( result[ 1 ], 16 ),
+        parseInt( result[ 2 ], 16 ),
+        parseInt( result[ 3 ], 16 )
+    ] : null;
+}
+
+</script></body></html>

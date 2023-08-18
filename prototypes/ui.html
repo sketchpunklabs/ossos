@@ -1,0 +1,325 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; border:1px solid red; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body>
+<script type="module">
+//#region IMPORTS
+// import useThreeWebGL2, { useDarkScene } from './_lib/useThreeWebGL2.js';
+// import useTransformControl              from './_lib/useTransformControl.js';
+// import facedCube            from './_lib/meshes/facedCube.js';
+// import ShapePointsMesh      from './_lib/meshes/ShapePointsMesh.js';
+// import DynLineMesh          from './_lib/meshes/DynLineMesh.js';
+//#endregion
+
+//#region MAIN
+// let App   = useDarkScene( useThreeWebGL2() );
+// let Debug = {};
+// let Ref   = {
+//     gizmo : useTransformControl( App ),
+// };
+
+// window.addEventListener( 'load', async _=>{
+//     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//     // Setup
+//     App.sphericalLook( 0, 20, 6 );
+//     App.scene.add( ( Debug.pnt = new ShapePointsMesh() ) );
+//     App.scene.add( ( Debug.ln  = new DynLineMesh() ) );
+//     App.scene.add( ( Ref.cube  = facedCube() ) );
+
+//     Ref.gizmo.attach( Ref.cube );
+
+//     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//     Debug.pnt.add( [0,1,0], 0x00ff00, 7, 6 );
+//     Debug.ln.add( [0,1,0], [0,2,0], 0x00ff00, 0x00ffff );
+    
+//     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//     App.renderLoop();
+//     // App.createRenderLoop( onPreRender ).start();
+// });
+
+// function onPreRender( dt, et ){}
+//#endregion
+</script>
+<style>
+    * { font-family:monospace; color:white; }
+    .layout{ 
+        border:0px solid red;
+        display : grid;
+        grid-template-areas   : "viewport panel bar";
+        grid-template-columns : 1fr 250px 50px;
+        height:100vh;
+        width:100vw;
+        background-color: #000000;
+        grid-gap:1px;
+    }
+
+    .closed{
+        grid-template-areas   : "viewport bar";
+        grid-template-columns : 1fr 50px;
+    }
+
+    .closed .mainpanel { display:none; }
+
+    .viewport{ grid-area: viewport; }
+    .mainpanel{ grid-area: panel; 
+        overflow-y:auto;
+        scrollbar-color: #3FA0A7 #DFE9EB;
+    }
+    .mainpanel::-webkit-scrollbar{ width:6px; }
+    .mainpanel::-webkit-scrollbar-track{ background-color: transparent; }
+    .mainpanel::-webkit-scrollbar-thumb{ 
+        background-color: #404040; 
+        border-radius: 8px; 
+        border: 4px solid #222222;
+        border-width: 0px 0px 4px 0px;
+    }
+
+    
+
+    .layout > section{ 
+        box-sizing:border-box;
+        background-color: #222222;
+    }
+
+    .panel{
+        border-bottom: 1px solid black;
+    }
+
+    .panel > header { padding:6px 10px; font-size:14px; display:flex; flex-direction:row; }
+    .panel > main { padding:0px 10px 10px 10px; }
+
+    .mainbar{ grid-area: bar;
+        display: flex;
+        flex-direction: column;
+        padding-top:6px;
+    }
+    .mainbar > button{
+        color: white;
+        fill: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: transparent;
+        border-radius: 4px;
+        border-width: 0px;
+        height: 35px;
+        margin: 2px 6px;
+        cursor: pointer;
+    }
+
+    .mainbar > button:hover{
+        background-color: #444444;
+        fill: #00ff00;
+    }
+
+    .mainbar > button.sel{
+        background-color: #444444;
+    }
+
+    input[type=range]{
+        appearance:none;
+        background-color: transparent;
+        cursor: pointer;
+        margin: 0px;
+        width: 100%;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track{ background: #323232; border-radius: 2px; height: 8px; }
+
+    input[type=range]::-webkit-slider-thumb{
+      appearance: none; background-color: #808080;
+      border-radius: 3px; margin-top: -2px;
+      width: 12px; height: 12px; 
+    }
+    
+    input[type=range]:hover::-webkit-slider-runnable-track{ background-color: #555555; }
+    input[type=range]:hover::-webkit-slider-thumb{ background: white; }
+
+
+    .togBtn{
+        background-color: transparent;
+        border-width: 0;
+        fill: white;
+        display: grid;
+        cursor: pointer;
+        padding: 0px;
+        margin-right: 7px;
+        margin-left: 2px;
+    }
+
+    button.icoDown > svg{
+        transform: scale( 1.3 );
+    }
+
+    button.icoUp > svg {
+        transform:scale( -1.3 );
+    }
+
+    .dropdown{
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr;
+        position: relative;
+
+        border-radius: 4px;
+        background-color: #323232;
+        
+        color: #777777;
+        fill: #D9D9D9;
+        font-family: monospace;
+        padding: 2px 6px;
+    }
+
+    .dropdown:hover{
+      background-color: #444444;
+      color: #ffffff;
+      fill: #ffffff;
+    }
+
+    .dropdown > select {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+    }
+
+    .dropdown > div {
+        user-select: none;
+        align-self: stretch;
+        justify-self: stretch;
+        cursor: pointer;
+    }
+
+    .dropdown > svg {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translate( 0%, -50% );
+        pointer-events: none;
+    }
+
+
+    input[type=color] {
+        background: none;
+        border-width: 0px;
+        cursor: pointer;
+        height: 15px;
+        padding: 0px;
+        width: 100%;
+    }
+
+    input[type=color]::-webkit-color-swatch-wrapper{
+      padding: 0px;
+    }
+
+    input[type=color]::-webkit-color-swatch{
+      border-width: 0px;
+      border-radius: 4px;
+    }
+
+    input[type=text]{
+        background-color: #323232;
+        border-radius: 4px;
+        border-width: 0px;
+        min-width: 1px;
+        color: #777777;
+        font-size: 16px;
+        padding: 2px 6px;
+    }
+
+    input[type=text]:focus{
+      background-color: #444444;
+      color: #ffffff;
+      outline: none;
+    }
+</style>
+
+
+<div class="layout">
+    <section class="viewport">
+        X
+    </section>
+    <section class="mainpanel">
+        
+        <div class="panel">
+            <header>Header</header>
+            <main>
+                Start
+                test<br>test<br>test<br>test<br>test<br>test<br>test<br>test<br>test<br>
+            </main>
+        </div>
+
+        <div class="panel">
+            <header>
+                <button class="togBtn icoUp">
+                    <svg width="9" height="5" viewBox="0 0 9 5" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3.8 4.4c.4.3 1 .3 1.4 0L8 1.7A1 1 0 007.4 0H1.6a1 1 0 00-.7 1.7l3 2.7z"></path>
+                    </svg>
+                </button>
+                Header
+            </header>
+            <main>
+                <input type="range"/><br><br>
+
+
+                
+              <input type="color" /><br><br>
+
+                <input type="text"/><br><br>
+
+                <div class="dropdown">
+                    <select class="test">
+                        <option>0</option>
+                        <option>1</option>
+                        <option>0</option>
+                    </select>
+              
+                    <div>
+                      &nbsp;
+                    </div>
+              
+                    <svg width="9" height="5" viewBox="0 0 9 5" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3.8 4.4c.4.3 1 .3 1.4 0L8 1.7A1 1 0 007.4 0H1.6a1 1 0 00-.7 1.7l3 2.7z"></path>
+                    </svg>
+                </div>
+
+            </main>
+        </div>
+
+        <div class="panel">
+            <header>Header</header>
+            <main>
+                Start
+                test<br>test<br>test<br>test<br>test<br>test<br>test<br>test<br>test<br>
+            </main>
+        </div>
+
+        <div class="panel">
+            <header>Header</header>
+            <main>
+                Start
+                test<br>test<br>test<br>test<br>test<br>test<br>test<br>test<br>test<br>
+            </main>
+        </div>
+
+    </section>
+    <section class="mainbar">
+        
+        <button >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 512 512">
+                <path d="M0 416c0 17.7 14.3 32 32 32l54.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48L480 448c17.7 0 32-14.3 32-32s-14.3-32-32-32l-246.7 0c-12.3-28.3-40.5-48-73.3-48s-61 19.7-73.3 48L32 384c-17.7 0-32 14.3-32 32zm128 0a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM320 256a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm32-80c-32.8 0-61 19.7-73.3 48L32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l246.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48l54.7 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-54.7 0c-12.3-28.3-40.5-48-73.3-48zM192 128a32 32 0 1 1 0-64 32 32 0 1 1 0 64zm73.3-64C253 35.7 224.8 16 192 16s-61 19.7-73.3 48L32 64C14.3 64 0 78.3 0 96s14.3 32 32 32l86.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48L480 128c17.7 0 32-14.3 32-32s-14.3-32-32-32L265.3 64z"></path>
+            </svg>
+        </button>
+
+        <button class="sel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 512 512">
+                <path d="M0 416c0 17.7 14.3 32 32 32l54.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48L480 448c17.7 0 32-14.3 32-32s-14.3-32-32-32l-246.7 0c-12.3-28.3-40.5-48-73.3-48s-61 19.7-73.3 48L32 384c-17.7 0-32 14.3-32 32zm128 0a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM320 256a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm32-80c-32.8 0-61 19.7-73.3 48L32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l246.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48l54.7 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-54.7 0c-12.3-28.3-40.5-48-73.3-48zM192 128a32 32 0 1 1 0-64 32 32 0 1 1 0 64zm73.3-64C253 35.7 224.8 16 192 16s-61 19.7-73.3 48L32 64C14.3 64 0 78.3 0 96s14.3 32 32 32l86.7 0c12.3 28.3 40.5 48 73.3 48s61-19.7 73.3-48L480 128c17.7 0 32-14.3 32-32s-14.3-32-32-32L265.3 64z"></path>
+            </svg>
+        </button>
+
+    </section>
+</div>
+
+</body>
+</html>

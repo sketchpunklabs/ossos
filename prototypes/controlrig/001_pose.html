@@ -1,0 +1,305 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+
+import GltfUtil, { Gltf2 }              from '../_lib/misc/GltfUtil.js';
+import Util                             from '../_lib/misc/Util.js';
+import MatrixSkinMaterial               from '../_lib/customSkinning/MatrixSkinMaterial.js';
+import { 
+    Armature, Pose, TranMatrixSkin,
+    BoneMap, Bone,
+    Vec3, Quat, Transform,
+
+    IKTarget, IKChain, limbSolver, Fabrik, fabrikSolver,
+    aimChainSolver,
+} from '../../src/index';
+
+// #endregion
+
+// #region MAIN
+let App   = useDarkScene( useThreeWebGL2() );
+let Debug = {};
+let Ref   = {
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 30, 4, [0,0.8,0] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const char = await Character.fetch( '/prototypes/_res/models/nabba/nabba.gltf' );
+    App.scene.add( char.mesh );
+    Ref.char = char;
+
+    fromHumanPose( char.pose );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // App.createRenderLoop( onPreRender ).start();
+    App.renderLoop( onPreRender );
+});
+
+function onPreRender( dt, et ){}
+// #endregion
+
+// #region CHARACTER
+class Character{
+    static async fetch( url ){
+        const gltf = await Gltf2.fetch( url );
+        return new Character( gltf );
+    }
+
+    constructor( gltf ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Armature
+        this.arm = GltfUtil.parseArmature( gltf );      // Armature
+        this.arm.useSkin( TranMatrixSkin );             // Create Skin
+        this.pose = this.arm.newPose();                 // Main Pose
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Mesh
+        const geo = GltfUtil.loadGeoBuffers( gltf )[0];
+        const mat = MatrixSkinMaterial( '#606060', this.arm.skin );
+        this.mesh = new THREE.Mesh( geo, mat );
+    }
+
+    updateSkin(){
+        this.pose.updateWorld();
+        this.arm.skin.updateFromPose( this.pose );
+    }
+}
+// #endregion
+
+
+
+/*
+- Controls
+--- Needs to be scalable, Maybe not part of prototype
+--- Locally Attached to a Bone??
+--- Always have a Root
+
+-- Head
+--- Aim IK with Twist
+
+-- Hip
+--- Rotation will create a curve with the first spine bone
+
+Chest
+--- Rotation will create curve with its parent bone
+
+
+- Points
+-- Should be parented
+-- Have access to bone, Maybe save the bone idx
+-- Transform heirachy?
+*/
+
+// #region POINT RIG
+
+function fromHumanPose( pose ){
+    const map = new BoneMap( pose );
+    // console.log( map );
+
+    /*
+    const color = 0x00ffff;
+    const size  = 1.2;
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'hip' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneMap( 'spine' ).lastIndex ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'neck' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'head' ) ).world.pos, color, size );
+
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'upperarm_r' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'forearm_r' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'hand_r' ) ).world.pos, color, size );
+
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'upperarm_l' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'forearm_l' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'hand_l' ) ).world.pos, color, size );
+
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'thigh_l' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'shin_l' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'foot_l' ) ).world.pos, color, size );
+
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'thigh_r' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'shin_r' ) ).world.pos, color, size );
+    Debug.pnt.add( pose.getBone( map.getBoneIndex( 'foot_r' ) ).world.pos, color, size );
+    */
+
+    // let b;
+    // b = pose.getBone( map.getBoneIndex( 'hip' ) );
+    // rig.add( { name: 'hip', pos: b.world.pos } );
+    // b = pose.getBone( map.getBoneMap( 'spine' ).lastIndex );
+    // rig.add( { name: 'chest', pos: b.world.pos, parent:'hip' } );
+    // b = pose.getBone( map.getBoneIndex( 'neck' ) );
+    // rig.add( { name: 'neck', pos: b.world.pos, parent:'chest' } );
+    // b = pose.getBone( map.getBoneIndex( 'head' ) );
+    // rig.add( { name: 'head', pos: b.world.pos, parent:'neck' } );
+
+    // b = pose.getBone( map.getBoneIndex( 'upperarm_r' ) );
+    // rig.add( { name: 'upperarm_r', pos: b.world.pos, parent:'chest' } );
+    // b = pose.getBone( map.getBoneIndex( 'forearm_r' ) );
+    // rig.add( { name: 'forearm_r', pos: b.world.pos, parent:'upperarm_r' } );
+    // b = pose.getBone( map.getBoneIndex( 'hand_r' ) );
+    // rig.add( { name: 'hand_r', pos: b.world.pos, parent:'forearm_r' } );
+
+    // b = pose.getBone( map.getBoneIndex( 'upperarm_l' ) );
+    // rig.add( { name: 'upperarm_l', pos: b.world.pos, parent:'chest' } );
+    // b = pose.getBone( map.getBoneIndex( 'forearm_l' ) );
+    // rig.add( { name: 'forearm_l', pos: b.world.pos, parent:'upperarm_l' } );
+    // b = pose.getBone( map.getBoneIndex( 'hand_l' ) );
+    // rig.add( { name: 'hand_l', pos: b.world.pos, parent:'forearm_l' } );
+
+    // b = pose.getBone( map.getBoneIndex( 'thigh_r' ) );
+    // rig.add( { name: 'thigh_r', pos: b.world.pos, parent:'hip' } );
+    // b = pose.getBone( map.getBoneIndex( 'shin_r' ) );
+    // rig.add( { name: 'shin_r', pos: b.world.pos, parent:'thigh_r' } );
+    // b = pose.getBone( map.getBoneIndex( 'foot_r' ) );
+    // rig.add( { name: 'foot_r', pos: b.world.pos, parent:'shin_r' } );
+
+    // b = pose.getBone( map.getBoneIndex( 'thigh_l' ) );
+    // rig.add( { name: 'thigh_l', pos: b.world.pos, parent:'hip' } );
+    // b = pose.getBone( map.getBoneIndex( 'shin_l' ) );
+    // rig.add( { name: 'shin_l', pos: b.world.pos, parent:'thigh_l' } );
+    // b = pose.getBone( map.getBoneIndex( 'foot_l' ) );
+    // rig.add( { name: 'foot_l', pos: b.world.pos, parent:'shin_l' } );
+
+    const rig = new PointRig();
+
+    const x = [
+        { bone:'hip' },
+        { bone:'spine', parent:'hip', index:-1, name:'chest' },
+        { bone:'neck',  parent:'chest' },
+        { bone:'head',  parent:'neck' },
+
+        { bone:'upperarm_r', parent:'chest' },
+        { bone:'forearm_r',  parent:'upperarm_r' },
+        { bone:'hand_r',     parent:'forearm_r' },
+
+        { bone:'upperarm_l', parent:'chest' },
+        { bone:'forearm_l',  parent:'upperarm_l' },
+        { bone:'hand_l',     parent:'forearm_l' },
+
+        { bone:'upperarm_r', parent:'chest' },
+        { bone:'forearm_r',  parent:'upperarm_r' },
+        { bone:'hand_r',     parent:'forearm_r' },
+
+        { bone:'thigh_r', parent:'hip' },
+        { bone:'shin_r',  parent:'thigh_r' },
+        { bone:'foot_r',  parent:'shin_r' },
+
+        { bone:'thigh_l', parent:'hip' },
+        { bone:'shin_l',  parent:'thigh_l' },
+        { bone:'foot_l',  parent:'shin_l' },
+    ];
+
+    let b;
+    let m;
+    let o;
+    for( let i of x ){
+        if( i.index === undefined ){
+            b = pose.getBone( map.getBoneIndex( i.bone ) );
+        }else{
+            m = map.getBoneMap( i.bone );
+            b = ( i.index === -1 )
+                ? pose.getBone( m.lastIndex )
+                : pose.getBone( m.items[ i.index ] );
+        }
+
+        rig.add( { 
+            name    : i.name || i.bone, 
+            pos     : b.world.pos,
+            parent  : i.parent,
+            boneIdx : i.index,
+        } );
+    }
+
+    for( let p of rig.points ){
+        Debug.pnt.add( p.pos, 0xffffff, 1.3 );
+        for( let i of p.children ){
+            let c = rig.points[ i ];
+            Debug.ln.add( p.pos, c.pos, 0xffffff, 0x777777 );
+        }
+    }
+}
+
+class Point{
+    index    = -1;
+    pindex   = -1;
+    boneIdx  = -1;
+    name     = '';
+    pos      = new Vec3();
+    children = [];
+    
+    setParent( p ){
+        this.pindex = p.index;          // Save parent index
+        p.children.push( this.index );  // Save as child 
+        return this;
+    }
+}
+
+class PointRig{
+    points = [];
+    names  = new Map();
+
+    add( props={} ){
+        const pnt = new Point();
+        pnt.index = this.points.length;
+        pnt.name  = props.name || '_point_' + pnt.index;
+
+        if( props.boneIdx !== undefined ) pnt.boneIdx = props.boneIdx;
+
+        if( props.pos )    pnt.pos.copy( props.pos );
+        if( props.parent ){
+            const pi = this.names.get( props.parent );
+            if( pi !== undefined ) pnt.setParent( this.points[ pi ] );
+            else                   console.log( 'Parent not found: ', props.parent );
+        }
+        
+        this.points.push( pnt );
+        this.names.set( pnt.name, pnt.index );
+        return pnt;
+    }
+}
+
+// #endregion
+
+function distanceConstraint( a, b, dist, aAnchored=false, bAnchored=false, isRigid=true ){
+        if( aAnchored && bAnchored ) return 1;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Get direction & test if already at distance
+        // If not rigid, can be 0 to dist in length
+        const dir       = new Vec3().fromSub( a.pos, b.pos );
+        const curDist   = dir.len;
+        const epsilon   = 1e-3;
+        if( 
+            ( !isRigid && curDist <= dist ) ||
+            Math.abs( curDist - dist ) < epsilon
+        ) return 1;
+
+        // Normalize relation of the distance to set with the current distance
+        const delta = ( curDist === 0 )? dist : ( dist - curDist ) / curDist;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Determine the ratio in which how much each point will
+        // move toward eachother, changes if a point is anchored
+        let aScl = 0.5;
+        let bScl = 0.5;
+        if( aAnchored ){        aScl = 0; bScl = 1; }
+        else if( bAnchored ){   aScl = 1; bScl = 0; }
+
+        a.pos[ 0 ] += dir[ 0 ] * aScl * delta;
+        a.pos[ 1 ] += dir[ 1 ] * aScl * delta;
+        a.pos[ 2 ] += dir[ 2 ] * aScl * delta;
+        
+        b.pos[ 0 ] -= dir[ 0 ] * bScl * delta;
+        b.pos[ 1 ] -= dir[ 1 ] * bScl * delta;
+        b.pos[ 2 ] -= dir[ 2 ] * bScl * delta;
+
+        return 0;
+    }
+
+</script></body></html>

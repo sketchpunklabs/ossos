@@ -292,7 +292,7 @@ export default class Quat extends Array< number >{
         return this;
     }
 
-    invert(): Quat{
+    invert(): this{
         const a0  = this[ 0 ],
               a1  = this[ 1 ],
               a2  = this[ 2 ],
@@ -309,7 +309,7 @@ export default class Quat extends Array< number >{
         return this;
     }
 
-    negate(): Quat{
+    negate(): this{
         this[ 0 ] = -this[ 0 ];
         this[ 1 ] = -this[ 1 ];
         this[ 2 ] = -this[ 2 ];

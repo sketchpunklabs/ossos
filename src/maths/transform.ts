@@ -110,9 +110,9 @@ export default class Transform{
     }
 
     addPos( cp: TVec3, ignoreScl=false ) : this{
-        //POSITION - parent.position + ( parent.rotation * ( parent.scale * child.position ) )
-        if( ignoreScl )	this.pos.add( new Vec3().fromQuat( this.rot, cp ) );
-        else 			this.pos.add( new Vec3().fromMul( cp, this.scl ).transformQuat( this.rot ) );
+        // POSITION - parent.position + ( parent.rotation * ( parent.scale * child.position ) )
+        if( ignoreScl ) this.pos.add( new Vec3().fromQuat( this.rot, cp ) );
+        else            this.pos.add( new Vec3().fromMul( cp, this.scl ).transformQuat( this.rot ) );
         return this;
     }
 

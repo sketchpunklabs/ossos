@@ -1,0 +1,334 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import useTransformControl          from '../_lib/useTransformControl.js';
+import Util                         from '../_lib/misc/Util.js';
+
+import { 
+    Armature,
+    Quat, Vec3, Transform,
+    IKChain, IKTarget,
+} from '../../src/index';
+
+// #endregion
+
+// #region MAIN
+let Debug;
+let App = useDarkScene( useThreeWebGL2(), { ambient:0xffffff } );
+let Ref = {
+    gizmo : useTransformControl( App ).useAxes( 0.1 ),
+    pos   : new Vec3( 1, 1, 1 ),
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 2, [ 0, 0.6, 0 ] );
+    Debug = await useVisualDebug( App );
+    
+    Ref.gizmo.setPos( Ref.pos );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+//     export interface BoneProps{
+//     name    ?: string;
+//     parent  ?: Bone | number | string;
+//     len     ?: number;
+//     pos     ?: TVec3;
+//     rot     ?: TQuat;
+//     scl     ?: TVec3;
+// }
+
+    const arm = new Armature();
+    const b0  = arm.addBone( { name:'b0', pos:[0,0,0], parent:undefined } );
+    const b1  = arm.addBone( { name:'b1', pos:[0,0.135,0], rot:new Quat().rotX(-90*Math.PI/180), parent:b0 } );
+    const b2  = arm.addBone( { name:'b2', pos:[-0.098,0,0.0], parent:b1 } );
+    const b3  = arm.addBone( { name:'b3', pos:[0.075,0.355,0], parent:b2 } );
+    const b4  = arm.addBone( { name:'b4', pos:[0.05,0.292,0.0], parent:b3 } );
+    const b5  = arm.addBone( { name:'b5', pos:[0.04333822,0.04200262,0.0], parent:b4 } );
+    arm.bind( 0.1 );
+
+    b0.constraint = new HingeConstraint( [0,1,0] );
+    b1.constraint = new HingeConstraint( [0,1,0] );
+    b2.constraint = new HingeConstraint( [1,0,0] );
+    b3.constraint = new HingeConstraint( [1,0,0] );
+    b4.constraint = new HingeConstraint( [1,0,0] );
+    b5.constraint = new HingeConstraint( [0,1,0] );
+
+
+    // const arm = new Armature();
+    // const b0  = arm.addBone( { name:'b0', pos:[0,0,0], parent:undefined } );
+    // const b1  = arm.addBone( { name:'b1', pos:[0,0.135,0], rot:new Quat().rotZ(90*Math.PI/180), parent:b0 } );
+    // const b2  = arm.addBone( { name:'b2', pos:[0,0.1,0.0], rot:new Quat().rotZ(-90*Math.PI/180), parent:b1 } );
+    // const b3  = arm.addBone( { name:'b3', pos:[0,0.355,0], rot:new Quat().rotZ(-90*Math.PI/180), parent:b2 } );
+    // const b4  = arm.addBone( { name:'b4', pos:[0,0.075,0.0], rot:new Quat().rotZ(90*Math.PI/180), parent:b3 } );
+    // const b5  = arm.addBone( { name:'b5', pos:[0,0.29,0.0], rot:new Quat().rotZ(-90*Math.PI/180), parent:b4 } );
+    // const b6  = arm.addBone( { name:'b6', pos:[0,0.05,0.0], rot:new Quat().rotZ(90*Math.PI/180), parent:b5 } );
+    // const b7  = arm.addBone( { name:'b7', pos:[0,0.045,0.0], rot:new Quat().rotZ(-90*Math.PI/180), parent:b6 } );
+    // arm.bind( 0.1 );
+    // console.log( b2 );
+    // b0.constraint = new HingeConstraint().fromWorldAxis( [0,1,0], b0.world.rot );
+    // // b1.constraint = new HingeConstraint( [0,0,1] );
+    // // b2.constraint = new HingeConstraint( [0,1,0] );
+    // // b3.constraint = new HingeConstraint( [1,0,0] );
+    // // b4.constraint = new HingeConstraint( [1,0,0] );
+    // // b5.constraint = new HingeConstraint( [0,1,0] );
+
+    const pose = arm.newPose();
+    Ref.chain  = new IKChain( arm.getBones( ['b0','b1','b2','b3','b4','b5'] ) );
+    Ref.pose   = pose;
+
+    Ref.chain.resetWorld();
+    
+    testSolver();
+    
+    Util.debugBones( Ref.pose.bones, Debug );
+    
+
+    // console.log( Ref.target.dir );
+    // Debug.pnt.add( Ref.target.pos, 0x00ff00, 2 );
+    // Debug.ln.add( Ref.target.pos, new Vec3().fromScale( Ref.target.poleDir, 0.2 ).add( Ref.target.pos ), 0x00ff00 );
+    // Debug.ln.add( Ref.target.pos, new Vec3().fromScale( Ref.target.pointDir, 0.4 ).add( Ref.target.pos ), 0x00ff00 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Box Joint Rig from tutorial
+    const boxGeo = new THREE.BoxGeometry( 1, 1, 1 );
+    const mat    = new THREE.MeshLambertMaterial({ color: 0x888888 });
+    const make   = ( parent, pos, size, offset, axis, limits )=>{
+        const mesh  = new THREE.Mesh( boxGeo, mat );
+        mesh.scale.fromArray( size );
+        mesh.position.fromArray( offset );
+      
+        const grp   = new THREE.Group();
+        grp.position.fromArray( pos );
+        grp.axis     = new THREE.Vector3(axis[0], axis[1], axis[2]);
+        grp.minLimit = limits[0] * 0.0174533;
+        grp.maxLimit = limits[1] * 0.0174533;
+        grp.add( mesh );
+
+        parent.add( grp );
+        return grp;
+    };
+    
+    const j0 = make( App.scene, [0,0,0], [0.05,0.1,0.05], [0,0.05,0],   [0,1,0], [0,0] );
+    const j1 = make( j0, [0,0.1152001,0], [0.1,0.1,0.1], [0,0.025,0],   [0,1,0], [-180,180] );
+    const j2 = make( j1, [-0.0655,0.046,0.0], [0.1,0.45,0.1], [-0.03450041,0.147,0],  [1,0,0], [-90,90] );
+    const j3 = make( j2, [0.01247041,0.3202634,-0.000739485], [0.05,0.35,0.05], [0.028,0.1514,0],  [1,0,0], [-150,150] );
+    const j4 = make( j3, [0.02984276,0.3001859,0.0], [0.05,0.05,0.05], [0.048,0.0017,0],  [1,0,0], [-90,90] );
+    const j5 = make( j4, [0.04333822,0.04200262,0.0], [0.1,0.035,0.035], [0.03156178,0.003,0], [0,1,0], [-180,180] );
+
+    const effector = new THREE.Group();
+    effector.position.set( 0.083, 0.010, 0.0 );
+    j5.add( effector );
+
+    Ref.joints = [ j0, j1, j2, j3, j4, j5 ];
+    Ref.eff    = effector;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( onPreRender ).start();
+    // App.renderLoop();
+
+    // const a = new Vec3( 0,1,-0.0 ).norm();
+    // const b = new Vec3( 0.01,2,0.1 ).norm();
+
+    // console.log( 'yo',  Vec3.angleTo( a, b ) * 180 / Math.PI,  Vec3.angle( a, b ) * 180 / Math.PI );
+
+    // Debug.ln.add( [0,0,0], a.scale( 10 ), 0x00ff00 );
+    // Debug.ln.add( [0,0,0], b.scale( 10 ), 0xffff00 );
+});
+
+function onPreRender( dt, et ){
+    // solveIK( Ref.pos );
+    testSolver();
+}
+
+Ref.gizmo.onMove = p=>{
+    Ref.pos.copy( p );
+
+    // console.log( p );
+
+    // Ref.target.setPos( p );
+    // Ref.target.setEndOrientation( Ref.dir, Ref.pole );
+    // Ref.target.setStartOrientation( [0,1,0], [0,0,1] );
+
+    // testSolver();
+
+    // Debug.ln.add( p, new Vec3().fromScale( Ref.pole, 1.0 ).add( p ), 0xffff00 );
+    // Debug.ln.add( p, new Vec3().fromScale( Ref.dir, 1.0 ).add( p ), 0xffff00 );
+};
+
+function testSolver(){
+    Debug.reset();
+
+    ccdSolver( Ref.pos, Ref.chain, Ref.pose );
+    Ref.pose.updateWorld();
+    Util.debugBones( Ref.pose.bones, Debug );
+}
+// #endregion
+
+
+
+function ccdSolver( target, chain, pose ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Initialize Local Space Transform Array
+    let locals = chain.data?.locals;
+    let worlds = chain.data?.worlds;
+    if( !locals ){
+        if( !chain.data ) chain.data = {};
+        chain.data.locals = locals = new Array( chain.count + 1 );
+        chain.data.worlds = worlds = new Array( chain.count + 1 );
+        for( let i=0; i < chain.count; i++ ){
+            locals[ i ] = new Transform( chain.links[i].bind );
+            worlds[ i ] = new Transform();
+        }
+
+        worlds[ chain.count ] = new Transform()
+        locals[ chain.count ] = new Transform()
+        locals[ chain.count ].pos[1] = chain.links[ chain.count-1 ].len;
+    }
+
+    updateWorldFrom( locals, worlds, 0 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const effector = worlds[ chain.count ];
+    const effDir   = new Vec3();
+    const tarDir   = new Vec3();
+    const rot      = new Quat();
+    let w;
+    let lnk
+    const tmp = new Vec3();
+
+    for( let i=chain.count-1; i >=0; i-- ){
+        lnk = chain.links[ i ];
+        w   = worlds[ i ];
+
+        effDir.fromSub( effector.pos, w.pos ).norm();
+        tarDir.fromSub( target, w.pos ).norm();
+        // if( Vec3.dot( effDir, tarDir ) >= 0.9999 ) continue;
+
+        // Debug.reset();
+        // Debug.ln.add( w.pos, tmp.fromScaleThenAdd( 2, effDir, w.pos ), 0xffff000 );
+        // Debug.ln.add( w.pos, tmp.fromScaleThenAdd( 2, tarDir, w.pos ), 0xffff000 );
+        // Debug.pnt.add( effector.pos, 0xffff00, 1 );
+
+        rot.fromSwing( effDir, tarDir );
+        w.rot.pmul( rot );
+
+        locals[i].rot.copy( w.rot );
+        if( i !== 0 ) locals[i].rot.pmulInvert( worlds[i-1].rot );
+
+        if( pose.bones[ lnk.index ].constraint ){
+            pose.bones[ lnk.index ].constraint.applyLocal( locals[i].rot );
+        }
+
+        updateWorldFrom( locals, worlds, i );
+
+        // TODO Test if effector has reached target.
+
+        // Debug.pnt.add( worlds[i+1].pos, 0xff0000, 1.4 );
+
+        // if( i == chain.count-1 ) break;
+
+        // // Point the effector towards the goal
+        // directionToEffector = effector.position - joint.position;
+        // directionToGoal = goal.position - joint.position;
+        // joint.rotateFromTo(directionToEffector, directionToGoal);
+
+        // console.log( i, lnk.world.pos );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    updatePoseFromLocal( chain, pose, locals );
+}
+
+function updateWorldFrom( locals, worlds, idx ){
+    for( let i=idx; i < locals.length; i++ ){
+        if( i !== 0 )   worlds[i].fromMul( worlds[i-1], locals[i] );
+        else            worlds[i].copy( locals[i] );
+    }
+}
+
+function updatePoseFromLocal( chain, pose, locals ){
+    let lnk;
+    for( let i=0; i < chain.count; i++ ){
+        lnk = chain.links[ i ];
+        pose.bones[ lnk.index ].local.rot
+            .copy( locals[ i ].rot );
+    }
+}
+
+
+class HingeConstraint{
+    axis = new Vec3( 1, 0, 0 );
+    a    = new Vec3();
+    q    = new Quat();
+
+    constructor( axis=null ){
+        if( axis ) this.axis.copy( axis );
+    }
+
+    fromWorldAxis( axis, rot ){
+        const qi = new Quat().fromInvert( rot );
+        this.axis.fromQuat( qi, axis );
+        return this;
+    }
+
+    applyLocal( rot ){
+        this.a.fromQuat( rot, this.axis );
+        // if( Vec3.dot( this.axis, this.a ) >= 0.9999 ) return;
+        rot.pmul( this.q.fromSwing( this.a, this.axis ) );
+
+        // var clampedRot = new THREE.Vector3()
+        //     .setFromEuler( Ref.joints[i].rotation )
+        //     .clampScalar( Ref.joints[i].minLimit, Ref.joints[i].maxLimit );
+        // Ref.joints[i].rotation.setFromVector3(clampedRot);
+    }
+}
+
+// https://zalo.github.io/blog/inverse-kinematics/
+// https://github.com/zalo/zalo.github.io/blob/master/assets/js/IK/IKExample.js
+// https://codepen.io/zalo/pen/MLBKBv?editors=0010
+
+function solveIK( targetPosition ){
+    var tooltipPosition = new THREE.Vector3();
+    var toolRotation    = new THREE.Quaternion();
+    var fromToQuat      = new THREE.Quaternion();
+
+    for (var i = Ref.joints.length - 1; i >= 0; i--) {
+        Ref.joints[i].updateMatrixWorld();
+        Ref.eff.getWorldPosition( tooltipPosition );
+
+        // (Ideally this could be done entirely in worldspace (instead of local space
+        // (which require all of these terrible hacks that you see)))
+        // Rotate towards the Target
+
+        var toolDirection   = Ref.joints[i].worldToLocal(tooltipPosition.clone()).normalize();
+        var targetDirection = Ref.joints[i].worldToLocal(new THREE.Vector3().fromArray( targetPosition ) ).normalize();
+        fromToQuat.setFromUnitVectors( toolDirection, targetDirection );
+        Ref.joints[i].quaternion.multiply( fromToQuat);
+
+        // Find the rotation from here to the parent, and rotate the axis by it...
+        // This ensures that were always rotating with the hinge
+        // (this can also be "done" by projecting the directions in the block above
+        // to the plane of the axis of rotation, but that allows for the joint's hinge 
+        // angle to drift due to floating point inaccuracy)
+        var invRot = Ref.joints[i].quaternion.clone().invert();
+        var parentAxis = Ref.joints[i].axis.clone().applyQuaternion(invRot);
+        fromToQuat.setFromUnitVectors(Ref.joints[i].axis, parentAxis);
+        Ref.joints[i].quaternion.multiply(fromToQuat);
+
+        // Clamp to Joint Limits - Relies on sensical computation of these values... only works for x-axis here ¯\_(ツ)_/¯
+        // Seems like rotations range from -pi, pi... not the worst... but bad for clamps through there
+        // var clampedRot = new THREE.Vector3()
+        //     .setFromEuler( Ref.joints[i].rotation )
+        //     .clampScalar( Ref.joints[i].minLimit, Ref.joints[i].maxLimit );
+        // Ref.joints[i].rotation.setFromVector3(clampedRot);
+
+        Ref.joints[i].updateMatrixWorld();
+    }
+}
+
+
+</script></body></html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body>
+<script type="module">
+
+window.addEventListener( 'load', async _=>{
+
+    const alloc = new Vec3Allocator( 3 );
+    alloc.push( [1,1,1] );      // idx 0
+    alloc.push( [2,2,2] );      // idx 1
+    alloc.push( [3,3,3] );      // idx 2
+    alloc.setAt( 2, [5,5,5] );  // Modify 3rd Vec3
+    alloc.resize( 4 );          // Resize to hold 4 Vec3, [0,0,0]
+
+    // Get Mutable Slice
+    const vmut = alloc.getMut( 0 ); // [1,1,1]
+    vmut[ 1 ] = 77;                 // [1,77,1]
+
+    // Get Mutable Vec3 Slice Instance
+    const v = alloc.getVec3( 1 );   // [2,2,2]
+    v   .add( [10,10,10] )          // [12,12,12]
+        .scale( 0.5 )               // [6,6,6]
+        .x += 2                     // [8,6,6]
+
+    console.log( v );
+
+    console.log( 'Array', alloc.toArray() );
+    // [1, 77, 1, 8, 6, 6, 5, 5, 5, 0, 0, 0]
+
+    console.log( 'From Vec3 Like', new Vec3( [1,2,3] ) );
+    console.log( 'Set Components', new Vec3( 4, 5, 6 ) );
+    console.log( 'Mutable Slice', new Vec3( alloc.arrayBuffer, 2 ) ); // [5,5,5]
+
+    // let vv = alloc.getVec3( 0 );
+    // for( let i=0; i < 4; i++ ){
+    //     console.log( vv.bufferOffset( i ) );
+    // }
+    
+    const cls = class{
+        _x = 0;
+        _y = 0;
+        _z = 0;
+        get x(){ return this._x; }
+        set x( v ){ this._x = v; }
+        get y(){ return this._y; }
+        set y( v ){ this._y = v; }
+        get z(){ return this._z; }
+        set z( v ){ this._z = v; }
+    };
+
+    const cls2 = class{
+        // buf = new Float32Array( [0,0,0,0,0,0] );
+        buf = [0,0,0,0,0,0];
+        idx = 3;
+        get x(){ return this.buf[ this.idx ]; }
+        set x( v ){ this.buf[ this.idx ] = v; }
+        get y(){ return this.buf[ this.idx+1 ]; }
+        set y( v ){ this.buf[ this.idx+1 ] = v; }
+        get z(){ return this.buf[ this.idx+2 ]; }
+        set z( v ){ this.buf[ this.idx+2 ] = v; }
+    }
+
+    // let c = new cls();                // 41.66000000089407
+    let c = new cls2();                // 59.34000000059605
+    // let c = { x:0, y:0, z:0 };        // 41.13499999940395
+    // let c = [0,0,0];                  // 39.38999999910593
+    // let c = new Float32Array( [0,0,0] ); // 54.119999998807906
+
+    const steps = 20;
+    let total   = 0;
+    for( let j=0; j < steps; j++ ){
+        const t = performance.now();
+        for( let i=0; i < 10_000_000; i++ ){
+            c.x += 1;
+            c.y += 1;
+            c.z += 1;
+
+            // c[0] += 1;
+            // c[1] += 1;
+            // c[2] += 1;
+        }
+        total += performance.now() - t;
+    }
+    console.log( 'Avg ms', total / steps );
+    
+
+});
+
+class Vec3Allocator{
+    // #region MAIN
+    _buf        = null; // Float32Array Buffer
+    _capacity   = 0;    // Max vecs possible
+    _size       = 0;    // Current vec count
+    _autoResize = 0;    // How many vecs to auto resize allocator
+    _idx        = 0;
+
+    constructor( size=10 ){
+        this.resize( size );
+    }
+    // #endregion
+
+    // #region GETTERS
+    get size(){ return this._size; }
+    get byteSize(){ return this._buf.byteLength; }
+    get arrayBuffer(){ return this._buf.buffer; }
+
+    toArray(){ return Array.from( this._buf ); }
+    // #endregion
+
+    // #region METHODS
+    push( v ){
+        if( this._size >= this._capacity ){ console.log( 'Vec3Allocator at capacity' ); return this; }
+
+        this._buf.set( v, this._idx ); // Copy contents to buffer, V must be a [0,0,0] of some kind.
+        this._size += 1;    // Extra Vec
+        this._idx  += 3;    // Move Buffer Index by 3 Floats = 1 Vec3
+
+        return this;
+    }
+
+    setAt( idx, v ){
+        if( idx >= this._size ){ console.log( 'GetMut: Index out of bounds' ); return this; }
+        this._buf.set( v, idx * 3 );
+        return this;
+    }
+
+    getMut( idx ){
+        if( idx >= this._size ){ console.log( 'GetMut: Index out of bounds' ); return null; }
+        return new Float32Array( this._buf.buffer, idx * 3 * 4, 3 ); // vecIndex * 3 Float * 4Byte Per Float
+    }
+
+    getVec3( idx ){
+        if( idx >= this._size ){ console.log( 'GetVec3: Index out of bounds' ); return null; }
+        return new Vec3( this._buf.buffer, idx ); // vecIndex * 3 Float * 4Byte Per Float
+    }
+
+    // Resize buffer allocation
+    resize( size=0 ){
+        if( size <= this._capacity ) return this;
+
+        const newBuf = new Float32Array( size * 3 );    // Create new buffer
+        if( this._buf ) newBuf.set( this._buf );         // Copy old buffer contents
+
+        this._buf       = newBuf;
+        this._capacity  = size;
+
+        return this;
+    }
+    // #endregion
+}
+
+class Vec3 extends Float32Array{
+    constructor( arg0=null, arg1=null, arg2=null ){
+        // Slice of an existing Array Buffer
+        if( arg0 instanceof ArrayBuffer && typeof arg1 === 'number' ){
+            super( arg0, arg1 * 3 * 4, 3 );
+        }else{
+            super( 3 );
+
+            // First Argument is a vector3 like
+            if( ( Array.isArray( arg0 ) || arg0 instanceof Float32Array ) && arg0.length === 3 ){
+                this.set( arg0 );
+            
+            // Setting XYZ
+            }else if( typeof arg0 === 'number' && typeof arg1 === 'number' && typeof arg2 === 'number' ){
+                this[ 0 ] = arg0;
+                this[ 1 ] = arg1;
+                this[ 2 ] = arg2;
+            }
+        }
+    }
+
+    get x(){ return this[ 0 ]; }
+    get y(){ return this[ 1 ]; }
+    get z(){ return this[ 2 ]; }
+
+    set x( v ){ this[ 0 ] = v; }
+    set y( v ){ this[ 1 ] = v; }
+    set z( v ){ this[ 2 ] = v; }
+
+    add( v ){
+        this[ 0 ] += v[ 0 ];
+        this[ 1 ] += v[ 1 ];
+        this[ 2 ] += v[ 2 ];
+        return this;
+    }
+
+    scale( s ){
+        this[ 0 ] *= s;
+        this[ 1 ] *= s;
+        this[ 2 ] *= s;
+        return this
+    }
+
+    bufferOffset( i ){
+        this.byteOffset = i * 3;
+        return this;
+    }
+}
+
+</script></body></html>

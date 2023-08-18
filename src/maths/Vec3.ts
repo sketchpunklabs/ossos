@@ -117,6 +117,13 @@ export default class Vec3 extends Array< number >{
         return this;
     }
 
+    fromScaleThenAdd( scale: number, a: ConstVec3, b: ConstVec3 ): this{
+        this[0] = a[0] * scale + b[0];
+        this[1] = a[1] * scale + b[1];
+        this[2] = a[2] * scale + b[2];
+        return this;
+    }
+
     fromCross( a: ConstVec3, b: ConstVec3 ): this{
         const ax = a[0], ay = a[1], az = a[2],
               bx = b[0], by = b[1], bz = b[2];

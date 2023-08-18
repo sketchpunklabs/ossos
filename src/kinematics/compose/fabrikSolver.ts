@@ -5,18 +5,18 @@ import type IKTarget    from '../IKTarget';
 
 import Fabrik           from '../solvers/fabrik';
 
-import Vec3, { TVec3 }  from '../../maths/Vec3';   
+import Vec3             from '../../maths/Vec3';   
 // #endregion
 
 type fabrikProps = {
-    startTwistDir ?: TVec3,
-    endTwistDir   ?: TVec3,
+    sigmoidK      ?: number,
     epsilon        : number,
 };
 
 export default function fabrikSolver ( target: IKTarget, chain: IKChain, pose: Pose, props ?: fabrikProps ): void{
     const pp: fabrikProps = Object.assign( { 
-        epsilon : 0.001,
+        sigmoidK : 0,
+        epsilon  : 0.001,
     }, props );
 
 
@@ -38,22 +38,35 @@ export default function fabrikSolver ( target: IKTarget, chain: IKChain, pose: P
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Perform Main Solver Steps
-    for( let i=0; i < 10; i++ ){
-        Fabrik.iterateBackward( chain, target, pnts );
-                
-        pnts[0].copy( anchor ); // Move root back to starting position
-        Fabrik.iterateForward( chain, pnts ); 
 
-        if( Vec3.dist( target.pos, effector ) <= pp.epsilon ){
-            console.log( 'Done', i );
-            break;
+    if( target.isAOrient && target.isBOrient ){
+        // ------------------------------------
+        // Target orientation is available, use different functions.
+
+        for( let i=0; i < 10; i++ ){
+            Fabrik.iterateBackwardWDir( chain, target, pnts, props?.sigmoidK, !!(i === 0) );
+
+            pnts[0].copy( anchor ); // Move root back to starting position
+            Fabrik.iterateForwardWDir( chain, target, pnts ); 
+    
+            if( Vec3.dist( target.pos, effector ) <= pp.epsilon ){ console.log( 'Done', i ); break; }
         }
-    }
 
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Apply twisting to chain
-    if( pp.startTwistDir && pp.endTwistDir ){
-        Fabrik.applyTwistLerp( chain, pp.startTwistDir, pp.endTwistDir );
+        // Realign the twist rotation for each bone in the chain
+        Fabrik.applyTwistLerp( chain, target.aTwistDir, target.bTwistDir );
+
+    }else{
+        // ------------------------------------
+        // Only position target
+
+        for( let i=0; i < 10; i++ ){
+            Fabrik.iterateBackward( chain, target, pnts );
+                    
+            pnts[0].copy( anchor ); // Move root back to starting position
+            Fabrik.iterateForward( chain, pnts ); 
+    
+            if( Vec3.dist( target.pos, effector ) <= pp.epsilon ){ console.log( 'Done', i ); break; }
+        }
     }
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

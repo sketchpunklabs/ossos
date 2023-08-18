@@ -1,0 +1,50 @@
+    <div className={stylex(styles.container, props.xstyle)}>
+      {props.items.map((i: FloatingButtonItem, idx: number) => {
+        return (
+          <button
+            className={stylex(styles.item)}
+            key={idx}
+            title={i.tooltip}
+            onClick={i.onClick}>
+            {i.label}
+          </button>
+        );
+      })}
+    </div>
+
+    container: {
+    boxShadow: '0px 0px 5px 2px rgba( 0,0,0,0.55 )',
+    borderRadius: '4px',
+    backgroundColor: '#282828',
+  },
+
+  item: {
+    backgroundColor: '#26476F',
+    borderWidth: '0px',
+    color: '#ffffff',
+    cursor: 'pointer',
+    height: '30px',
+    padding: '0px',
+    width: '35px',
+    marginRight: '1px',
+    ':first-child': {
+      // eslint-disable-next-line stylex/valid-styles
+      borderTopLeftRadius: '4px',
+      // eslint-disable-next-line stylex/valid-styles
+      borderBottomLeftRadius: '4px',
+    },
+    ':last-child': {
+      // eslint-disable-next-line stylex/valid-styles
+      borderTopRightRadius: '4px',
+      // eslint-disable-next-line stylex/valid-styles
+      borderBottomRightRadius: '4px',
+      marginRight: '0px',
+    },
+    ':hover': {
+      color: 'lime',
+      backgroundColor: '#282828',
+    },
+    ':active': {
+      backgroundColor: '#383838',
+    },
+  },
