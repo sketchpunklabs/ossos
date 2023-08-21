@@ -102,6 +102,44 @@ class Clip{
         return clip;
     }
 
+    static fromThree( anim: any, arm: any ) : Clip {
+        // Convert from THREE.AnimationClip to OSSOS.Clip (needs armature for bone names)
+        const clip = new Clip();
+        clip.name = anim.name;
+        clip.duration = anim.duration;
+        clip.frameCount = anim.tracks[0].times.length;
+        clip.timeStamps = [anim.tracks[0].times];   // Limit: Only one timestamp per clip
+        
+        // Add tracks
+        clip.tracks = [];
+        let track    : ITrack;          // Animator Track    
+        for ( const t of anim.tracks ) {
+                
+            switch ( t.constructor.name ) {
+                case "VectorKeyframeTrack":     track = new Vec3Track(); break;
+                case "QuaternionKeyframeTrack": track = new QuatTrack(); break;
+                default: continue; break;
+            }
+            
+            switch( t.getInterpolation() ){
+                case 2300 : track.setInterpolation( ELerp.Step );   break;
+                case 2301 : track.setInterpolation( ELerp.Linear ); break;
+                case 2302 : track.setInterpolation( ELerp.Cubic );  break;
+            }
+
+            track.values = t.values;
+            track.timeStampIndex = 0;
+            
+            // Find the bone index
+            const boneName = t.name.split( '.' )[0];
+            track.boneIndex = arm.names.get( boneName ) ?? -2;
+
+            clip.tracks.push( track )
+        }
+      
+        return clip
+    }
+
     //#endregion
 }
 
