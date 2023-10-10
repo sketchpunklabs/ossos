@@ -326,6 +326,24 @@ export default function useThreeWebGL2( props={} ){
     //     return this;
     //   }
 
+    // saveCanvasImage( fileName = 'image', type = 'png', quality = 1 ){
+    //     // Convert canvas framebuffer to a data url with an image type
+    //     const canvas = this.renderer.domElement;
+    //     let url;
+    //     switch( type ){
+    //       case 'jpg'    : url = canvas.toDataURL('image/jpeg', quality); break;
+    //       case 'webp'   : url = canvas.toDataURL('image/webp', quality); break;
+    //       default       : url = canvas.toDataURL('image/png'); break;
+    //     }
+    
+    //     // Create an anchor tag to initiate download
+    //     const elm    = document.createElement('a');
+    //     elm.href     = url;
+    //     elm.download = `${fileName}.${type}`;
+    //     elm.click();
+    //     elm.remove();
+    // }
+
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     window.addEventListener( 'resize', ()=>resize() );

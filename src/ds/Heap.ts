@@ -49,6 +49,13 @@ export default class Heap<T>{
         this.bubbleDown( idx );
         return rmItem;
     }
+
+    /** Pass in a task reference to find & remove it from heap */
+    removeItem( itm: T ): boolean{
+        const idx = this.items.indexOf( itm );
+        if( idx !== -1 ){ this.remove( idx ); return true; }
+        return false;
+    }
     // #endregion
 
     // #region SHIFTING
