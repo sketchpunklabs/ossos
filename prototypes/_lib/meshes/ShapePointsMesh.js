@@ -1,4 +1,4 @@
-import * as THREE           from 'three';
+import * as THREE from '@three';
 
 class ShapePointsMesh extends THREE.Points{
     _defaultShape   = 1;

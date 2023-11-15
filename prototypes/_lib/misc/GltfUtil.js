@@ -1,5 +1,5 @@
 // #region IMPORTS
-import * as THREE               from 'three';
+import * as THREE               from '@three';
 import { Armature, Clip, TrackVec3, TrackQuat } 
                                 from '../../../src/index';
 import Gltf2                    from '../gltf2Parser.es.js';

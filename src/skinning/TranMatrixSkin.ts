@@ -9,13 +9,13 @@ import Mat4                 from '../maths/Mat4';
 
 export default class TranMatrixSkin implements ISkin{
     // #region MAIN
-    bind            !: Array< Transform >;
-    world           !: Array< Transform >;
-    offsetBuffer    !: Float32Array;
+    bind            !: Array< Transform >;      // Bind pose 
+    world           !: Array< Transform >;      // World space computation
+    offsetBuffer    !: Float32Array;            // Final Output for shaders to use
 
     constructor( bindPose: Pose ){
         const bCnt                          = bindPose.bones.length;
-        const mat4Identity                  = new Mat4();        // used to fill in buffer with default data
+        const mat4Identity                  = new Mat4();           // used to fill in buffer with default data
         const world : Array< Transform >    = new Array( bCnt );    // World space matrices
         const bind  : Array< Transform >    = new Array( bCnt );    // bind pose matrices
         

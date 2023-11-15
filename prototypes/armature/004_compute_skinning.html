@@ -1,0 +1,411 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+//#region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import Util                         from '../_lib/misc/Util.js';
+import { Armature, Pose, TranMatrixSkin } from '../../src/index';
+
+import Gltf2                        from '../_lib/gltf2Parser.es.js';
+import { vec3, quat }               from 'gl-matrix';
+//#endregion
+
+//#region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Debug;
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 50, 30, 3, [ 0, 1, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Mesh from GLTF Model
+    const gltf = await Gltf2.fetch( '/prototypes/_res/models/nabba/nabba.gltf' );
+    const prim = gltfPrimitive( gltf );
+    const bGeo = Util.geoBuffer(
+        prim.position.data,
+        prim.indices.data, 
+        prim.normal.data, 
+        prim.texcoord_0.data, 
+    );
+
+    // Toon Shell Outline
+    const shell = new THREE.Mesh( bGeo, customMaterial( { displace:0.02 } ) );
+    App.scene.add( shell );
+
+    // Main Render
+    const mat  = new THREE.MeshPhongMaterial();
+    const mesh = new THREE.Mesh( bGeo, mat );
+    App.scene.add( mesh );
+
+    App.render(); // So mesh bGeo gets created on the gpu
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create Armature with TransMatrix Skinning
+    const arm = gltfArmature( gltf );
+    arm.useSkin( TranMatrixSkin );  // Transform+Matrix Skinning ( Unreal's Skin method I think )
+    createPose( arm );              // arm.skin.offsetBuffer will be updated with pose data
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const skinCompute = new MatrixSkinCompute( App.renderer );
+
+    skinCompute.setInput(
+        prim.position.data, // Need to duplicate Vertices + Normals
+        prim.normal.data,
+        prim.joints_0.data,
+        prim.weights_0.data,
+        prim.weights_0.componentLen
+    );
+
+    skinCompute.setOutput( bGeo );
+
+    skinCompute.setSkinPose( arm.skin.offsetBuffer );
+
+    skinCompute.compute();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.renderLoop();
+});
+// #endregion
+
+// #region HELPERS + LOADERS
+function createPose( arm ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const pose = arm.newPose();
+    pose.offset.pos[2] = -0.5;
+
+    pose.rotWorld( 'Hips', 20 );
+    pose.moveLocal( 'Hips', [0,0.3,0] );
+    
+    pose.rotLocal( 'Spine1', -20 );
+    pose.rotLocal( 'Spine2', -20 );
+    pose.rotLocal( 'Spine3', -10 );
+    pose.rotLocal( 'Neck', 15 );
+    pose.rotLocal( 'Head', 20 );
+    pose.rotLocal( 'Head', 40, 1 );
+
+    pose.rotLocal( 'Thigh_R', 80 );
+    pose.rotLocal( 'Thigh_R', 4, 2 );
+    pose.rotLocal( 'Shin_R', -100 );
+    pose.rotLocal( 'Foot_R', -30 );
+
+    pose.rotLocal( 'Thigh_L', 30 );
+    pose.rotLocal( 'Shin_L', -20 );
+    pose.rotLocal( 'Foot_L', -40 );
+
+    pose.rotLocal( 'UpperArm_L', 30 );
+    pose.rotLocal( 'ForeArm_L', -40 );
+    pose.rotLocal( 'UpperArm_R', 30 );
+    pose.rotLocal( 'ForeArm_R', -40 );
+
+    pose.sclLocal( 'Head', 1.3 );
+    pose.sclLocal( 'Foot_L', 1.5 );
+    pose.sclLocal( 'Hand_R', 1.5 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Update the skin by processing the World Space Matrices
+    // with the BindPose matrices to create an offset that
+    // can then be used by a custom shader
+    arm.skin.updateFromPose( pose );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Debug Armature Bones
+    // pose.updateWorld();
+    // Util.debugBones( pose.bones, Debug, 0.05, 0.8 );
+}
+
+function gltfArmature( gltf ){
+    const skin  = gltf.getSkin();
+    const arm   = new Armature();
+
+    let b;
+    for( const j of skin.joints ){
+        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) quat.copy( b.local.rot, j.rotation );
+        if( j.position ) vec3.copy( b.local.pos, j.position );
+        if( j.scale )    vec3.copy( b.local.scl, j.scale );
+    }
+
+    arm.bind( 0.1 );
+    return arm;
+}
+
+function gltfPrimitive( gltf ){
+    const gMesh = gltf.getMesh();
+    const gPrim = gMesh.primitives[ 0 ];
+    return gPrim;
+}
+// #endregion
+
+// #region TRANSFORMFEEDBACK COMPUTE
+import GLBuffer from '../_lib/gl/GLBuffer.js';
+import GLShader from '../_lib/gl/GLShader.js';
+
+class MatrixSkinCompute{
+    // #region MAIN
+    gl          = null;
+    renderer    = null;
+    shader      = null;
+    feedback    = null;
+
+    uniformPose = null; // Flat array of all bone matrices
+    bGeo        = null; // 3JS Geometry Buffer
+
+    inVertices  = null; 
+    inNormals   = null;
+    inJoints    = null;
+    inWeights   = null;
+
+    constructor( renderer ){
+        this.renderer   = renderer;
+        this.gl         = renderer.getContext();
+        this.feedback   = this.gl.createTransformFeedback();
+
+        this.shader     = new GLShader( this.gl );
+        this.shader.compile( VERT_SRC, FRAG_SRC, [ 'skinPosition', 'skinNormal' ] );
+        this.shader.useUniforms( [ 'pose' ] );
+
+        console.log( this.shader );
+    }
+
+    dispose(){
+        this.inVertices.dispose();
+        this.inNormals.dispose();
+        this.inJoints.dispose();
+        this.inWeights.dispose();
+        this.shader.dispose();
+        this.gl.deleteTransformFeedback( this.feedback );
+        this.gl = null;
+    }
+    // #endregion
+
+    // #region SETTERS
+    setInput( vertices, normals, joints, weights, bLen=4 ){
+        // Joints can come in as Uint8 Array from GLTF
+        // But to be usable it needs to be a float array
+        if( !( joints instanceof Float32Array ) ){
+            joints = new Float32Array( joints );
+        }
+
+        this.inVertices = new GLBuffer( this.gl, 3 ).set( vertices );
+        this.inNormals  = new GLBuffer( this.gl, 3 ).set( normals );
+        this.inJoints   = new GLBuffer( this.gl, bLen ).set( joints );
+        this.inWeights  = new GLBuffer( this.gl, bLen ).set( weights );
+        return this;
+    }
+
+    setOutput( bGeo ){
+        this.bGeo = bGeo;
+        // const rend = this.renderer;
+        // console.log( 'x', rend.attributes.get( this.bGeo.attributes.position ) );
+        // console.log( 'x', rend.attributes.get( this.bGeo.attributes.normal ) );
+        return this;
+    }
+
+    setSkinPose( buf ){ this.uniformPose = buf; return this; }
+    // #endregion
+
+    compute(){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Alias + Setups
+        const rend  = this.renderer;
+        const gl    = this.gl;
+
+        // Looks like 3JS leaves VAOs bound after rendering.
+        // This breaks buffer binding for transform feedback
+        // SOOO... Make sure there are no VAO bound before running TF
+        gl.bindVertexArray( null );
+
+        // For extra protection, lets just unbind array buffers too
+        // Doesn't seem needed but since VAO was an issue, lets do this too.
+        gl.bindBuffer( gl.ARRAY_BUFFER, null );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Setup Shader
+        gl.useProgram( this.shader.prog );                     // Turn on shader
+        gl.uniformMatrix4fv( this.shader.uniforms.pose, false, this.uniformPose, 0 ); // Pass Pose as a Uniform Array
+        
+        // Position Attribute
+        gl.bindBuffer( gl.ARRAY_BUFFER, this.inVertices.gRef ); // Bind position gl buffer
+        gl.vertexAttribPointer( 0, 3, gl.FLOAT, false, 0, 0 );  // Setup as attribute @ LOC 0
+        gl.enableVertexAttribArray( 0 );
+
+        // Normal Attribute
+        gl.bindBuffer( gl.ARRAY_BUFFER, this.inNormals.gRef );
+        gl.vertexAttribPointer( 1, 3, gl.FLOAT, false, 0, 0 ); 
+        gl.enableVertexAttribArray( 1 );
+
+        // Bone Joint Indices Attribute
+        gl.bindBuffer( gl.ARRAY_BUFFER, this.inJoints.gRef );
+        gl.vertexAttribPointer( 2, this.inJoints.components, gl.FLOAT, false, 0, 0 ); 
+        gl.enableVertexAttribArray( 2 );
+
+        // Bone Weights Attribute
+        gl.bindBuffer( gl.ARRAY_BUFFER, this.inWeights.gRef );
+        gl.vertexAttribPointer( 3, this.inWeights.components, gl.FLOAT, false, 0, 0 ); 
+        gl.enableVertexAttribArray( 3 );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Setup TransformFeedback
+        gl.bindTransformFeedback( gl.TRANSFORM_FEEDBACK, this.feedback );    // Bind TransformFeedback
+        gl.enable( gl.RASTERIZER_DISCARD );                                 // Disable fragment shader, its not needed
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Bind the output buffers
+        const outPosition = rend.attributes.get( this.bGeo.attributes.position );
+        const outNormal   = rend.attributes.get( this.bGeo.attributes.normal );
+
+        gl.bindBufferBase( gl.TRANSFORM_FEEDBACK_BUFFER, 0, outPosition.buffer );
+        gl.bindBufferBase( gl.TRANSFORM_FEEDBACK_BUFFER, 1, outNormal.buffer );
+
+        // Run compute shader
+        const vertCount = this.inVertices.size / 4 / 3; // 4 bytes for each of the 3 Floats
+        gl.beginTransformFeedback( gl.POINTS );     // Execute as 1 vector at a time linearly
+        gl.drawArrays( gl.POINTS, 0, vertCount );
+        gl.endTransformFeedback();
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        gl.disable( gl.RASTERIZER_DISCARD );                        // Turn back on Fragment shaders 
+        gl.bindTransformFeedback( gl.TRANSFORM_FEEDBACK, null );    // Turn off Transform feedback
+        gl.useProgram( null );                                      // Turn off shader
+    }
+}
+// #endregion
+
+// #region COMPUTE SHADER
+const VERT_SRC = `#version 300 es
+precision highp float;
+
+layout(location=0) in vec3 position;
+layout(location=1) in vec3 normal;
+layout(location=2) in vec4 skinIndex;  // Bone Indices
+layout(location=3) in vec4 skinWeight; // Bone Weights
+
+out vec3 skinPosition;
+out vec3 skinNormal;
+
+#define MAXBONES 100
+uniform mat4 pose[ MAXBONES ];
+
+////////////////////////////////////////////////////////////////////////
+
+mat4 getBoneMatrix( mat4[ MAXBONES ] pose, vec4 idx, vec4 wgt ){
+    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    NORMALIZE BONE WEIGHT VECTOR - INCASE MODEL WASN'T PREPARED LIKE THAT
+    If Weights are not normalized, Merging the Bone Offsets will create artifacts */
+    int a = int( idx.x ),
+        b = int( idx.y ),
+        c = int( idx.z ),
+        d = int( idx.w );
+    
+    wgt *= 1.0 / ( wgt.x + wgt.y + wgt.z + wgt.w );
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // MERGE THE BONE OFFSETS BASED ON WEIGHT
+    mat4 bone_wgt =
+        pose[ a ] * wgt.x +  
+        pose[ b ] * wgt.y +
+        pose[ c ] * wgt.z +
+        pose[ d ] * wgt.w;
+
+    return bone_wgt;
+}
+
+////////////////////////////////////////////////////////////////////////
+
+void main(){
+    mat4 boneMatrix = getBoneMatrix( pose, skinIndex, skinWeight );
+    skinPosition    = ( boneMatrix * vec4( position, 1.0 ) ).xyz;           
+    skinNormal      = mat3( transpose( inverse( boneMatrix ) ) ) * normal;
+}`;
+
+const FRAG_SRC = '#version 300 es\nvoid main(){}';
+// #endregion
+
+// #region SIMPLE TOON SHELL OUTLINE
+function customMaterial( props ){
+    // #region PROPS
+    props = Object.assign( {
+        baseColor : 0x000000,
+        displace  : 0.1,
+    }, props );
+    // #endregion
+
+    const mat = new THREE.RawShaderMaterial({
+        // depthTest       : true,
+        side            : THREE.BackSide,
+        // transparent     : true, 
+        // forceSinglePass : true,             
+        // alphaToCoverage : true,             
+        // lights          : true,
+
+        uniforms        : {
+            baseColor : { type :'vec3', value: new THREE.Color( props.baseColor ) },
+            displace  : { type: 'float', value: props.displace },
+        },
+
+        extensions      : { 
+            derivatives : true
+        },
+
+        vertexShader    : `#version 300 es
+        in	vec3    position;
+        in  vec3    normal;
+        in	vec2    uv;
+        
+        uniform     float   displace;
+
+        uniform     mat4    modelMatrix;
+        uniform     mat4    viewMatrix;
+        uniform     mat4    projectionMatrix;
+
+        out vec3    fragWPos;  // World Space Position
+        out vec3    fragNorm;
+        out vec2    fragUV;
+        
+        // ################################################################
+
+        void main(){
+            vec3 pos            = position + normal * displace;
+            vec4 wPos 	        = modelMatrix * vec4( pos, 1.0 );   // World Space
+            vec4 vPos           = viewMatrix * wPos;                // View Space
+            
+            fragUV              = uv;
+            fragWPos            = wPos.xyz;
+            fragNorm            = ( modelMatrix * vec4( normal, 0.0 ) ).xyz;
+
+            gl_Position			= projectionMatrix * vPos;
+        }`,
+
+        fragmentShader  : `#version 300 es
+        precision mediump float;
+        
+        uniform vec3 baseColor;
+        // uniform sampler2D tex;
+        // uniform vec3 cameraPosition;
+
+        in  vec3    fragWPos;
+        in  vec3    fragNorm;
+        in  vec2    fragUV;
+        out vec4    outColor;
+
+        // ################################################################
+
+        void main(){
+            vec3 norm   = normalize( fragNorm );
+            outColor    = vec4( baseColor, 1.0 );
+            // outColor    = vec4( norm + baseColor, 1.0 );
+        }`
+    });
+
+    Object.defineProperty( mat, 'baseColor', { 
+        set: ( v )=>{ mat.uniforms.baseColor.value.set( v ); } 
+    });
+    
+    return mat;
+}
+// #endregion
+
+</script></body></html>

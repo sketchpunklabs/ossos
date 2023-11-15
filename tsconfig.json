@@ -16,7 +16,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "types": [ "vite/client" ]
+    "types": [ "vite/client", "./src/global.d.ts" ]
   },
   "include": [ "./src/index.ts" ],
   "exclude": [ "**/*.test.ts", "node_modules" ]

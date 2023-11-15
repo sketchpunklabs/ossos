@@ -13,7 +13,8 @@ import MatrixSkin       from './skinning/MatrixSkin';
 import DQTSkin          from './skinning/DQTSkin';
 import TranMatrixSkin   from './skinning/TranMatrixSkin';
 import DualQuatSkin     from './skinning/DualQuatSkin';
-export { MatrixSkin, DQTSkin, TranMatrixSkin, DualQuatSkin };
+import SQTSkin          from './skinning/SQTSkin';
+export { MatrixSkin, DQTSkin, TranMatrixSkin, DualQuatSkin, SQTSkin };
 // #endregion
 
 // #region KINEMATICS
@@ -28,7 +29,6 @@ import Fabrik           from './kinematics/solvers/Fabrik';
 
 import limbSolver       from './kinematics/compose/limbSolver';
 import fabrikSolver     from './kinematics/compose/fabrikSolver';
-
 
 export { 
     IKTarget, IKChain, BoneAxes, AxesDirections,

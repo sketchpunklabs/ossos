@@ -1,0 +1,23 @@
+https://cdnjs.com/libraries/three.js
+https://cdnjs.cloudflare.com/ajax/libs/three.js/0.157.0/three.module.min.js
+https://cdnjs.cloudflare.com/ajax/libs/three.js/0.157.0/three.module.js // Modified
+comment out define SHADER_TYPE
+find _this.properties = properties; and Add
+			_this.attributes = attributes;
+
+https://cdn.jsdelivr.net/npm/three@0.157.0/
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/controls/OrbitControls.js
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/loaders/GLTFLoader.js
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/utils/BufferGeometryUtils.js
+
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/postprocessing/RenderPass.js
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/postprocessing/Pass.js
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/postprocessing/EffectComposer.js // MODIFIED, shader import
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/postprocessing/MaskPass.js
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/postprocessing/ShaderPass.js
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/shaders/CopyShader.js
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/postprocessing/OutputPass.js // MODIFIED, shader imort
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/shaders/OutputShader.js
+
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/postprocessing/UnrealBloomPass.js // MODIFIED, Shader imports
+https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/shaders/LuminosityHighPassShader.js

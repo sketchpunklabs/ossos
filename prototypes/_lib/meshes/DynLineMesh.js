@@ -1,4 +1,4 @@
-import * as THREE           from 'three';
+import * as THREE from '@three';
 
 class DynLineMesh extends THREE.LineSegments{
     _defaultColor   = 0x00ff00;

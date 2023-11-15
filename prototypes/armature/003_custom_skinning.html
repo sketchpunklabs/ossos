@@ -5,12 +5,10 @@
 import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
 import Util                         from '../_lib/misc/Util.js';
 import { Armature, Pose,
-    MatrixSkin, DQTSkin, TranMatrixSkin, DualQuatSkin,
+    MatrixSkin, DQTSkin, TranMatrixSkin, DualQuatSkin, SQTSkin
 } from '../../src/index';
 import { vec3, quat }               from 'gl-matrix';
 import Gltf2                        from '../_lib/gltf2Parser.es.js';
-
-import SQTSkin from '../../src/skinning/SQTSkin.ts';
 
 import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
 import DQTSkinMaterial              from '../_lib/customSkinning/DQTSkinMaterial.js';
@@ -38,10 +36,10 @@ window.addEventListener( 'load', async _=>{
     // const skin = new MatrixSkin( arm.bindPose );
     // const skin = arm.useSkin( new MatrixSkin( arm.bindPose ) );
     // const skin = arm.useSkin( MatrixSkin );
-    
+    */
     const skin = arm.useSkin( TranMatrixSkin );
     const mat  = MatrixSkinMaterial( 'cyan', skin );
-    */
+    
 
     /*
     const skin = new DQTSkin( arm );
@@ -53,17 +51,18 @@ window.addEventListener( 'load', async _=>{
     const mat  = DualQuatSkinMaterial( 'cyan', skin );
     */
 
-    /**/
+    /*
     const skin = new SQTSkin( arm.bindPose );
     const mat  = SQTSkinMaterial( 'cyan', skin );
-    
+    */
    
+    // const mesh = new THREE.Mesh( bGeo, new THREE.MeshBasicMaterial() );
     const mesh = new THREE.Mesh( bGeo, mat );
     App.scene.add( mesh );
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Pose Armature
-    const pose = arm.newPose;
+    const pose = arm.newPose();
     pose.offset.pos[2] = -0.5;
 
     pose.rotWorld( 'Hips', 20 );

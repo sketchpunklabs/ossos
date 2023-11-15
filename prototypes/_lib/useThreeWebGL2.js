@@ -1,6 +1,6 @@
 // #region IMPORTS
-import * as THREE           from 'three';
-import { OrbitControls }    from 'three/examples/jsm/controls/OrbitControls.js';
+import * as THREE           from '@three'; //'three';
+import { OrbitControls }    from '@OrbitControls'; //'three/examples/jsm/controls/OrbitControls.js';
 export { THREE };
 // #endregion
 
