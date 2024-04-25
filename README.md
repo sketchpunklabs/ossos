@@ -9,19 +9,39 @@
 
 
 ## Character Animation Library ###
+
 <img align="right" width="160" src="/_images/Epic_MegaGrants_Recipient_logo.png?raw=true">
-This project is working toward a complete character skinning & animation library for the web. First most, this library is focused on being independent from any rendering engine with examples of how to use it in webgl based engines like threejs. The one big focus is recreating the IK Rig & IK Animations type system that was demoed several years ago from Ubisoft's GDC talk on IK Rigs. With many game engines like Unity and Unreal developing their own IK Rig like systems, this project helps fill the void for web based engines like threejs, babylon, etc. Hopefully with enough help we can create something just as good as the big boys, maybe even better since its free & open source.
+
+This project is working toward a complete character skinning & animation library
+for the web. First most, this library is focused on being independent from any
+rendering engine with examples of how to use it in threejs. The one big focus is
+recreating the IK Rig & IK Animations type system that was demoed several years
+ago from Ubisoft's GDC talk on IK Rigs. With many game engines like Unity and
+Unreal developing their own IK Rig like systems, this project helps fill the
+void for web based engines like (currently only threejs). Hopefully with enough
+help we can create something just as good as the big boys, maybe even better
+since its free & open source.
 
 <br><img align='center' src="https://media-exp1.licdn.com/dms/image/C4D22AQEAyhN1Srt_2g/feedshare-shrink_2048_1536/0/1646282533489?e=2147483647&v=beta&t=6ajBcu44vaRavbj3df4kI4towfkjHJUqnKywxqP8WiE" />
 
 ### Setup ###
 
-```
+```sh
 npm install
 npm run dev
 ```
 
-**[ NOTE ]** To be able to run the example, you'll need to go into /examples/_res/ and follow the instructions to clone the resource repo. The files are quite large, so they are kept in a seperate repo to keep this project as light weight as possible.
+> [!NOTE]
+> To be able to run the examples, you'll need to clone the git submodule
+that has all the assets by running
+
+```sh
+git submodule update --init
+```
+
+The files are quite large, so they are kept in a seperate repo to keep this
+project as light weight as possible. We use a git submodule so that we can
+reproduce the examples at any particular commit.
 
 ## Usage ###
 
@@ -76,7 +96,6 @@ App.add( mesh );
   * ZSolver
   * Catenary / Rope
 * GLTF2 Asset Parsing for cherry picking what you need to load.
-* A few examples using BabylonJS for rendering
 * Several examples using ThreeJS for rendering
   * Some extra fun examples like converting animations to Data Textures
   * Running Full Skinned animation on the GPU with GLSL Example
@@ -101,7 +120,7 @@ App.add( mesh );
 - [ ] Figure out how to implement VRIK
 - [x] Bone Slots / Attachments
 - [ ] Actions or State Machine based Animator
-- [x] Build Examples in other Rendering Engines like BabylonJS
+- [ ] Build Examples in other Rendering Engines like BabylonJS
 - [ ] Remake Auto Skinning ( Need WebGPU compute shaders for this )
 - [ ] Bone Constraints
 - [ ] Procedural Animation ProtoTyping
