@@ -1,0 +1,3 @@
+[submodule "prototypes/_res"]
+	path = prototypes/_res
+	url = git@github.com:sketchpunk/res.git
