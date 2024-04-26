@@ -10,15 +10,49 @@
 
 ## Character Animation Library ###
 <img align="right" width="160" src="/_images/Epic_MegaGrants_Recipient_logo.png?raw=true">
-This project is working toward a complete character skinning & animation library for the web. First most, this library is focused on being independent from any rendering engine with examples of how to use it in webgl based engines like threejs. The one big focus is recreating the IK Rig & IK Animations type system that was demoed several years ago from Ubisoft's GDC talk on IK Rigs. With many game engines like Unity and Unreal developing their own IK Rig like systems, this project helps fill the void for web based engines like threejs, babylon, etc. Hopefully with enough help we can create something just as good as the big boys, maybe even better since its free & open source.
+
+This project is working toward a complete character skinning & animation library for the web. First most, this library is focused on being independent from any rendering engine with examples of how to use it in webgl based engines like threejs. The one big focus is recreating the IK Rig & IK Animations type system that was demoed several years ago from Ubisoft's GDC talk on IK Rigs. With many game engines like Unity and Unreal developing their own IK Rig like systems, this project helps fill the void for web based engines like Threejs, Babylon, PlayCanvas, etc. Hopefully with enough help we can create something just as good as the big boys, maybe even better since its free & open source.
+
+The bone animation system in ossos is entirely standalone:
+
+- Gltf files are loaded by ossos (f.e. not Threejs GLTFLoader)
+- Character bone tree structures are created by ossos base on the gltf results
+  (this is not a tree structure from Threejs, Babylon, PlayCanvas, etc)
+- The animation system in ossos animates the ossos bone tree structure
+- Finally you can map the transforms from the ossos bone tree to your
+  Three/Babylon/PlayCanvas tree for rendering, similar to how you'd map transforms
+  from a standalone physics system's objects to your render engine's objects
 
 <br><img align='center' src="https://media-exp1.licdn.com/dms/image/C4D22AQEAyhN1Srt_2g/feedshare-shrink_2048_1536/0/1646282533489?e=2147483647&v=beta&t=6ajBcu44vaRavbj3df4kI4towfkjHJUqnKywxqP8WiE" />
 
 ### Setup ###
 
+Some examples require assets from a separate repo, linked as a [git
+submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules) to keep the main
+repo size from getting too big from assets. To get the assets if you need them
+for certain examples, if you already cloned the root repo, run
+
+```sh
+git submodule update --init
 ```
-git clone --recurse-submodules --depth=1 https://github.com/sketchpunklabs/ossos
+
+If you want a shallow clone of the git submodule, you can clone the root repo
+recursively with `recursive` `depth=1` to avoid pulling the whole history of the
+asset repo:
+
+```sh
+git clone --recursive --depth=1 git@github.com:sketchpunklabs/ossos.git
+```
+
+Install dependencies (requires [Node.js](https://nodejs.org) in your system first):
+
+```sh
 npm install
+```
+
+Finally, run the build in dev mode and open in your browser:
+
+```sh
 npm run dev
 ```
 
@@ -100,7 +134,8 @@ App.add( mesh );
 - [ ] Figure out how to implement VRIK
 - [x] Bone Slots / Attachments
 - [ ] Actions or State Machine based Animator
-- [x] Build Examples in other Rendering Engines like BabylonJS
+- [ ] Build Examples with BabylonJS
+- [ ] Build Examples with PlayCanvas
 - [ ] Remake Auto Skinning ( Need WebGPU compute shaders for this )
 - [ ] Bone Constraints
 - [ ] Procedural Animation ProtoTyping
