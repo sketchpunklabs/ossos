@@ -41,11 +41,12 @@
         "lint": "eslint . --ext .ts"
     },
     "devDependencies": {
+        "@types/three": "^0.148.1",
         "@typescript-eslint/eslint-plugin": "^5.48.0",
         "@typescript-eslint/parser": "^5.48.0",
         "eslint": "^8.31.0",
         "three": "^0.148.0",
-        "typescript": "^5.0.3",
+        "typescript": "^5.5.0-beta",
         "vite": "^4.0.0",
         "vite-plugin-list-directory-contents": "^1.4.5"
     },

@@ -39,7 +39,7 @@ window.addEventListener( 'load', async _=>{
 
     Ref.bot     = ikbot;
     Ref.target  = new IKTarget();
-    Ref.target.setPosition( Ref.pos );
+    Ref.target.setPos( Ref.pos );
 
 
     const chain = new IKChain( Ref.bot.arm.bindPose.getBones( ['Eye'] ) )

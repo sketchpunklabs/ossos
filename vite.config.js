@@ -28,13 +28,6 @@ export default defineConfig(({ command, mode, ssrBuild }) => {
                 open        : '/',
                 strictPort  : true,
             },
-
-            resolve : {
-                alias:{
-                    '@three'          : path.resolve( __dirname, './prototypes/_thirdparty/three.module.js' ),
-                    '@OrbitControls'  : path.resolve( __dirname, './prototypes/_thirdparty/OrbitControls.js' ),
-                }
-            }
         }
     } else {
       // command === 'build'

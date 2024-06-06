@@ -935,6 +935,7 @@ class Gltf2Parser {
     }
     return false;
   }
+  /** @param {string} url */
   static async fetch(url) {
     const res = await fetch(url);
     if (!res.ok)

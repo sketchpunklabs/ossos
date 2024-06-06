@@ -1,6 +1,6 @@
 // #region IMPORTS
-import * as THREE           from '@three'; //'three';
-import { OrbitControls }    from '@OrbitControls'; //'three/examples/jsm/controls/OrbitControls.js';
+import * as THREE           from 'three';
+import { OrbitControls }    from 'three/examples/jsm/controls/OrbitControls.js';
 export { THREE };
 // #endregion
 
@@ -19,6 +19,7 @@ App
 
 
 // #region OPTIONS
+/** @param {ReturnType<typeof useThreeWebGL2>} tjs */
 export function useDarkScene( tjs, props={} ){
     const pp = Object.assign( { ambient:0x404040, grid:true, }, props );
 
@@ -156,6 +157,12 @@ export default function useThreeWebGL2( props={} ){
         };
     };
 
+    /**
+     * @param {number} lon
+     * @param {number} lat
+     * @param {number} radius
+     * @param {[number, number, number] | null} target
+     */
     const sphericalLook = ( lon, lat, radius, target=null )=>{
         const phi 	= ( 90 - lat )  * Math.PI / 180;
         const theta = ( lon + 180 ) * Math.PI / 180;

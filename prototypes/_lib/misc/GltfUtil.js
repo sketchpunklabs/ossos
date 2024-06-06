@@ -1,8 +1,8 @@
 // #region IMPORTS
-import * as THREE               from '@three';
+import * as THREE               from 'three';
 import { Armature, Clip, TrackVec3, TrackQuat } 
                                 from '../../../src/index';
-import Gltf2                    from '../gltf2Parser.es.js';
+import Gltf2                    from '../gltf2parser.es.js';
 // import MatrixSkinMaterial       from '../customSkinning/MatrixSkinMaterial.js';
 import MatrixSkinPbrMaterial    from '../customSkinning/MatrixSkinPbrMaterial.js';
 // #endregion
@@ -38,6 +38,7 @@ export default class GltfUtil{
     // #endregion
 
     // #region METHODS
+    /** @param {string} url */
     static async fetch( url ){ return await Gltf2.fetch( url ); }
 
     static filterNodes( gltf, props={} ){
