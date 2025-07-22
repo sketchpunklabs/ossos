@@ -173,17 +173,22 @@ export default class ScreenPicker{
             // ----------------------------------
             // Filter out objects that can be used by picking plus set the proper material
             // console.log( i.object.name, i.object.type, i.object.id, i.object.uuid );
-            switch( i.object.type ){
-                case 'Mesh'  : break;
-                case 'Points':
-                    if( i.object.name === 'ShapePointsMesh' ){
-                        pickMat = this.materials.shapePnt;
-                        pickMat.depthTest = i.object.material.depthTest;
-                    }
-                    break;
-                
-                // Skip this object
-                default: continue;
+
+            if( i.object.material.pickingMaterial ){
+                pickMat = i.object.material.pickingMaterial;
+            }else{
+                switch( i.object.type ){
+                    case 'Mesh'  : break;
+                    case 'Points':
+                        if( i.object.name === 'ShapePointsMesh' ){
+                            pickMat = this.materials.shapePnt;
+                            pickMat.depthTest = i.object.material.depthTest;
+                        }
+                        break;
+                    
+                    // Skip this object
+                    default: continue;
+                }
             }
 
             // ----------------------------------
@@ -221,12 +226,12 @@ export default class ScreenPicker{
 
     // #region TASKS
 
-    pixelTaskFromEvent( e, fn, alwaysCall=false ){
+    pixelTaskFromEvent( e, fn, alwaysCall=false, data=null ){
         return ()=>{
-            const pos = [ e.clientX, e.clientY ];
-            const dat = this.pickPoint( pos );
+            const pos    = [ e.clientX, e.clientY ];
+            const result = this.pickPoint( pos );
             // console.log( 'PICKING', pos, dat );
-            if( alwaysCall || dat.id !== -1 ) fn( dat );
+            if( alwaysCall || result.id !== -1 ) fn( result, data );
         }
     }
 

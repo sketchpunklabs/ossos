@@ -22,10 +22,17 @@ export default function useTransformControl( tjs ){
         },
 
         toTranslate : ()=>{ gizmo.setMode( 'translate' ); return self; },
-        toRotate    : ()=>{gizmo.setMode( 'rotate' ); return self; },
+        toRotate    : ()=>{ gizmo.setMode( 'rotate' ); return self; },
+        toLocal     : ()=>{ gizmo.setSpace( 'local' ); return self; },
+        toWorld     : ()=>{ gizmo.setSpace( 'world' ); return self; },
 
-        setPos      : p=>{
-            if( gizmo.object ) gizmo.object.position.fromArray( p );
+        setPos      : v=>{
+            if( gizmo.object ) gizmo.object.position.fromArray( v );
+            return self;
+        },
+
+        setRot      : v=>{
+            if( gizmo.object ) gizmo.object.quaternion.fromArray( v );
             return self;
         },
 

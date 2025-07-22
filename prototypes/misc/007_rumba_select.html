@@ -1,0 +1,590 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import { Armature, Pose, TranMatrixSkin, Vec3, Quat, Mat4 } from '../../src/index';
+
+import GltfUtil, { Gltf2 }      from '../_lib/misc/GltfUtil.js';
+
+import useTransformControl      from '../_lib/useTransformControl.js';
+import ScreenPicker, { Tasker } from '../_lib/misc/ScreenPicker.js';
+// #endregion
+
+// #region MAIN
+let App = useDarkScene( useThreeWebGL2() );
+let Debug;
+let Ref   = {
+    tasks   : new Tasker(),
+    picker  : new ScreenPicker( App ),
+    gizmo   : useTransformControl( App ).useAxes().hide(),
+    meshes  : [],
+    selIdx  : -1,
+    hovIdx  : -1,
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 45, 20, 3, [0,0.8,0] );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // #region DOWNLOAD FILE
+    const url  = '/prototypes/_res/models/inklinggirl/inkling_girl.gltf';
+    const gltf = await Gltf2.fetch( url );
+    // #endregion
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // #region PARSE & RENDER SKELETON
+    const arm   = parseArmature( gltf );
+    Ref.arm     = arm;
+    Ref.pose    = arm.bindPose.clone();
+    // #endregion
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // #region PARSE & RENDER MESH
+
+    Ref.meshes = loadCharacter( gltf, arm );
+    App.scene.add( ...Ref.meshes );
+    
+    // #endregion
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // App.renderLoop();
+    App.createRenderLoop( null, onPostRender ).start();   
+});
+
+function onPreRender( dt, et ){}
+function onPostRender( dt, et ){
+    Ref.tasks.run();
+}
+
+function updateBone( r ){
+    if( Ref.selIdx === -1 ) return;
+
+    const bone = Ref.pose.bones[ Ref.selIdx ];
+    bone.local.rot.copy( r );
+
+    Ref.arm.skin.updateFromPose( Ref.pose );
+}
+// #endregion
+
+// #region GIZMO
+Ref.gizmo.onMove = p=>{};
+Ref.gizmo.onRotate = v=>{ updateBone( v ) }
+// #endregion
+
+// #region PICKING
+window.addEventListener( 'pointerdown', e=>{
+    if( e.button === 2 ){
+        Ref.gizmo.hide();
+        Ref.selIdx = -1;
+        return;
+    }
+
+    if( Ref.gizmo.o.dragging ) return;
+    if( Ref.selIdx !== -1 ) return;
+    Ref.tasks.push( Ref.picker.pixelTaskFromEvent(e, onPicker, false, { mode:'click' }) );
+});
+
+window.addEventListener( 'pointermove', e=>{
+    if( Ref.selIdx !== -1 ) return;
+    if( Ref.gizmo.o.dragging ) return;
+    Ref.tasks.push( Ref.picker.pixelTaskFromEvent(e, onPicker, true, { mode:'hover' } ) );
+});
+
+function onPicker( o, data ){
+    // console.log( 'Pick', o );
+    if( o.type === 'matrixSkin' ){
+        for( const m of Ref.meshes ) m.material.selJoint = o.joint;
+
+        if( data.mode === 'click' ){
+            const bone = Ref.pose.bones[ o.joint ];
+            const ws   = Ref.pose.getWorldTransform( o.joint );
+
+            Ref.gizmo.toRotate()
+                .toLocal()
+                .setRot( bone.local.rot )
+                .show( ws.pos );
+
+            Ref.selIdx = o.joint;
+        }else{
+            Ref.hovIdx = o.joint;
+        }
+    }else if( Ref.hovIdx !== -1 ){
+        Ref.hovIdx = -1;
+        for( const m of Ref.meshes ) m.material.selJoint = -1;
+    }
+}
+// #endregion
+
+// #region GLTF PARSINBG
+function parseArmature( gltf, minLen=0.1 ){
+    const skin  = gltf.getSkin();
+    const arm   = new Armature();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create Armature Skeleton
+    let b;
+    for( const j of skin.joints ){
+        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) b.local.rot.copy( j.rotation );
+        if( j.position ) b.local.pos.copy( j.position );
+        if( j.scale )    b.local.scl.copy( j.scale );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Set offset before binding, GLTF's inverseMatrices will
+    // include this in the bindpose which I think shouldnt
+    if( skin.position || skin.scale || skin.rotation  ){
+        const pose = arm.bindPose;
+        if( skin.position ) pose.offset.pos.copy( skin.position );
+        if( skin.rotation ) pose.offset.rot.copy( skin.rotation );
+        if( skin.scale  )   pose.offset.scl.copy( skin.scale  );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Finalize bone & instialize one of the skinning algorithms
+    arm.bind( minLen );
+    arm.useSkin( TranMatrixSkin );
+
+    return arm;
+}
+
+/** Turn GLTF Skeleton to an OSSOS Armature */
+function getArmature( gltf, minLen=0.1 ){
+    const skin  = gltf.getSkin();
+    const arm   = new Armature();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    let b;
+    for( const j of skin.joints ){
+        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) b.local.rot.copy( j.rotation );
+        if( j.position ) b.local.pos.copy( j.position );
+        if( j.scale )    b.local.scl.copy( j.scale );
+
+        // console.log( j );
+    }
+
+    arm.bindPose.offset.rot.copy( skin.rotation );
+    arm.bindPose.offset.scl.copy( skin.scale );
+
+    arm.bind( minLen );
+    arm.useSkin( TranMatrixSkin );
+
+    /*
+    console.log( arm.poses.bind );
+
+    const m4 = new Mat4(  skin.joints[0].bindMatrix );
+    console.log( 'Original', m4 );
+    console.log( 'Inverted', m4.invert() );
+
+    const rot = [0,0,0,0];
+    const pos = [0,0,0];
+    const scl = [1,0,0];
+    m4.decompose( rot, pos, scl );
+    console.log( 'Decompose', 'Rot', rot, 'Pos', pos, 'Scl', scl );
+    console.log( 'Local', 'Rot', skin.joints[0].rotation ,'Pos', skin.joints[0].position, 'Scl', skin.joints[0].scale  );
+    console.log( 'Offset', 'Rot', skin.rotation, 'Pos', skin.position, 'Scl', skin.scale );
+
+    const mm = new Mat4().fromQuatTranScale( skin.rotation, [0,0,0], skin.scale );
+    console.log( 'Offset Matrix', mm );
+    
+    console.log( 'Test', mm.invert().mul( m4 ) );
+    mm.decompose( rot, pos, scl );
+    console.log( 'Decompose2', 'Rot', rot, 'Pos', pos, 'Scl', scl );
+    */
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if( skin.position || skin.scale || skin.rotation  ){
+        const opose = arm.newPose( 'offset' );
+        if( skin.position ) opose.offset.pos.copy( skin.position );
+        if( skin.rotation ) opose.offset.rot.copy( skin.rotation );
+        if( skin.scale  ) opose.offset.scl.copy( skin.scale  );
+        opose.updateWorld();
+    }
+
+    return arm;
+}
+
+/** Turn GLTF Primitive data into 3JS Geometry */
+function geoPrimitive( prim, useSkin=true ){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute( 'position', new THREE.BufferAttribute( prim.position.data, prim.position.componentLen ) );
+
+    if( prim.indices )    geo.setIndex( new THREE.BufferAttribute( prim.indices.data, 1 ) );
+    if( prim.normal )     geo.setAttribute( 'normal', new THREE.BufferAttribute( prim.normal.data, prim.normal.componentLen ) );
+    if( prim.texcoord_0 ) geo.setAttribute( 'uv', new THREE.BufferAttribute( prim.texcoord_0.data, prim.texcoord_0.componentLen ) );
+
+    if( useSkin && prim.joints_0 && prim.weights_0 ){
+        geo.setAttribute( 'skinWeight', new THREE.BufferAttribute( prim.weights_0.data, prim.weights_0.componentLen ) );
+        geo.setAttribute( 'skinIndex',  new THREE.BufferAttribute( prim.joints_0.data,  prim.joints_0.componentLen ) );
+    }
+
+    return geo;
+}
+
+function loadCharacter( gltf, arm ){
+    const mCnt  = gltf.json.meshes.length;
+    const rtn   = [];
+    const mats  = {};
+    const texs  = {};
+
+    let m, p;
+    let mat, tex;
+    let geo, mesh;
+
+    for( let i=0; i < mCnt; i++ ){
+        m = gltf.getMesh( i );
+
+        for( p of m.primitives ){
+            const gMat = gltf.getMaterial( p.materialIdx );
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            mat = mats[ gMat.name ];
+            if( !mat ){
+                if( gMat.baseTexture ){
+                    tex = texs[ gMat.baseTexture.uri ];
+                    if( !tex ){
+                        tex       = new THREE.TextureLoader().load( gltf.path + gMat.baseTexture.uri );
+                        tex.wrapS = THREE.RepeatWrapping;
+                        tex.wrapT = THREE.RepeatWrapping;
+                        tex.flipY = false;
+                        texs[ gMat.baseTexture.uri ] = tex;
+                    }
+                }else tex = null;
+                
+                mat = new MatrixSkinMaterial( { tex:tex, color:0xffffff, skin:arm.skin } );
+                mats[ gMat.name ] = mat;
+            }
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            geo  = geoPrimitive( p );
+            mesh = new THREE.Mesh( geo, mat );
+            rtn.push( mesh );
+        }
+    }
+
+    return rtn;
+}
+// #endregion
+
+// #region MATERIAL
+class MatrixSkinMaterial extends THREE.RawShaderMaterial{
+    set selJoint( v=-1 ){ this.uniforms.selJoint.value = v; this.uniformsNeedUpdate = true; }
+
+    constructor( props={} ){
+        super();
+
+        this.pickingMaterial = new PickingMatrixSkinMaterial( props );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Merge custom props with default options
+        const opts = Object.assign({
+            tex    : null,
+            color  : new THREE.Color( '#000000' ),
+        }, props );
+
+        if( opts.tex !== null ) opts.color = new THREE.Color( '#000000' );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.name               = 'MatrixSkinMaterial';
+        this.glslVersion        = THREE.GLSL3;
+        // this.side               = THREE.DoubleSide;
+        // this.depthTest          = true;
+        // this.transparent        = true;
+        // this.alphaToCoverage    = true;
+        // this.lights             = true;
+
+        this.uniforms           = {
+            pose        : { value : opts.skin?.offsetBuffer },
+            color       : { value : new THREE.Color( opts.color ) },
+            tex         : { type: 'sampler2D', value: opts.tex },
+            selJoint    : { type: 'int', value:-1 },
+        };
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.vertexShader = `
+        in vec3 position;   // Vertex Position
+        in vec3 normal;     // Vertex Normal
+        in vec2 uv;         // Vertex Texcoord
+        in vec4 skinWeight; // Bone Weights
+        in vec4 skinIndex;  // Bone Indices
+                
+        #define MAXBONES 110            // Arrays can not be dynamic, so must set a size
+        uniform mat4 pose[ MAXBONES ];
+        uniform int selJoint;
+
+        uniform mat4 modelMatrix;       // Matrices should be filled in by THREE.JS Automatically.
+        uniform mat4 viewMatrix;
+        uniform mat4 projectionMatrix;
+
+        out vec3 fragWPos;             // Fragment World Space Position
+        out vec3 fragNorm;             // Fragment Normal
+        out vec2 fragUv;               // Fragment Texcoord
+        flat out int fragSel;
+
+        // #####################################################################
+
+        mat4 getBoneMatrix( mat4[ MAXBONES ] pose, vec4 idx, vec4 wgt ){
+            /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            NORMALIZE BONE WEIGHT VECTOR - INCASE MODEL WASN'T PREPARED LIKE THAT
+            If Weights are not normalized, Merging the Bone Offsets will create artifacts */
+            int a = int( idx.x ),
+                b = int( idx.y ),
+                c = int( idx.z ),
+                d = int( idx.w );
+            
+            wgt *= 1.0 / ( wgt.x + wgt.y + wgt.z + wgt.w );
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // MERGE THE BONE OFFSETS BASED ON WEIGHT
+            mat4 bone_wgt =
+                pose[ a ] * wgt.x +  
+                pose[ b ] * wgt.y +
+                pose[ c ] * wgt.z +
+                pose[ d ] * wgt.w;
+
+            return bone_wgt;
+        }
+
+        int greatestWeight( vec4 wgt ){
+            float m = wgt.x;
+            int idx = 0;
+
+            if( wgt.y > m ){ m = wgt.y; idx = 1; }
+            if( wgt.z > m ){ m = wgt.z; idx = 2; }
+            if( wgt.w > m ){ m = wgt.w; idx = 3; }
+
+            if( m < 0.0001 ) return -1;
+            return idx;
+        }
+
+        int hasInfluenceOLD( vec4 indices, int idx ){
+            ivec4 i = ivec4( indices );
+            if( i.x == idx || i.y == idx || i.z == idx || i.w == idx  ) return 1;
+            return 0;
+        }
+        
+        int hasInfluence( vec4 indices, vec4 wgts, int idx, float wMin ){
+            ivec4 i = ivec4( indices );
+            if( i.x == idx && wgts.x >= wMin ) return 1;
+            if( i.y == idx && wgts.y >= wMin ) return 1;
+            if( i.z == idx && wgts.z >= wMin ) return 1;
+            if( i.w == idx && wgts.w >= wMin ) return 1;
+
+            return 0;
+        }
+
+        // #####################################################################
+
+        void main(){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
+            mat4 boneMatrix = getBoneMatrix( pose, skinIndex, skinWeight );         // Get the Skinning Matrix
+            mat4 mbMatrix   = modelMatrix * boneMatrix;                             // Merge Model and Bone Matrices together
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
+            vec4 wpos       = mbMatrix * vec4( position, 1.0 );                     // Use new Matrix to Transform Vertices
+            gl_Position     = projectionMatrix * viewMatrix * wpos;
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
+            fragUv         = uv;
+            fragWPos       = wpos.xyz;                                             // Save WorldSpace Position for Fragment Shader
+            fragNorm       = mat3( transpose( inverse( mbMatrix ) ) ) * normal;    // Transform Normals using bone + model matrix
+            // fragNorm       = ( mbMatrix * vec4( normal, 0.0 ) ).xyz;
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // int wIdx = greatestWeight( skinWeight );
+            // if( wIdx > -1 ){
+            //     // if( int( skinIndex[ wIdx ] ) == 1 ) fragSel = 1;
+            //     // else fragSel = 0;
+
+            //     if( hasInfluence( skinIndex, skinWeight, 1, 0.5 ) == 1 ) fragSel = 1;
+            //     else fragSel = 0;
+            // }
+
+            if( hasInfluence( skinIndex, skinWeight, selJoint, 0.5 ) == 1 ) fragSel = 1;
+            else fragSel = 0;
+        }`;
+
+        this.fragmentShader = `precision mediump float;
+        in vec3 fragWPos;
+        in vec3 fragNorm;
+        in vec2 fragUv;
+        flat in int fragSel;
+
+        out vec4 outColor;
+
+        uniform vec3 color;
+        uniform sampler2D tex;
+
+        // #####################################################################
+
+        // TODO, Try to parse Improved Lambert into simple GLSL insert
+        // https://x.com/manish4u2/status/1779582587985371451
+        // https://github.com/mrdoob/three.js/pull/28543
+
+        vec3 lightDir = normalize( vec3( 4.0, 5.0, 4.0 ) );
+        vec3 lambertLighting( vec3 norm, vec3 color, float nMin ){
+            vec3 N    = normalize( norm );        
+            float NdL = dot( N, lightDir );
+            NdL       = NdL * 0.5 + 0.5;                    // Remap -1:0 to 0:1
+            NdL       = clamp( 0.0, 1.0, NdL );             // Help remove any midtone shadows, don't notice it using planes
+            NdL       = NdL * NdL;                          // Valve's Half Lambert, just curves the light value
+
+            return color * max( nMin, NdL );
+        }
+
+        // #####################################################################
+
+        void main(){
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    
+            // Use default color or texture
+            vec4 col = vec4( color, 1.0 );
+            if( color == vec3(0.0) ) col.rgb = texture( tex, fragUv ).rgb;
+
+            if( fragSel == 1 ) col.rgb = vec3( 0.0, 1.0, 1.0 );
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Apply lighting
+            col.rgb = lambertLighting( fragNorm, col.rgb, 0.3 );
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            outColor = col;
+        }`;
+    }
+
+    // #region SETTERS
+    // setOffset( v ){
+    //     this.uniforms.offset.value = v;
+    //     return this;
+    // }
+    // #endregion
+}
+
+class PickingMatrixSkinMaterial extends THREE.RawShaderMaterial{
+    set intID( v ){ 
+        this.uniforms.intID.value   = v; 
+        this.uniformsNeedUpdate     = true;
+    }
+
+    decodePixel( px, itm ){
+        return { 
+            type    : 'matrixSkin',
+            obj     : itm.o,
+            id      : px[0],
+            joint   : px[1],
+        };
+    }
+
+    constructor(  props={} ){
+        super();
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Merge custom props with default options
+        const opts = Object.assign({
+            // tex    : null,
+            // color  : new THREE.Color( '#000000' ),
+        }, props );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.name               = 'MatrixSkinMaterial';
+        this.glslVersion        = THREE.GLSL3;
+        this.depthTest          = true;
+        // this.side               = THREE.DoubleSide;
+        // this.transparent        = true;
+        // this.alphaToCoverage    = true;
+        // this.lights             = true;
+
+        this.uniforms           = {
+            intID   : { type: 'int', value: 0 },
+            pose    : { value : opts.skin?.offsetBuffer },
+        };
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.vertexShader = `
+        in vec3 position;   // Vertex Position
+        in vec3 normal;     // Vertex Normal
+        in vec2 uv;         // Vertex Texcoord
+        in vec4 skinWeight; // Bone Weights
+        in vec4 skinIndex;  // Bone Indices
+                
+        #define MAXBONES 110            // Arrays can not be dynamic, so must set a size
+        uniform mat4 pose[ MAXBONES ];
+
+        uniform mat4 modelMatrix;       // Matrices should be filled in by THREE.JS Automatically.
+        uniform mat4 viewMatrix;
+        uniform mat4 projectionMatrix;
+
+        flat out int jointIdx;
+
+        // #####################################################################
+        
+        mat4 getBoneMatrix( mat4[ MAXBONES ] pose, vec4 idx, vec4 wgt ){
+            /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            NORMALIZE BONE WEIGHT VECTOR - INCASE MODEL WASN'T PREPARED LIKE THAT
+            If Weights are not normalized, Merging the Bone Offsets will create artifacts */
+            int a = int( idx.x ),
+                b = int( idx.y ),
+                c = int( idx.z ),
+                d = int( idx.w );
+            
+            wgt *= 1.0 / ( wgt.x + wgt.y + wgt.z + wgt.w );
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // MERGE THE BONE OFFSETS BASED ON WEIGHT
+            mat4 bone_wgt =
+                pose[ a ] * wgt.x +  
+                pose[ b ] * wgt.y +
+                pose[ c ] * wgt.z +
+                pose[ d ] * wgt.w;
+
+            return bone_wgt;
+        }
+
+        int greatestWeight( vec4 wgt ){
+            float m = wgt.x;
+            int idx = 0;
+
+            if( wgt.y > m ){ m = wgt.y; idx = 1; }
+            if( wgt.z > m ){ m = wgt.z; idx = 2; }
+            if( wgt.w > m ){ m = wgt.w; idx = 3; }
+
+            if( m < 0.0001 ) return -1;
+            return idx;
+        }
+
+        // #####################################################################
+
+        void main(){
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
+            mat4 boneMatrix = getBoneMatrix( pose, skinIndex, skinWeight );         // Get the Skinning Matrix
+            mat4 mbMatrix   = modelMatrix * boneMatrix;                             // Merge Model and Bone Matrices together
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
+            vec4 wpos       = mbMatrix * vec4( position, 1.0 );                     // Use new Matrix to Transform Vertices
+            gl_Position     = projectionMatrix * viewMatrix * wpos;
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            int wIdx = greatestWeight( skinWeight );
+            if( wIdx > -1 ) jointIdx = int( skinIndex[ wIdx ] );
+            else            jointIdx = -1;
+        }`,
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        this.fragmentShader = `
+        precision mediump float;
+
+        uniform int intID;
+        flat in int jointIdx;
+
+        layout(location=0) out ivec4 outData;
+    
+        void main(){ outData = ivec4( intID, jointIdx, 0, 0 ); }`;
+    }
+}
+// #endregion
+
+</script></body></html>

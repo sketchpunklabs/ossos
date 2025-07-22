@@ -61,14 +61,16 @@ const ComponentVarMap = {
 };
 
 class Accessor {
-  componentLen = 0;
-  elementCnt = 0;
-  byteOffset = 0;
-  byteSize = 0;
-  boundMin = null;
-  boundMax = null;
-  type = null;
-  data = null;
+  constructor() {
+    this.componentLen = 0;
+    this.elementCnt = 0;
+    this.byteOffset = 0;
+    this.byteSize = 0;
+    this.boundMin = null;
+    this.boundMax = null;
+    this.type = null;
+    this.data = null;
+  }
   fromBin(accessor, bufView, bin) {
     const [
       compByte,
@@ -95,11 +97,11 @@ class Accessor {
 }
 
 class Attrib {
-  byteOffset = 0;
-  componentLen = 0;
-  boundMin = null;
-  boundMax = null;
   constructor(accID, json) {
+    this.byteOffset = 0;
+    this.componentLen = 0;
+    this.boundMin = null;
+    this.boundMax = null;
     const accessor = json.accessors[accID];
     this.componentLen = ComponentVarMap[accessor.type];
     this.byteOffset = accessor.byteOffset;
@@ -108,20 +110,20 @@ class Attrib {
   }
 }
 class InterleavedBuffer {
-  data = null;
-  elementCnt = 0;
-  componentLen = 0;
-  byteStride = 0;
-  byteSize = 0;
-  position = null;
-  normal = null;
-  tangent = null;
-  texcoord_0 = null;
-  texcoord_1 = null;
-  color_0 = null;
-  joints_0 = null;
-  weights_0 = null;
   constructor(attr, json, bin) {
+    this.data = null;
+    this.elementCnt = 0;
+    this.componentLen = 0;
+    this.byteStride = 0;
+    this.byteSize = 0;
+    this.position = null;
+    this.normal = null;
+    this.tangent = null;
+    this.texcoord_0 = null;
+    this.texcoord_1 = null;
+    this.color_0 = null;
+    this.joints_0 = null;
+    this.weights_0 = null;
     const accessor = json.accessors[attr.POSITION];
     const bView = json.bufferViews[accessor.bufferView];
     this.elementCnt = accessor.count;
@@ -150,12 +152,9 @@ class InterleavedBuffer {
 }
 
 class Draco {
-  mod;
-  decoder;
-  mesh;
-  faceCnt = 0;
-  vertCnt = 0;
   constructor(mod) {
+    this.faceCnt = 0;
+    this.vertCnt = 0;
     this.mod = mod;
     this.decoder = new this.mod.Decoder();
   }
@@ -263,45 +262,53 @@ class Draco {
 }
 
 class Mesh {
-  index = null;
-  name = null;
-  primitives = [];
-  position = null;
-  rotation = null;
-  scale = null;
-  morphTargets = null;
+  constructor() {
+    this.index = null;
+    this.name = null;
+    this.primitives = [];
+    this.position = null;
+    this.rotation = null;
+    this.scale = null;
+    this.morphTargets = null;
+  }
 }
 class Primitive {
-  materialName = null;
-  materialIdx = null;
-  indices = null;
-  position = null;
-  normal = null;
-  tangent = null;
-  texcoord_0 = null;
-  texcoord_1 = null;
-  color_0 = null;
-  joints_0 = null;
-  weights_0 = null;
-  interleaved = null;
+  constructor() {
+    this.materialName = null;
+    this.materialIdx = null;
+    this.indices = null;
+    this.position = null;
+    this.normal = null;
+    this.tangent = null;
+    this.texcoord_0 = null;
+    this.texcoord_1 = null;
+    this.color_0 = null;
+    this.joints_0 = null;
+    this.weights_0 = null;
+    this.interleaved = null;
+  }
 }
 
 class Skin {
-  index = null;
-  name = null;
-  joints = [];
-  position = null;
-  rotation = null;
-  scale = null;
+  constructor() {
+    this.index = null;
+    this.name = null;
+    this.joints = [];
+    this.position = null;
+    this.rotation = null;
+    this.scale = null;
+  }
 }
 class SkinJoint {
-  name = null;
-  index = null;
-  parentIndex = null;
-  bindMatrix = null;
-  position = null;
-  rotation = null;
-  scale = null;
+  constructor() {
+    this.name = null;
+    this.index = null;
+    this.parentIndex = null;
+    this.bindMatrix = null;
+    this.position = null;
+    this.rotation = null;
+    this.scale = null;
+  }
 }
 
 const ETransform = {
@@ -314,16 +321,15 @@ const ELerp = {
   Linear: 1,
   Cubic: 2
 };
-class Track {
-  static Transform = ETransform;
-  static Lerp = ELerp;
-  transform = ETransform.Pos;
-  interpolation = ELerp.Step;
-  jointIndex = 0;
-  timeStampIndex = 0;
-  keyframes;
+const _Track = class {
+  constructor() {
+    this.transform = ETransform.Pos;
+    this.interpolation = ELerp.Step;
+    this.jointIndex = 0;
+    this.timeStampIndex = 0;
+  }
   static fromGltf(jointIdx, target, inter) {
-    const t = new Track();
+    const t = new _Track();
     t.jointIndex = jointIdx;
     switch (target) {
       case "translation":
@@ -349,28 +355,40 @@ class Track {
     }
     return t;
   }
-}
+};
+let Track = _Track;
+Track.Transform = ETransform;
+Track.Lerp = ELerp;
 class Animation {
-  name = "";
-  timestamps = [];
-  tracks = [];
   constructor(name) {
+    this.name = "";
+    this.timestamps = [];
+    this.tracks = [];
     if (name)
       this.name = name;
   }
 }
 
 class Texture {
-  index = -1;
-  name = "";
-  mime = "";
-  uri = "";
-  blob = null;
+  constructor() {
+    this.index = -1;
+    this.name = "";
+    this.mime = "";
+    this.uri = "";
+    this.blob = null;
+  }
   static fromIndex(idx, parser) {
     const tex = new Texture();
     tex.index = idx;
     const info = parser.json.textures[idx];
-    const src = parser.json.images[info.source];
+    let src;
+    if (info.source != null) {
+      src = parser.json.images[info.source];
+    } else {
+      if (info.extensions && info.extensions.EXT_texture_webp) {
+        src = parser.json.images[info.extensions.EXT_texture_webp.source];
+      }
+    }
     tex.name = src.name;
     tex.mime = src.mimeType;
     if (src.uri)
@@ -385,10 +403,6 @@ class Texture {
 }
 
 class PoseJoint {
-  index;
-  rot;
-  pos;
-  scl;
   constructor(idx, rot, pos, scl) {
     this.index = idx;
     this.rot = rot;
@@ -397,9 +411,9 @@ class PoseJoint {
   }
 }
 class Pose {
-  name = "";
-  joints = [];
   constructor(name) {
+    this.name = "";
+    this.joints = [];
     if (name)
       this.name = name;
   }
@@ -409,13 +423,13 @@ class Pose {
 }
 
 class Material {
-  index = -1;
-  name = "";
-  metallic = 0;
-  roughness = 0;
-  baseTexture = null;
-  baseColor = null;
   constructor(mat, parser) {
+    this.index = -1;
+    this.name = "";
+    this.metallic = 0;
+    this.roughness = 0;
+    this.baseTexture = null;
+    this.baseColor = null;
     this.name = mat.name || window.crypto.randomUUID();
     if (mat.pbrMetallicRoughness) {
       if (mat.pbrMetallicRoughness.baseColorFactor) {
@@ -431,12 +445,10 @@ class Material {
 }
 
 class Gltf2Parser {
-  json;
-  bin;
-  path = "";
-  _needsDraco = false;
-  _extDraco = void 0;
   constructor(json, bin) {
+    this.path = "";
+    this._needsDraco = false;
+    this._extDraco = void 0;
     this.json = json;
     this.bin = bin || new ArrayBuffer(0);
     if (json.extensionsRequired) {
