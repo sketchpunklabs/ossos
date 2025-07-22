@@ -339,87 +339,172 @@ class FourBarLinkage{
     }
 }
 
+// https://en.wikipedia.org/wiki/Four-bar_linkage
+// - https://en.wikipedia.org/wiki/Grashof_condition
+// - Wiki has a much simpler classification table
+// - The 27 cases help categorize all possible motion types of a four-bar linkage based on the Grashof criteria
 
+// Pi-rocker
+// This link oscillates through an angle greater than 180° (π radians)
+// The motion sweeps through a large arc that crosses over its own pivot point
+// The link "rocks" back and forth but can't make a complete rotation
+// It's sometimes called a "change-point rocker" because it can pass through a singular position where the linkage aligns
 
+// 0-rocker (Zero-rocker):
+// This link oscillates through an angle less than 180° (π radians)
+// The motion occurs entirely on one side of the line connecting its pivot points
+// The link makes a smaller rocking motion compared to a π-rocker
+// It never crosses over its pivot point
+
+// A crank: can rotate a full 360 degrees
+// A rocker: can rotate through a limited range of angles which does not include 0° or 180°
+// A 0-rocker: can rotate through a limited range of angles which includes 0° but not 180°
+// A π-rocker: can rotate through a limited range of angles which includes 180° but not 0°
+
+// The T1, T2, T3 values in four-bar linkage analysis come from the Grashof criteria and help determine the mobility characteristics of the mechanism. Here's what each represents:
+// T1 = l + s - p - q
+// T2 = l - s - p + q
+// T3 = l + s - p + q
+
+// Where:
+// l is the longest link length
+// s is the shortest link length
+// p and q are the lengths of the remaining two links
+
+// These T values help determine several important things:
+
+// If there's at least one link that can make a full 360° rotation (crank)
+// The type of motion each link can achieve
+// Whether the linkage configuration is even possible
+
+// For example:
+// If T1 > 0, it indicates certain mobility conditions
+// When T2 = 0, it represents a change point in the mechanism's behavior
+// T3's sign helps determine if we get a π-rocker or 0-rocker motion
+
+// A period is one complete circle or rocker motion resulting with all the
+// links back to its original position. Some cases require different period lengths
+// to get the links back to its original position.
+
+// Key is based on T1,T2,T3 & represents when each one is either negative, positive or 0
+// 0: Input Type
+// 1: Output Type
+// 2: Is Grashof, shortest link rotates fully else it reciprocates
+// 3: Flip Phase
+// 4: flip Period, canFlip = ( dat[4] > 0 )
+// 5: Input min limited, value >= 0, index to angle math
+// 6: Input max limit, value >= 0, index to angle math
 const ClassificationMap = {
-    "+++": ["crank",    "rocker",   true,  0, 0, -1, -1],
-    "0++": ["crank",    "Ï€-rocker", true,  0, 2, -1, -1],
-    "-++": ["Ï€-rocker", "Ï€-rocker", false, 0, 2,  2,  3],
-    "+0+": ["crank",    "0-rocker", true,  0, 2, -1, -1],
-    "00+": ["crank",    "crank",    true,  0, 2, -1, -1],
-    "-0+": ["crank",    "crank",    true,  0, 2, -1, -1],
-    "+-+": ["Ï€-rocker", "0-rocker", false, 0, 2,  4,  5],
-    "0-+": ["crank",    "crank",    true,  0, 2, -1, -1],
-    "--+": ["crank",    "crank",    true,  0, 0, -1, -1],
-    "++0": ["crank",    "Ï€-rocker", true,  1, 2, -1, -1],
-    "0+0": ["crank",    "Ï€-rocker", true,  0, 1, -1, -1],
-    "-+0": ["Ï€-rocker", "Ï€-rocker", true,  1, 1,  2,  3],
-    "+00": ["crank",    "crank",    true,  0, 1, -1, -1],
-    "000": ["crank",    "crank",    true,  0, 1, -1, -1],
-    "-00": ["crank",    "crank",    true,  0, 1, -1, -1],
-    "+-0": ["Ï€-rocker", "crank",    true,  1, 1,  4,  5],
-    "0-0": ["crank",    "crank",    true,  0, 1, -1, -1],
-    "--0": ["crank",    "crank",    true,  1, 2, -1, -1],
-    "++-": ["0-rocker", "Ï€-rocker", false, 0, 2,  1,  0],
-    "0+-": ["0-rocker", "Ï€-rocker", true,  1, 1,  1,  0],
-    "-+-": ["rocker",   "rocker",   true,  0, 2,  2,  0],
-    "+0-": ["0-rocker", "crank",    true,  1, 1,  1,  0],
-    "00-": ["0-rocker", "crank",    true,  1, 1,  1,  0],
-    "-0-": ["0-rocker", "0-rocker", true,  1, 1,  1,  0],
-    "+--": ["rocker",   "crank",    true,  0, 2,  4,  0],
-    "0--": ["0-rocker", "crank",    true,  1, 1,  1,  0],
-    "---": ["0-rocker", "0-rocker", false, 0, 2,  1,  0]
+    '+++': ['crank',     'rocker',    true,  0, 0, -1, -1],
+    '0++': ['crank',     'Ï€-rocker', true,  0, 2, -1, -1],
+    '-++': ['Ï€-rocker', 'Ï€-rocker', false, 0, 2,  2,  3],
+    '+0+': ['crank',     '0-rocker',  true,  0, 2, -1, -1],
+    '00+': ['crank',     'crank',     true,  0, 2, -1, -1],
+    '-0+': ['crank',     'crank',     true,  0, 2, -1, -1],
+    '+-+': ['Ï€-rocker', '0-rocker',  false, 0, 2,  4,  5],
+    '0-+': ['crank',     'crank',     true,  0, 2, -1, -1],
+    '--+': ['crank',     'crank',     true,  0, 0, -1, -1],
+    '++0': ['crank',     'Ï€-rocker', true,  1, 2, -1, -1],
+    '0+0': ['crank',     'Ï€-rocker', true,  0, 1, -1, -1],
+    '-+0': ['Ï€-rocker', 'Ï€-rocker', true,  1, 1,  2,  3],
+    '+00': ['crank',     'crank',     true,  0, 1, -1, -1],
+    '000': ['crank',     'crank',     true,  0, 1, -1, -1],
+    '-00': ['crank',     'crank',     true,  0, 1, -1, -1],
+    '+-0': ['Ï€-rocker', 'crank',     true,  1, 1,  4,  5],
+    '0-0': ['crank',     'crank',     true,  0, 1, -1, -1],
+    '--0': ['crank',     'crank',     true,  1, 2, -1, -1],
+    '++-': ['0-rocker',  'Ï€-rocker', false, 0, 2,  1,  0],
+    '0+-': ['0-rocker',  'Ï€-rocker', true,  1, 1,  1,  0],
+    '-+-': ['rocker',    'rocker',    true,  0, 2,  2,  0],
+    '+0-': ['0-rocker',  'crank',     true,  1, 1,  1,  0],
+    '00-': ['0-rocker',  'crank',     true,  1, 1,  1,  0],
+    '-0-': ['0-rocker',  '0-rocker',  true,  1, 1,  1,  0],
+    '+--': ['rocker',    'crank',     true,  0, 2,  4,  0],
+    '0--': ['0-rocker',  'crank',     true,  1, 1,  1,  0],
+    '---': ['0-rocker',  '0-rocker',  false, 0, 2,  1,  0]
 };
 
+// https://dynref.engr.illinois.edu/aml.js
 class Grashof{
+    // baseLen, InputLen, CouplerLen, OutputLen
     update( bLen, iLen, cLen, oLen ){
+        // const L = bLen + cLen + iLen + oLen;
+        // const minLen = Math.min( bLen, iLen, cLen, oLen );
+        // const maxLen = Math.max( bLen, iLen, cLen, oLen )
+        // const validityIndex = L - 2 * maxLen;
+        // const valid =( validityIndex >= 0 ) && ( minLen >= 0 );
+        // const grashofIndex = L - 2 * ( maxLen + minLen );
+        // // if (limits.GrashofIndex > 0) {
+        // //     limits.GrashofRelation = "> 0";
+        // // } else if (limits.GrashofIndex == 0) {
+        // //     limits.GrashofRelation = "= 0";
+        // // } else {
+        // //     limits.GrashofRelation = "< 0";
+        // // }
+
+        //Using Classification instead of Grashof condition
         const T1    = bLen + cLen - iLen - oLen;
         const T2    = oLen + bLen - iLen - cLen;
         const T3    = oLen + cLen - iLen - bLen;
         const key   = this.genKey( [T1,T2,T3] );
-
         const dat   = ClassificationMap[ key ];
 
-        // console.log( key, dat );
-
         var limitAngles = [
-            lawcosAngle(iLen, bLen, cLen + oLen),
-            -lawcosAngle(iLen, bLen, cLen + oLen),
-            lawcosAngle(iLen, bLen, cLen - oLen),
-            2 * Math.PI - lawcosAngle(iLen, bLen, cLen - oLen),
-            lawcosAngle(iLen, bLen, oLen - cLen),
-            2 * Math.PI - lawcosAngle( iLen, bLen, oLen - cLen )
+             lawcosAngle( iLen, bLen, cLen + oLen ),
+            -lawcosAngle( iLen, bLen, cLen + oLen ),
+             lawcosAngle( iLen, bLen, cLen - oLen ),
+             2 * Math.PI - lawcosAngle( iLen, bLen, cLen - oLen ),
+             lawcosAngle( iLen, bLen, oLen - cLen ),
+             2 * Math.PI - lawcosAngle( iLen, bLen, oLen - cLen )
         ];
 
-        this.inputType = dat[0];
+        this.inputType  = dat[0];
         this.outputType = dat[1];
-        this.canFlip = (dat[4] > 0);
-        this.limited = (dat[5] >= 0);
-        this.Grashof = dat[2];
-        this.flipPhase = dat[3];
+        this.canFlip    = ( dat[4] > 0 );
+        this.limited    = ( dat[5] >= 0 ); // Has a limited Range
+        this.Grashof    = dat[2];
+        this.flipPhase  = dat[3];
         this.flipPeriod = dat[4];
-        this.alphaMin = (dat[5] >= 0 ? limitAngles[dat[5]] : 0);
-        this.alphaMax = (dat[6] >= 0 ? limitAngles[dat[6]] : 0);
+        // this.alphaMin   = (dat[5] >= 0 ? limitAngles[dat[5]] : 0);
+        // this.alphaMax   = (dat[6] >= 0 ? limitAngles[dat[6]] : 0);
 
-        if (this.Grashof) {
-            this.GrashofType = "Grashof";
-            this.GrashofInfo = "rotates fully";
+        this.alphaMin   = (dat[5] >= 0 ? this.getLimitAngle( dat[5], bLen, iLen, cLen, oLen ) : 0);
+        this.alphaMax   = (dat[6] >= 0 ? this.getLimitAngle( dat[6], bLen, iLen, cLen, oLen ) : 0);
+
+        if( this.Grashof ){
+            this.GrashofType = 'Grashof';
+            this.GrashofInfo = 'rotates fully';
         } else {
-            this.GrashofType = "non-Grashof";
-            this.GrashofInfo = "reciprocates";
+            this.GrashofType = 'non-Grashof';
+            this.GrashofInfo = 'reciprocates';
         }
 
         console.log( this );
+    }
 
+    getLimitAngle( idx, bLen, iLen, cLen, oLen ){
+        // var limitAngles = [
+        //      lawcosAngle( iLen, bLen, cLen + oLen ),
+        //     -lawcosAngle( iLen, bLen, cLen + oLen ),
+        //      lawcosAngle( iLen, bLen, cLen - oLen ),
+        //      2 * Math.PI - lawcosAngle( iLen, bLen, cLen - oLen ),
+        //      lawcosAngle( iLen, bLen, oLen - cLen ),
+        //      2 * Math.PI - lawcosAngle( iLen, bLen, oLen - cLen )
+        // ];
+        switch( idx ){
+            case 0: return lawcosAngle( iLen, bLen, cLen + oLen );
+            case 1: return -lawcosAngle( iLen, bLen, cLen + oLen );
+            case 2: return lawcosAngle( iLen, bLen, cLen - oLen );
+            case 3: return 2 * Math.PI - lawcosAngle( iLen, bLen, cLen - oLen );
+            case 4: return lawcosAngle( iLen, bLen, oLen - cLen );
+            case 5: return 2 * Math.PI - lawcosAngle( iLen, bLen, oLen - cLen );
+        }
     }
     
+    // Generate key for classification map
     genKey( ary ){
         let key = '';
-        for( let i of ary ){
-            key += i == 0 ? 0 
-                 : i > 0 ? '+' : '-';
-        }
-
+        for( let i of ary ) key += i == 0 ? 0 : i > 0 ? '+' : '-';
         return key;
     }
 }
@@ -612,7 +697,7 @@ class Grashof{
 		// public double d {
 
 
-        /** Find the output angle beta for a four-bar linkage.
+/** Find the output angle beta for a four-bar linkage.
 
 //  @param {number} g Ground link length.
 //  @param {number} f Input link length.

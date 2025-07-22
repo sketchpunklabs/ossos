@@ -93,6 +93,28 @@ export default class BoneMap {
 
         return ( rtn.length > 0 )? rtn : null;
     }
+
+    getBoneSet( n: string  ): Nullable<Array<Bone>>{
+        // @ts-ignore ts(7053)
+        const bs  = BONE_SETS[ n ];
+        const ary : Array<Bone> = [];
+
+        let bi: Nullable<BoneInfo>;
+        for( let i of bs ){
+            bi = this.bones.get( i );
+            if( bi ){
+                for( const bii of bi.items ){
+                    // @ts-ignore ts(7053)
+                    ary.push( this.obj.bones[ bii.index ] );
+                }
+            }else{
+                console.log( 'Missing bone: ', i, 'for set', n );
+                return null;
+            }
+        }
+
+        return ary;
+    }
 }
 
 // #region DATA STRUCTURES
@@ -118,6 +140,17 @@ export class BoneInfo {
     get index(): number{ return this.items[0].index; }
     get lastIndex(): number{ return this.items[ this.items.length-1 ].index; }
 }
+
+const BONE_SETS = {
+    leftArm     : [ 'upperarm_l', 'forearm_l', 'hand_l' ],
+    rightArm    : [ 'upperarm_r', 'forearm_r', 'hand_r' ],
+    leftLeg     : [ 'thigh_l', 'shin_l', 'ankle_l' ],
+    rightLeg    : [ 'thigh_r', 'shin_r', 'ankle_r' ],
+    hip         : [ 'hip' ],
+    spine       : [ 'spine' ],
+    head        : [ 'head' ],
+};
+
 // #endregion
 
 // #region NAME PARSING
@@ -154,6 +187,7 @@ const reRight   = new RegExp( '\\.r|right|_r', 'i' );
 const Parsers   = [
     new BoneParse( 'thigh',     true, 'thigh|up.*leg|hip(?!s)', 'twist' ), //upleg | upperleg, hip NOT hips
     new BoneParse( 'shin',      true, 'shin|leg|calf|knee', 'up|twist' ),
+    new BoneParse( 'ankle',     true, 'ankle' ),
     new BoneParse( 'foot',      true, 'foot' ),
     new BoneParse( 'toe',       true, 'toe' ),
     new BoneParse( 'shoulder',  true, 'clavicle|shoulder|collar', 'shoulder_BIND' ),            // Exclude cartwheel's upperarm being shoulder_BIND
@@ -169,20 +203,5 @@ const Parsers   = [
     // eslint-disable-next-line no-useless-escape
     new BoneParse( 'spine',     false, 'spine.*\d*|chest', undefined, true ),
 ];
-
-// {"left_shoulder_BIND" => 8}
-// 9
-// : 
-// {"left_elbow_BIND" => 9}
-// {"left_hip_BIND" => 55}
-// 56
-// : 
-// {"left_knee_BIND" => 56}
-// 57
-// : 
-// {"left_ankle_BIND" => 57}
-// 58
-// : 
-// {"left_foot_BIND" => 58}
 
 // #endregion

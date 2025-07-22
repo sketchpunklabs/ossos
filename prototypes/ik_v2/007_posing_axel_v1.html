@@ -1,0 +1,636 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import GltfUtil, { Gltf2 }          from '../_lib/misc/GltfUtil.js';
+import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
+
+import useTransformControl          from '../_lib/useTransformControl.js';
+import Util                         from '../_lib/misc/Util.js';
+import ShapePointsMesh              from '../_lib/meshes/ShapePointsMesh.js';
+
+import ScreenPicker, { Tasker }     from '../_lib/misc/ScreenPicker.js';
+
+import { 
+    Armature, TranMatrixSkin,
+    Quat, Vec3, Transform, 
+    Pose, BoneMap,
+} from '../../src/index';
+
+
+import { NurbsSpline } from '../../src/maths/curves/index';
+import {
+    BoneAxes, IKTarget, IKChain,
+    IKSplineTarget, splineCompose, limbCompose, lookCompose,
+} from '../../src/kinematics2/index';
+
+// #endregion
+
+// #region MAIN
+let Debug;
+let App = useDarkScene( useThreeWebGL2() );
+let Ref = {
+    pnts    : new ShapePointsMesh(),
+    gizmo   : useTransformControl( App ).useAxes().hide(),
+    picker  : new ScreenPicker( App ),
+    tasks   : new Tasker(),
+    selPnt  : -1,
+};
+
+let POSE = [
+    { pos:[0,0,0], key:'leftArm', type:'target' },
+    { pos:[0,0,0], key:'leftArm', type:'pole' },
+
+    { pos:[0,0,0], key:'rightArm', type:'target' },
+    { pos:[0,0,0], key:'rightArm', type:'pole' },
+
+    { pos:[0,0,0], key:'leftLeg', type:'target' },
+    { pos:[0,0,0], key:'leftLeg', type:'pole' },
+
+    { pos:[0,0,0], key:'rightLeg', type:'target' },
+    { pos:[0,0,0], key:'rightLeg', type:'pole' },
+
+    { pos:[0,0,0], key:'spine', type:'target' },
+    { pos:[0,0,0], key:'spine', type:'pole' },
+]
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 20, 20, 4, [ 0, 0.8, 0 ] );
+    globalThis.Debug = Debug = await useVisualDebug( App );
+
+    Ref.pnts.renderOrder = 100;
+    Ref.pnts.material.depthTest = false;
+    App.scene.add( Ref.pnts );
+
+    // Ref.pnts
+    //     .add( [0,1,0], 0x00ffff, 4, 6 )
+    //     .add( [0,2,0], 0xffff00, 4, 6 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Load Character Mesh
+    Ref.char0 = await fetchCharacter( '/prototypes/_res/models/axel/axel.json' );
+    // Ref.char0.setOffsetPos( [1.6,0,0] );
+    App.scene.add( ...Ref.char0.models );
+
+    const rig = Ref.char0.rig;
+    for( let i of POSE ){
+        switch( i.type ){
+            case 'target':
+                i.pos = rig.getTargetPos( i.key );
+                Ref.pnts.add( i.pos, 0x00ff00, 1.5, 1 );
+                break;
+            case 'pole':
+                i.pos = rig.getPolePos( i.key );
+                Ref.pnts.add( i.pos, 0xffff00, 1.5, 0 );
+                break;
+        }
+    }
+
+    rig.getPolePos( 'leftArm' );
+
+    // console.log( Ref.char0 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Load Animation for Retargetting
+    
+    // const retarget = new IKBipedRetarget();
+    // retarget
+    //     .setSourceTPose( arm.bindPose ) // TPose for the clip animation
+    //     .setPlacementReset( [0,0,1] )   // Animation uses Zup, clear XY
+    //     .setClip( clip );               // Set animation to retarget
+
+    // Ref.retarget = retarget;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Test Frame Reargetting
+    // Ref.retarget
+    //     .atFrame( 0 )                           // Animate Frame + Gen IK Data
+    //     // .step( 0.1 )                         // Move Animation by seconds
+    //     .debugBones( Debug )                    // Visualize Bones
+    //     .debugIKPose( Debug )                   // Visualize IK Data
+    //     .applyIkPoseToRig( Ref.char0.rig );     // Push IK data to target IK Rig 
+
+    // Ref.char0
+    //     .runIk()
+    //     .updateSkin()
+    //     .debugBones();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( null, onPostRender ).start();
+    // App.renderLoop();
+});
+
+Ref.gizmo.onMove = pos=>{
+    if( Ref.selPnt === -1 ) return;
+    Ref.pnts.setPosAt( Ref.selPnt, pos );    
+    
+    const pi =  POSE[ Ref.selPnt ];
+    switch( pi.type ){
+        case 'target':
+            Ref.char0.rig.setTargetPos( pi.key, pos );
+            break;
+        case 'pole':
+            Ref.char0.rig.setPolePos( pi.key, pos );
+            break;
+    }
+
+    Ref.char0.runSolvers();
+};
+
+function onPreRender( dt, et ){}
+function onPostRender( dt, et ){ Ref.tasks.run(); }
+
+window.addEventListener( 'pointerdown', e=>{
+    if( e.button === 2 ){
+        Ref.gizmo.hide();
+        Ref.selPnt = -1;
+        return;
+    }
+
+    if( Ref.gizmo.o.dragging ) return;
+    Ref.tasks.push( Ref.picker.pixelTaskFromEvent(e, onPicker, false) );
+});
+
+function onPicker( o ){
+    // console.log( 'Pick', o );
+    // if( o.id === -1 || o.type !== "shapePoint" ) return;
+    if( o.id === -1 || o.obj !== Ref.pnts ) return;
+    // console.log( 'Pick', o );
+    Ref.gizmo.show( o.hit );
+    Ref.selPnt = o.idx;
+}
+// #endregion
+
+// #region ARMATURE
+
+// Turn GLTF Skeleton to an OSSOS Armature
+function parseArmature( gltf, idx=0, minLen=0.1 ){
+    const skin  = gltf.getSkin( idx );
+    const arm   = new Armature();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create Armature Skeleton
+    let b;
+    for( const j of skin.joints ){
+        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) b.local.rot.copy( j.rotation );
+        if( j.position ) b.local.pos.copy( j.position );
+        if( j.scale )    b.local.scl.copy( j.scale );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Set offset before binding, GLTF's inverseMatrices will
+    // include this in the bindpose which I think shouldnt
+    if( skin.position || skin.scale || skin.rotation  ){
+        const pose = arm.bindPose;
+        if( skin.position ) pose.offset.pos.copy( skin.position );
+        if( skin.rotation ) pose.offset.rot.copy( skin.rotation );
+        if( skin.scale  )   pose.offset.scl.copy( skin.scale  );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Finalize bone & instialize one of the skinning algorithms
+    arm.bind( minLen );
+    arm.useSkin( TranMatrixSkin );
+
+    return arm;
+}
+
+function getAnimationPose( gltf, pose, name='TPose', frame=0 ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Find animation
+    let idx = -1;
+    if( gltf.json.animations ){
+        idx = gltf.json.animations.findIndex( e=>(e.name.toLowerCase() === 'tpose') );
+    }
+
+    if( idx === -1 ){ console.log( 'Animation not found with the name: ', name ); return false; }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Parse Animation
+    const anim = gltf.getAnimation( idx );
+    if( anim.timestamps.length > 1 ) console.warn( 'Multiple timestamps in animation named: ', name );
+
+    for( let i of anim.tracks ){
+        switch( i.transform ){
+            case 0:
+                // TODO, frame value might need to be multiplied for use with .fromBuf
+                pose.bones[ i.jointIndex ].local.rot.fromBuf( i.keyframes.data, frame );
+                break;
+        }
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    pose.updateWorld();
+    return true;
+}
+
+function debugBones( ary, debug, offset=[0,0,0] ){ // flen=0.06, pntSize=0.9, doReset=false,
+    const flen      = 0.06; 
+    const pntSize   = 0.9;
+    const doReset   = false
+
+    const up        = new Vec3();
+    const fwd       = new Vec3();
+    const v         = new Vec3();
+    const boneColor = 0x797979;
+    const jntColor  = 0x909090;
+
+    if( doReset ){
+        debug.pnt.reset();
+        debug.ln.reset();
+    }
+
+    for( let b of ary ){
+        v   .fromAdd( b.world.pos, offset );
+
+        up  .fromQuat( b.world.rot, Vec3.UP )
+            // .scale( b.len * b.world.scl[1] )  
+            .scale( b.len ) // No Scale, can't see bones when dealing with offset transforms that scale characters
+            .add( v );
+
+        fwd .fromQuat( b.world.rot, Vec3.FORWARD )
+            .scale( flen )
+            .add( v );
+
+        debug.pnt.add( v, jntColor, pntSize, 1 );
+        debug.ln.add( v, fwd, jntColor );
+        debug.ln.add( v, up, boneColor );
+    }
+}
+
+// #endregion
+
+// #region IK RIG
+
+const IKSET_CONFIG = {
+    'leftArm'   : { type:'limb', solver: limbCompose, target: IKTarget, axes: BoneAxes.RBD },
+    'rightArm'  : { type:'limb', solver: limbCompose, target: IKTarget, axes: BoneAxes.LBU },
+
+    'leftLeg'   : { type:'limb', solver: limbCompose, target: IKTarget, axes: BoneAxes.DFR },
+    'rightLeg'  : { type:'limb', solver: limbCompose, target: IKTarget, axes: BoneAxes.DFR },
+    'spine'     : { type:'spine', solver: splineCompose, target: IKSplineTarget, axes: BoneAxes.UFR, opts:{ useReach:false } },
+};
+
+class IKSet{
+    chain       = new IKChain();
+    opts        = {};
+    target      = null;
+    solver      = null;
+    axesType    = -1;
+    type        = 'unknown'
+    constructor( conf=null ){
+        if( conf ) this.fromConfig( conf );
+    }
+
+    setChain( bAry ){
+        this.chain.setBones( bAry, this.axesType );
+        return this
+    }
+
+    fromConfig( c ){
+        this.target     = new c.target();
+        this.solver     = c.solver;
+        this.axesType   = c.axes;
+        this.type       = c.type;
+        this.opts       = c.opts;
+        return this;
+    }
+
+    updatePose( pose ){
+        this.solver( this.target, this.chain, pose, this.opts );
+    }
+}
+
+class IKPoseRig{
+    // #region MAIN
+    tpose       = null;
+    wpose       = null;
+    // skel = { leftLeg, leftArm, etc }
+    leftLeg     = new IKSet( IKSET_CONFIG.leftLeg );
+    rightLeg    = new IKSet( IKSET_CONFIG.rightLeg );
+    leftArm     = new IKSet( IKSET_CONFIG.leftArm );
+    rightArm    = new IKSet( IKSET_CONFIG.rightArm );
+    spine       = new IKSet( IKSET_CONFIG.spine );
+    
+    constructor( tpose, autoGen=false ){
+        this.tpose = tpose;
+        this.wpose = tpose.clone();
+        if( autoGen ) this.autoGen();
+    }
+
+    autoGen(){
+        const bMap = new BoneMap( this.tpose );
+
+        // console.log( bMap );
+        // console.log( this.tpose.arm.names );
+
+        this.leftArm.setChain( bMap.getBoneSet( 'leftArm' ) );
+        this.leftArm.target.setPositions( this.getTargetPos( 'leftArm' ) , this.getPolePos( 'leftArm' ) );
+
+        this.rightArm.setChain( bMap.getBoneSet( 'rightArm' ) );
+        this.rightArm.target.setPositions( this.getTargetPos( 'rightArm' ) , this.getPolePos( 'rightArm' ) );
+
+        this.leftLeg.setChain( bMap.getBoneSet( 'leftLeg' ) );
+        this.leftLeg.target.setPositions( this.getTargetPos( 'leftLeg' ) , this.getPolePos( 'leftLeg' ) );
+
+        this.rightLeg.setChain( bMap.getBoneSet( 'rightLeg' ) );
+        this.rightLeg.target.setPositions( this.getTargetPos( 'rightLeg' ) , this.getPolePos( 'rightLeg' ) );
+
+        this.spine.setChain( bMap.getBoneSet( 'spine' ) );
+        this.spine.target.setSpline( new NurbsSpline().appendCurve( [[0,0,0],[0,0,0],[0,0,0]] ) );
+        this.spine.target.setPositions( this.getTargetPos( 'spine' ) , this.getPolePos('spine') );
+
+        return this;
+    }
+    // #endregion
+
+    // #region GETTERS / SETTERS
+    setTargetPos( sName, pos ){
+        const s = this[ sName ];
+        s.target.setPositions( pos );
+        return this;
+    }
+
+    setPolePos( sName, pos ){
+        const s = this[ sName ];
+        s.target.setPolePos( pos );
+        return this;
+    }
+
+    getTargetPos( sName ){
+        const s = this[ sName ];
+        const i = s.chain.links.at(-1).index;
+        return this.wpose.getWorldTransform( i ).pos;
+    }
+
+    getPolePos( sName ){
+        const s     = this[ sName ];
+        const pos   = new Vec3();
+
+        const al    = s.chain.links[0];
+        const a     = this.wpose.getWorldTransform( al.index );
+        const bl    = s.chain.links.at(-1);
+        const b     = this.wpose.getWorldTransform( bl.index );
+
+        switch( s.type ){
+            case 'limb': 
+                const dir = new Vec3().fromQuat( a.rot, al.axes.twist ).scale( 0.3 );
+                pos.fromLerp( a.pos, b.pos, 0.5 ).add( dir );
+                break;
+
+            case 'spine':
+                pos.fromLerp( a.pos, b.pos, 0.5 )
+                pos[2] -= 0.05;
+                break;
+        }
+
+        return pos;
+    }
+    // #endregion
+
+    runSolvers(){
+        this.wpose.reset();
+        this.spine.updatePose( this.wpose );
+        this.leftArm.updatePose( this.wpose );
+        this.rightArm.updatePose( this.wpose );
+        this.leftLeg.updatePose( this.wpose );
+        this.rightLeg.updatePose( this.wpose );
+    }
+}
+
+
+
+// class IKBipedRig extends IKRig {
+//     // #region MAIN
+//     hipHeight = 0;  // Track how far character stands off the ground + for IK Scaling
+
+//     constructor( TPose, autoGen=true ){
+//         super( TPose );
+
+//         if( autoGen ){
+//             const bMap = new BoneMap( this.pose );
+//             // console.log( bMap );
+
+//             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//             // Limbs
+//             this.setLeftArm( bMap.getBoneNames( [ 'upperarm_l', 'forearm_l', 'hand_l' ] ) );
+//             this.setRightArm( bMap.getBoneNames( [ 'upperarm_r', 'forearm_r', 'hand_r' ] ) );
+//             this.setLeftLeg( bMap.getBoneNames( [ 'thigh_l', 'shin_l', 'foot_l' ] ) );
+//             this.setRightLeg( bMap.getBoneNames( [ 'thigh_r', 'shin_r', 'foot_r' ] ) );
+
+//             this.setLeftFoot( bMap.getBoneNames( [ 'foot_l' ] ) );
+//             this.setRightFoot( bMap.getBoneNames( [ 'foot_r' ] ) );
+
+//             this.setLeftHand( bMap.getBoneNames( [ 'hand_l' ] ) );
+//             this.setRightHand( bMap.getBoneNames( [ 'hand_r' ] ) );
+
+//             // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//             // Others
+//             this.setSpine( bMap.getBoneNames( [ 'spine' ] ) );
+//             this.setHead( bMap.getBoneNames( [ 'head' ] ) );
+//             this.setHip( bMap.getBoneNames( [ 'hip' ] ) );
+//         }
+//     }
+//     // #endregion
+
+//     // #region ARM CHAINS
+//     get leftArm(){ return this.sets[ this.names[ 'arm_l' ] ]; }
+//     setLeftArm( bones ){
+//         if( bones ) this.addSet( { name: 'arm_l', solver: 'limb', bones: bones, axes: BoneAxes.RBD, order: 10 } );
+//         return this;
+//     }
+
+//     get leftHand(){ return this.sets[ this.names[ 'hand_l' ] ]; }
+//     setLeftHand( bones ){
+//         if( bones ) this.addSet( { name: 'hand_l', solver: 'look', bones: bones, axes: BoneAxes.RBD, order: 11 } );
+//         return this;
+//     }
+
+//     get rightArm(){ return this.sets[ this.names[ 'arm_r' ] ]; }
+//     setRightArm( bones ){
+//         if( bones ) this.addSet( { name: 'arm_r', solver: 'limb', bones: bones, axes: BoneAxes.LBU, order: 10 } );
+//         return this;
+//     }
+
+//     get rightHand(){ return this.sets[ this.names[ 'hand_r' ] ]; }
+//     setRightHand( bones ){
+//         if( bones ) this.addSet( { name: 'hand_r', solver: 'look', bones: bones, axes: BoneAxes.LBU, order: 11 } );
+//         return this;
+//     }
+//     // #endregion
+
+//     // #region LEG CHAINS
+//     // Note : Reserve 8 for Toes
+//     get leftLeg(){ return this.sets[ this.names[ 'leg_l' ] ]; }
+//     setLeftLeg( bones ){
+//         if( bones ) this.addSet( { name: 'leg_l', solver: 'limb', bones: bones, axes: BoneAxes.DFR, order: 6 } );
+//         return this;
+//     }
+
+//     get leftFoot(){ return this.sets[ this.names[ 'foot_l' ] ]; }
+//     setLeftFoot( bones ){
+//         if( bones ) this.addSet( { name: 'foot_l', solver: 'look', bones: bones, axes: BoneAxes.FUR, order:7 } );
+//         return this;
+//     }
+
+//     get rightLeg(){ return this.sets[ this.names[ 'leg_r' ] ]; }
+//     setRightLeg( bones ){
+//         if( bones ) this.addSet( { name: 'leg_r', solver: 'limb', bones: bones, axes: BoneAxes.DFR, order: 6 } );
+//         return this;
+//     }
+
+//     get rightFoot(){ return this.sets[ this.names[ 'foot_r' ] ]; }
+//     setRightFoot( bones ){
+//         if( bones ) this.addSet( { name: 'foot_r', solver: 'look', bones: bones, axes: BoneAxes.FUR, order: 7 } );
+//         return this;
+//     }
+//     // #endregion
+
+//     // #region CENTER LINE
+//     get hip(){ return this.sets[ this.names[ 'hip' ] ]; }
+//     setHip( bones ){
+//         if( bones ){
+//             this.addSet( { name: 'hip', solver: 'root', bones: bones, axes: BoneAxes.FUR, order: 1, } );
+
+//             // Save Hip Height for use of scaling translations
+//             const b = this.pose.bones[ this.hip.chain.firstLink.index ];
+//             this.hipHeight = b.world.pos[ 1 ]; // Y can give us the hip height
+//         }
+//         return this;
+//     }
+
+//     get spine(){ return this.sets[ this.names[ 'spine' ] ]; }
+//     setSpine( bones ){
+//         if( bones ) this.addSet( { name: 'spine', solver: 'swingchain', bones: bones, axes: BoneAxes.UFR, order: 2, } );
+//         return this;
+//     }
+
+//     get head(){ return this.sets[ this.names[ 'head' ] ]; }
+//     setHead( bones ){
+//         if( bones ) this.addSet( { name: 'head', solver: 'look', bones: bones, axes: BoneAxes.FUR, order: 3, } );
+//         return this;
+//     }
+//     // #endregion
+// }
+
+// #endregion
+
+
+// #region CHARACTER LOADING
+
+class Character {
+    // #region MAIN
+    name    = '';       // Character Name
+    arm     = null;     // Armature
+    rig     = null;     // IK Rig
+    models  = [];       // Collection of skinned models that make character
+    constructor( name ){
+        if( name ) this.name = name;
+    }
+    // #endregion
+
+    // #region SETUP
+    setTPose( tpose, autoGen=true ){
+        this.arm = tpose.arm;
+        this.rig = new IKPoseRig( tpose, autoGen );
+        return this;
+    }
+
+    setOffsetPos( v ){ this.rig.pose.offset.pos.copy( v ); return this; }
+    // #endregion
+
+    // #region METHODS
+    
+    runSolvers(){ 
+        this.rig.runSolvers();
+        this.arm.skin.updateFromPose( this.rig.wpose );
+        return this;
+    }
+
+    // #endregion
+}
+
+async function fetchCharacter( url ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Load JSON Character File
+    const res = await fetch( url );
+    if( !res.ok ) throw new Error( `fetchCharacter: ${res.status} - ${res.statusText}` );
+
+    const json = await res.json();
+    if( !json.src || !json.src.includes( '.gltf' ) ) throw new Error( 'fetchCharacter: Src not GLTF' );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Download GLTF File
+    const path = url.substring( 0, url.lastIndexOf( '/' )+1 );
+    const gltf = await Gltf2.fetch( `${path}${json.src}` );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Parse skeleton & setup Ossos Armature
+    const arm = parseArmature( gltf, json.skinIndex || 0 );
+    // console.log( arm );
+
+    // BindPose might be an APose, so TPose can be stored 
+    // as a single frame animation
+    if( json.tpose && json.tpose.type === 'animation' ){
+        const tpose = arm.newPose( 'tpose' );
+        getAnimationPose( gltf, tpose, json.tpose.name, json.tpose.frame );
+        // arm.skin.updateFromPose( tpose );
+    }
+
+    const char = new Character( json.name )
+        .setTPose( arm.poses.tpose ?? arm.poses.bind );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Get all primitives to a gl mesh & create 3JS Meshes
+    const gmesh  = gltf.getMesh( json.meshName );
+    if( !gmesh || gmesh.primitives.length == 0 ){
+        console.error( `No gltf mesh found: ${id}` );
+        return null;
+    }
+
+    for( const p of gmesh.primitives ){
+        // --------------------------
+        let col = 'gray';
+        if( p.materialNam ){
+            const gmat = gltf.getMaterial( p.materialName );
+            
+            if( gmat.baseTexture && gmat.baseTexture.uri ){
+                col       = new THREE.TextureLoader().load( gltf.path + gmat.baseTexture.uri );
+                col.flipY = json.textureYFlip ?? true;
+            }else if( gmat.baseColor ) col = gmat.baseColor;
+        }
+        
+        // --------------------------
+        const mat  = MatrixSkinMaterial( col, arm.skin );
+        const geo  = geoPrimitive( p );
+        const mesh = new THREE.Mesh( geo, mat );
+        char.models.push( mesh );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    return char;
+}
+
+function geoPrimitive( prim, useSkin=true ){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute( 'position', new THREE.BufferAttribute( prim.position.data, prim.position.componentLen ) );
+
+    if( prim.indices )    geo.setIndex( new THREE.BufferAttribute( prim.indices.data, 1 ) );
+    if( prim.normal )     geo.setAttribute( 'normal', new THREE.BufferAttribute( prim.normal.data, prim.normal.componentLen ) );
+    if( prim.texcoord_0 ) geo.setAttribute( 'uv', new THREE.BufferAttribute( prim.texcoord_0.data, prim.texcoord_0.componentLen ) );
+
+    if( useSkin && prim.joints_0 && prim.weights_0 ){
+        geo.setAttribute( 'skinWeight', new THREE.BufferAttribute( prim.weights_0.data, prim.weights_0.componentLen ) );
+        geo.setAttribute( 'skinIndex',  new THREE.BufferAttribute( prim.joints_0.data,  prim.joints_0.componentLen ) );
+    }
+
+    return geo;
+}
+
+// #endregion
+
+</script></body></html>

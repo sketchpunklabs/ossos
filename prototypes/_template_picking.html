@@ -44,6 +44,7 @@ function onPostRender( dt, et ){
 }
 
 window.addEventListener( 'pointerdown', e=>{
+    // if( Ref.gizmo.o.dragging ) return;
     Ref.tasks.push( Ref.picker.pixelTaskFromEvent(e, onPicker, true) );
 });
 

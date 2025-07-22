@@ -73,6 +73,13 @@ class ShapePointsMesh extends THREE.Points{
         ];
     }
 
+    forDebugging( order=101 ){
+        this.renderOrder        = order;
+        this.frustumCulled      = false;
+        this.material.depthTest = false;
+        return this;
+    }
+
     _updateGeometry(){
         const geo       = this.geometry;
         const bVerts    = geo.attributes.position;

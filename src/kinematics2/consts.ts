@@ -9,12 +9,13 @@ import limbCompose              from './compose/limbCompose';
 import trapezoidCompose         from './compose/trapezoidCompose';
 import zCompose                 from './compose/zCompose';
 import swingTwistChainSolver    from './solvers/swingTwistChainSolver';
+import asincArcCompose          from './compose/asincArcCompose';
 // #endregion
 
 // #region TYPES
+export type TSolverOptions = Record< string, boolean | number | string >;
 
-export type TIKSolver = ( tar: IKTarget, chain: IKChain, pose: Pose, Debug ?: any )=>void;
-
+export type TIKSolver = ( tar: IKTarget, chain: IKChain, pose: Pose, opts ?: TSolverOptions )=>void;
 // #endregion
 
 // #region CONSTANTS
@@ -26,6 +27,7 @@ export const IK_SOLVERS : Record<string, TIKSolver> = {
     'z'             : zCompose,
     'trapezoid'     : trapezoidCompose,
     'swingchain'    : swingTwistChainSolver,
+    'asincarc'      : asincArcCompose,
 };
 
 // #endregion

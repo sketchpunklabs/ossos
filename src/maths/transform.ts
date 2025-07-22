@@ -1,5 +1,5 @@
-import Vec3, { TVec3, ConstVec3 } from './Vec3';
-import Quat, { TQuat, ConstQuat } from './Quat';
+import Vec3 from './Vec3';
+import Quat from './Quat';
 
 // https://gabormakesgames.com/blog_transforms_transforms.html
 // https://gabormakesgames.com/blog_transforms_transform_world.html
@@ -13,8 +13,8 @@ export default class Transform{
 
     constructor()
     constructor( tran: Transform )
-    constructor( rot: TQuat, pos: ConstVec3, scl: ConstVec3 )
-    constructor( rot ?: TQuat | Transform, pos ?: ConstVec3, scl ?: ConstVec3 ){
+    constructor( rot: ConstQuat, pos: ConstVec3, scl: ConstVec3 )
+    constructor( rot ?: ConstQuat | Transform, pos ?: ConstVec3, scl ?: ConstVec3 ){
         if( rot instanceof Transform ){
             this.copy( rot );
         }else if( rot && pos && scl ){
@@ -52,8 +52,8 @@ export default class Transform{
 
     // Computing Transforms, Parent -> Child
     mul( tran: Transform ) : this
-    mul( cr: ConstQuat, cp: TVec3, cs ?: TVec3 ) : this
-    mul( cr: ConstQuat | Transform, cp ?: TVec3, cs ?: TVec3 ) : this{
+    mul( cr: ConstQuat, cp: ConstVec3, cs ?: ConstVec3 ) : this
+    mul( cr: ConstQuat | Transform, cp ?: ConstVec3, cs ?: ConstVec3 ) : this{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // If just passing in Tranform Object
         if( cr instanceof Transform ){
@@ -81,8 +81,8 @@ export default class Transform{
 
     // Computing Transforms in reverse, Child - > Parent
     pmul( tran: Transform ) : this
-    pmul( pr: ConstQuat, pp: TVec3, ps: TVec3 ) : this
-    pmul( pr: ConstQuat | Transform, pp ?: TVec3, ps ?: TVec3 ) : this{
+    pmul( pr: ConstQuat, pp: ConstVec3, ps: ConstVec3 ) : this
+    pmul( pr: ConstQuat | Transform, pp ?: ConstVec3, ps ?: ConstVec3 ) : this{
         //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // If just passing in Tranform Object
         if( pr instanceof Transform ){
@@ -109,7 +109,7 @@ export default class Transform{
         return this
     }
 
-    addPos( cp: TVec3, ignoreScl=false ) : this{
+    addPos( cp: ConstVec3, ignoreScl=false ) : this{
         // POSITION - parent.position + ( parent.rotation * ( parent.scale * child.position ) )
         if( ignoreScl ) this.pos.add( new Vec3().fromQuat( this.rot, cp ) );
         else            this.pos.add( new Vec3().fromMul( cp, this.scl ).transformQuat( this.rot ) );
@@ -169,6 +169,53 @@ export default class Transform{
         // vec3.add( out, this.pos );
         // return out;
     }
+
+    // Create a temp inverted transform then apply it to a vector
+    // invTransformVec3( v: Vec3, out:Vec3=new Vec3() ): Vec3{
+    //     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //     // Create in inverse tranform
+    //     const rot = new Quat().fromInvert( this.rot );
+    //     const scl = new Vec3().fromInvert( this.scl );
+    //     const pos = new Vec3()
+    //         .fromNegate( this.pos )
+    //         .mul( scl )
+    //         .transformQuat( rot );
+
+    //     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //     // Apply transform in reverse order
+    //     // NOTE: Add pos because its been inverted, so its a plus negative
+    //     out.fromAdd( v, pos )
+    //         .transformQuat( rot )
+    //         .mul( scl );
+
+    //     return out;
+    // }
+ 
+    // When using an inversed transform, use this to transform
+    // WorldSpace vectors to local space
+    // transformVec3Rev( v: Vec3Like, out: Vec3Like=[0,0,0] ): Vec3Like{
+    //     // Translation
+    //     const vx = v[0] + this.pos[0];
+    //     const vy = v[1] + this.pos[1];
+    //     const vz = v[2] + this.pos[2];
+
+    //     // ( Rotation * Vector3 ) * scale
+    //     const qx = this.rot[0];
+    //     const qy = this.rot[1];
+    //     const qz = this.rot[2];
+    //     const qw = this.rot[3];
+    //     const x1 = qy * vz - qz * vy;
+    //     const y1 = qz * vx - qx * vz;
+    //     const z1 = qx * vy - qy * vx;
+    //     const x2 = qw * x1 + qy * z1 - qz * y1;
+    //     const y2 = qw * y1 + qz * x1 - qx * z1;
+    //     const z2 = qw * z1 + qx * y1 - qy * x1;
+
+    //     out[0]   = ( vx + 2 * x2 ) * this.scl[0];
+    //     out[1]   = ( vy + 2 * y2 ) * this.scl[1];
+    //     out[2]   = ( vz + 2 * z2 ) * this.scl[2];
+    //     return out;
+    // }
     // #endregion
 
 }

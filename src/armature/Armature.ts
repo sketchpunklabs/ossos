@@ -40,17 +40,28 @@ export default class Armature {
             return obj;
 
         }else{
-            const bone  = new Bone( obj );
+            const bone = new Bone( obj );
             bone.index = idx;
 
             bones.push( bone );
             this.names.set( bone.name, idx );
 
-            if( typeof obj?.parent === 'string' ){
-                const pIdx = this.names.get( obj?.parent );
+            if( obj?.parent != null ){
+                let pIdx: number = -1;
+                switch( obj.parent.constructor.name ){
+                    case 'Number' : pIdx = obj.parent as number; break;
+                    case 'String' : pIdx = this.names.get( obj.parent as string ) as number; break;
+                    case 'Bone'   : pIdx = (obj.parent as Bone).index; break;
+                    default:
+                        console.log( 'Unknown parent type', obj.parent );
+                }
 
-                if( pIdx !== undefined ) bone.pindex = pIdx;
-                else                     console.error( 'Parent bone not found', obj.name );
+                if( pIdx !== -1 && pIdx != null ){
+                    bone.pindex = pIdx;
+                    bones[pIdx].children.push( bone.index );
+                }else{
+                    console.error( 'Parent bone not found', obj.name );
+                }
             }
 
             return bone;

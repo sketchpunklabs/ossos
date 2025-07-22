@@ -2,7 +2,7 @@
 import type { IKChain }     from './IKChain';
 import type Pose            from '../armature/Pose';
 
-import Vec3, { ConstVec3 }  from '../maths/Vec3';
+import Vec3                 from '../maths/Vec3';
 import Transform            from '../maths/Transform';
 // #endregion
 
@@ -40,6 +40,13 @@ export default class IKTarget {
         this.endPos.copy( t );
 
         if( p ) this.polePos.copy( p );
+        return this;
+    }
+
+    setPolePos( p: ConstVec3 ): this{
+        this.hasChanged = true;
+        this.pMode      = 0;
+        this.polePos.copy( p );
         return this;
     }
 

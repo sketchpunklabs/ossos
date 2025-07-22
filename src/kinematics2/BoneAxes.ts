@@ -1,6 +1,6 @@
 // #region IMPORTS
-import type { ConstQuat } from '../maths/Quat';
 import Vec3 from '../maths/Vec3';
+import Quat from '../maths/Quat';
 // #endregion
 
 export default class BoneAxes {
@@ -40,6 +40,31 @@ export default class BoneAxes {
         this.swing.fromQuat( q, this.swing ).norm();
         this.twist.fromQuat( q, this.twist ).norm();
         this.ortho.fromQuat( q, this.ortho ).norm();
+        return this;
+    }
+
+    applyInvertQuat( q: ConstQuat ): this{
+        const qi = new Quat().fromInvert( q );
+        this.swing.fromQuat( qi, this.swing ).norm();
+        this.twist.fromQuat( qi, this.twist ).norm();
+        this.ortho.fromQuat( qi, this.ortho ).norm();
+        return this;
+    }
+
+    setOrthogonal( swing: ConstVec3, twist: ConstVec3=[0,0,1] ): this{
+        this.swing.copy( swing );
+        this.ortho.fromCross( twist, this.swing ).norm();
+
+        // FWD & UP are parallel
+        if( Vec3.lenSqr( this.ortho ) === 0 ){
+            if( Math.abs( twist[2] ) === 1 ) this.swing[0] += 0.0001;  // shift x when Fwd or Bak
+            else                             this.swing[2] += 0.0001;  // shift z
+
+            this.swing.norm();                                  // ReNormalize
+            this.ortho.fromCross( twist, this.swing ).norm();   // Redo Right
+        }
+
+        this.twist.fromCross( this.swing, this.ortho ).norm(); // Realign Up
         return this;
     }
 

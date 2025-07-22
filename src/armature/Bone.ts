@@ -13,12 +13,13 @@ export interface BoneProps{
 
 export default class Bone{
     // #region MAIN
-    index   = -1;               // Array Index
-    pindex  = -1;               // Array Index of Parent
-    name    = '';               // Bone Name
-    len     = 0;                // Length of Bone
-    local   = new Transform();  // Local space transform
-    world   = new Transform();  // World space transform
+    index   = -1;                   // Array Index
+    pindex  = -1;                   // Array Index of Parent
+    name    = '';                   // Bone Name
+    len     = 0;                    // Length of Bone
+    local   = new Transform();      // Local space transform
+    world   = new Transform();      // World space transform
+    children : Array<number> = [];  // Indices to children bones
     constraint : any = null;
 
     constructor( props ?: BoneProps ){
@@ -43,6 +44,7 @@ export default class Bone{
         b.pindex        = this.pindex;
         b.len           = this.len;
         b.constraint    = this.constraint;
+        b.children      = this.children.slice();
 
         b.local.copy( this.local );
         b.world.copy( this.world );

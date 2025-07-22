@@ -18,29 +18,14 @@ export { MatrixSkin, DQTSkin, TranMatrixSkin, DualQuatSkin, SQTSkin };
 // #endregion
 
 // #region KINEMATICS
-// import IKTarget         from './kinematics/IKTarget';
-// import { IKChain }      from './kinematics/IKChain';
-// import { BoneAxes, AxesDirections }
-//                         from './kinematics/BoneAxes';
-
-// import aimChainSolver   from './kinematics/solvers/aimChainSolver';
-// import twoBoneSolver    from './kinematics/solvers/twoBoneSolver';
-// import Fabrik           from './kinematics/solvers/Fabrik';
-
-// import limbSolver       from './kinematics/compose/limbSolver';
-// import fabrikSolver     from './kinematics/compose/fabrikSolver';
-
-// export { 
-//     IKTarget, IKChain, BoneAxes, AxesDirections,
-//     Fabrik, aimChainSolver, twoBoneSolver,
-//     limbSolver, fabrikSolver,
-// };
 
 // IK OBJECTS
 import BoneAxes                 from './kinematics2/BoneAxes';
 import IKTarget                 from './kinematics2/IKTarget';
 import { IKChain, IKLink }      from './kinematics2/IKChain';
 import { IKRig }                from './kinematics2/IKRig';
+
+import { IK_SOLVERS }           from './kinematics2/consts';
 
 // RAW SOLVERS
 import lookSolver               from './kinematics2/solvers/lookSolver';
@@ -49,6 +34,7 @@ import swingTwistChainSolver    from './kinematics2/solvers/swingTwistChainSolve
 import deltaMoveSolver          from './kinematics2/solvers/deltaMoveSolver';
 import trapezoidSolver          from './kinematics2/solvers/trapezoidSolver';
 import zSolver                  from './kinematics2/solvers/zSolver';
+import splineSolver             from './kinematics2/solvers/splineSolver';
 
 // COMPOSED SOLVERS
 import rootCompose              from './kinematics2/compose/rootCompose';
@@ -56,12 +42,13 @@ import lookCompose              from './kinematics2/compose/lookCompose';
 import limbCompose              from './kinematics2/compose/limbCompose';
 import zCompose                 from './kinematics2/compose/zCompose';
 import trapezoidCompose         from './kinematics2/compose/trapezoidCompose';
+import asincArcCompose          from './kinematics2/compose/asincArcCompose';
 
-// EXOIRT
+// EXPORT
 export {
-    IKRig, IKTarget, IKChain, IKLink, BoneAxes,
-    lookSolver, twoBoneSolver, swingTwistChainSolver, deltaMoveSolver, trapezoidSolver, zSolver,
-    rootCompose, lookCompose, limbCompose, zCompose, trapezoidCompose
+    IKRig, IKTarget, IKChain, IKLink, BoneAxes, IK_SOLVERS,
+    lookSolver, twoBoneSolver, swingTwistChainSolver, deltaMoveSolver, trapezoidSolver, zSolver, splineSolver,
+    rootCompose, lookCompose, limbCompose, zCompose, trapezoidCompose, asincArcCompose
 };
 // #endregion
 

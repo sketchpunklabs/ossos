@@ -1,0 +1,882 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import GltfUtil, { Gltf2 }          from '../_lib/misc/GltfUtil.js';
+import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
+
+import useTransformControl          from '../_lib/useTransformControl.js';
+import Util                         from '../_lib/misc/Util.js';
+import ShapePointsMesh              from '../_lib/meshes/ShapePointsMesh.js';
+
+import ScreenPicker, { Tasker }     from '../_lib/misc/ScreenPicker.js';
+
+import { 
+    Armature, TranMatrixSkin,
+    Quat, Vec3, Transform, 
+    Pose, BoneMap,
+} from '../../src/index';
+
+
+import { NurbsSpline, CatmullRomSpline, BezierQuadSpline } from '../../src/maths/curves/index';
+import {
+    BoneAxes, IKTarget, IKChain,
+    IKSplineTarget, splineCompose, limbCompose, lookCompose,
+} from '../../src/kinematics2/index';
+
+import { Pane }                 from '../_thirdparty/tweakpane-4.0.4.min.js';
+import * as TweakpaneEssentials from '../_thirdparty/tweakpane-plugin-essentials-0.2.1.min.js';
+// #endregion
+
+// #region MAIN
+let Debug;
+let App = useDarkScene( useThreeWebGL2() );
+let Ref = {
+    pnts    : new ShapePointsMesh().forDebugging( 100 ),
+    gizmo   : useTransformControl( App ).useAxes().hide(),
+    picker  : new ScreenPicker( App ),
+    tasks   : new Tasker(),
+    selPnt  : -1,
+
+    twistA  : 0,
+    twistB  : 0,
+};
+
+let POSE = [
+    { pos:[0,0,0], key:'leftArm', type:'target' },
+    { pos:[0,0,0], key:'leftArm', type:'pole' },
+
+    { pos:[0,0,0], key:'rightArm', type:'target' },
+    { pos:[0,0,0], key:'rightArm', type:'pole' },
+
+    { pos:[0,0,0], key:'leftLeg', type:'target' },
+    { pos:[0,0,0], key:'leftLeg', type:'pole' },
+
+    { pos:[0,0,0], key:'rightLeg', type:'target' },
+    { pos:[0,0,0], key:'rightLeg', type:'pole' },
+
+    { pos:[0,0,0], key:'spine', type:'target' },
+    { pos:[0,0,0], key:'spine', type:'pole' },
+]
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 90, 20, 2, [ 0, 1.1, 0 ] );
+    globalThis.Debug = Debug = await useVisualDebug( App );
+
+    App.scene.add( Ref.pnts );
+
+    // Ref.pnts
+    //     .add( [0,1,0], 0x00ffff, 4, 6 )
+    //     .add( [0,2,0], 0xffff00, 4, 6 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Load Character Mesh
+    Ref.char0 = await fetchCharacter( '/prototypes/_res/models/axel/axel.json' );
+    // Ref.char0.setOffsetPos( [1.6,0,0] );
+    App.scene.add( ...Ref.char0.models );
+
+    const rig = Ref.char0.rig;
+    for( let i of POSE ){
+        switch( i.type ){
+            case 'target':
+                i.pos = rig.getTargetPos( i.key );
+                Ref.pnts.add( i.pos, 0x00ff00, 1.5, 1 );
+                break;
+            case 'pole':
+                i.pos = rig.getPolePos( i.key );
+                Ref.pnts.add( i.pos, 0xffff00, 1.5, 0 );
+                break;
+        }
+    }
+
+    rig.setTargetPos( 'spine', [-9.955775093217767e-9, 1.134781189171546, 0.3871911897944943] );
+    
+
+
+    // for( const lnk of rig.spine.chain.links ){
+    //     Debug.pnt.add( rig.wpose.bones[ lnk.index ].world.pos, 0xff0000, 0.5 );
+    //     Debug.pnt.add( rig.tpose.bones[ lnk.index ].world.pos, 0xff0000, 1, 7  );
+    // }
+
+    // debugBones( rig.wpose.bones, Debug );
+
+    // console.log( Ref.char0 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Load Animation for Retargetting
+    
+    // const retarget = new IKBipedRetarget();
+    // retarget
+    //     .setSourceTPose( arm.bindPose ) // TPose for the clip animation
+    //     .setPlacementReset( [0,0,1] )   // Animation uses Zup, clear XY
+    //     .setClip( clip );               // Set animation to retarget
+
+    // Ref.retarget = retarget;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Test Frame Reargetting
+    // Ref.retarget
+    //     .atFrame( 0 )                           // Animate Frame + Gen IK Data
+    //     // .step( 0.1 )                         // Move Animation by seconds
+    //     .debugBones( Debug )                    // Visualize Bones
+    //     .debugIKPose( Debug )                   // Visualize IK Data
+    //     .applyIkPoseToRig( Ref.char0.rig );     // Push IK data to target IK Rig 
+
+    // Ref.char0
+    //     .runIk()
+    //     .updateSkin()
+    //     .debugBones();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( null, onPostRender ).start();
+    // App.renderLoop();
+    buildUI();
+});
+
+Ref.gizmo.onMove = pos=>{
+    console.log( pos );
+    if( Ref.selPnt === -1 ) return;
+    Ref.pnts.setPosAt( Ref.selPnt, pos );    
+    
+    const pi =  POSE[ Ref.selPnt ];
+    switch( pi.type ){
+        case 'target':
+            Ref.char0.rig.setTargetPos( pi.key, pos );
+            break;
+        case 'pole':
+            Ref.char0.rig.setPolePos( pi.key, pos );
+            break;
+    }
+
+    ikUpdate();
+};
+
+function onPreRender( dt, et ){}
+function onPostRender( dt, et ){ Ref.tasks.run(); }
+
+
+function ikUpdate(){
+    Debug.reset();
+    
+    const tar = Ref.char0.rig.spine.target;
+    tar.twistRadA = Ref.twistA * Math.PI / 180;
+    tar.twistRadB = Ref.twistB * Math.PI / 180;
+
+    Ref.char0.runSolvers();
+
+    const rig = Ref.char0.rig;
+
+    // debugBones( rig.wpose.bones, Debug );
+    
+    const v = new Vec3();
+    const samp = rig.spineData[0];
+    Debug.pnt.add( samp.items[0].pos, 0xFFA000, 1 );
+    for( let i=0; i < samp.items.length-1; i++ ){
+        Debug.ln.add( samp.items[i].pos, samp.items[i+1].pos, 0xFFA000 );
+
+        // v.fromScale( samp.items[i].normal, 0.05 ).add( samp.items[i].pos );
+        // Debug.ln.add( samp.items[i].pos, v, 0xFFA000 );
+
+        // v.fromScale( samp.items[i].tangent, 0.1 ).add( samp.items[i].pos );
+        // Debug.ln.add( samp.items[i].pos, v, 0xffffff );
+    }
+
+    const steps = rig.spineData[1];
+    for( const i of steps ){
+        Debug.pnt.add( i.pos, 0xFFA000, 0.5 );
+        v.fromScale( i.normal, 0.05 ).add( i.pos );
+        Debug.ln.add( i.pos, v, 0xFFA000 );
+    }
+
+    // for( const lnk of rig.spine.chain.links ){
+    //     Debug.pnt.add( rig.wpose.bones[ lnk.index ].world.pos, 0xff0000, 0.5 );
+    //     Debug.pnt.add( rig.tpose.bones[ lnk.index ].world.pos, 0xff0000, 1, 7  );
+    // }
+}
+
+window.addEventListener( 'pointerdown', e=>{
+    if( e.button === 2 ){
+        Ref.gizmo.hide();
+        Ref.selPnt = -1;
+        return;
+    }
+
+    if( Ref.gizmo.o.dragging ) return;
+    Ref.tasks.push( Ref.picker.pixelTaskFromEvent(e, onPicker, false) );
+});
+
+function onPicker( o ){
+    // console.log( 'Pick', o );
+    // if( o.id === -1 || o.type !== "shapePoint" ) return;
+    if( o.id === -1 || o.obj !== Ref.pnts ) return;
+    // console.log( 'Pick', o );
+    Ref.gizmo.show( o.hit );
+    Ref.selPnt = o.idx;
+}
+
+window.addEventListener( 'keydown', e=>{
+    switch( e.key ){
+        case ' ':
+            ikUpdate();
+            break;
+    }
+});
+
+async function buildUI(){
+    // const container = document.createElement( 'div' );
+    // container.className         = 'ppane';
+    // container.style.position    = 'fixed';
+    // container.style.top         = '10px';
+    // container.style.left        = '50%';
+    // // container.style.width       = '400px';
+    // container.style.height      = 'fit-content';
+    // container.style.transform   = 'translateX(-50%)';
+    // document.body.appendChild( container );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const p = new Pane( {  } );
+    p.on( 'change', e=>ikUpdate() );
+
+    const f = p.addFolder({ title: 'Twisting', expanded: true });
+    f.addBinding( Ref, 'twistA', { min: -180, max: 180, step: 1, label: 'Start' } );
+    f.addBinding( Ref, 'twistB', { min: -180, max: 180, step: 1, label: 'End' } );
+    f.addButton({ title: 'Reset' }).on( 'click', ()=>{
+        Ref.twistA = 0;
+        Ref.twistB = 0;
+        f.refresh();
+    });
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.pane = p;
+}
+// #endregion
+
+// #region ARMATURE
+
+// Turn GLTF Skeleton to an OSSOS Armature
+function parseArmature( gltf, idx=0, minLen=0.1 ){
+    const skin  = gltf.getSkin( idx );
+    const arm   = new Armature();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create Armature Skeleton
+    let b;
+    for( const j of skin.joints ){
+        b = arm.addBone( { name: j.name, parent: j.parentIndex } );
+        if( j.rotation ) b.local.rot.copy( j.rotation );
+        if( j.position ) b.local.pos.copy( j.position );
+        if( j.scale )    b.local.scl.copy( j.scale );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Set offset before binding, GLTF's inverseMatrices will
+    // include this in the bindpose which I think shouldnt
+    if( skin.position || skin.scale || skin.rotation  ){
+        const pose = arm.bindPose;
+        if( skin.position ) pose.offset.pos.copy( skin.position );
+        if( skin.rotation ) pose.offset.rot.copy( skin.rotation );
+        if( skin.scale  )   pose.offset.scl.copy( skin.scale  );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Finalize bone & instialize one of the skinning algorithms
+    arm.bind( minLen );
+    arm.useSkin( TranMatrixSkin );
+
+    return arm;
+}
+
+function getAnimationPose( gltf, pose, name='TPose', frame=0 ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Find animation
+    let idx = -1;
+    if( gltf.json.animations ){
+        idx = gltf.json.animations.findIndex( e=>(e.name.toLowerCase() === 'tpose') );
+    }
+
+    if( idx === -1 ){ console.log( 'Animation not found with the name: ', name ); return false; }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Parse Animation
+    const anim = gltf.getAnimation( idx );
+    if( anim.timestamps.length > 1 ) console.warn( 'Multiple timestamps in animation named: ', name );
+
+    for( let i of anim.tracks ){
+        switch( i.transform ){
+            case 0:
+                // TODO, frame value might need to be multiplied for use with .fromBuf
+                pose.bones[ i.jointIndex ].local.rot.fromBuf( i.keyframes.data, frame );
+                break;
+        }
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    pose.updateWorld();
+    return true;
+}
+
+function debugBones( ary, debug, offset=[0,0,0] ){ // flen=0.06, pntSize=0.9, doReset=false,
+    const flen      = 0.06; 
+    const pntSize   = 0.9;
+    const doReset   = false
+
+    const up        = new Vec3();
+    const fwd       = new Vec3();
+    const v         = new Vec3();
+    const boneColor = 0x797979;
+    const jntColor  = 0x909090;
+
+    if( doReset ){
+        debug.pnt.reset();
+        debug.ln.reset();
+    }
+
+    for( let b of ary ){
+        v   .fromAdd( b.world.pos, offset );
+
+        up  .fromQuat( b.world.rot, Vec3.UP )
+            // .scale( b.len * b.world.scl[1] )  
+            .scale( b.len ) // No Scale, can't see bones when dealing with offset transforms that scale characters
+            .add( v );
+
+        fwd .fromQuat( b.world.rot, Vec3.FORWARD )
+            .scale( flen )
+            .add( v );
+
+        debug.pnt.add( v, jntColor, pntSize, 1 );
+        debug.ln.add( v, fwd, jntColor );
+        debug.ln.add( v, up, boneColor );
+    }
+}
+
+// #endregion
+
+// #region IK RIG
+
+const IKSET_CONFIG = {
+    'leftArm'   : { type:'limb', solver: limbCompose, target: IKTarget, axes: BoneAxes.RBD },
+    'rightArm'  : { type:'limb', solver: limbCompose, target: IKTarget, axes: BoneAxes.LBU },
+
+    'leftLeg'   : { type:'limb', solver: limbCompose, target: IKTarget, axes: BoneAxes.DFR },
+    'rightLeg'  : { type:'limb', solver: limbCompose, target: IKTarget, axes: BoneAxes.DFR },
+    'spine'     : { type:'spine', solver: splineCompose, target: IKSplineTarget, axes: BoneAxes.UFR, opts:{ useReach:false } },
+};
+
+class IKSet{
+    chain       = new IKChain();
+    opts        = {};
+    target      = null;
+    solver      = null;
+    axesType    = -1;
+    type        = 'unknown'
+    constructor( conf=null ){
+        if( conf ) this.fromConfig( conf );
+    }
+
+    setChain( bAry ){
+        this.chain.setBones( bAry, this.axesType );
+        return this
+    }
+
+    fromConfig( c ){
+        this.target     = new c.target();
+        this.solver     = c.solver;
+        this.axesType   = c.axes;
+        this.type       = c.type;
+        this.opts       = c.opts;
+        return this;
+    }
+
+    updatePose( pose ){
+        return this.solver( this.target, this.chain, pose, this.opts );
+    }
+}
+
+class IKPoseRig{
+    // #region MAIN
+    tpose       = null;
+    wpose       = null;
+    leftLeg     = new IKSet( IKSET_CONFIG.leftLeg );
+    rightLeg    = new IKSet( IKSET_CONFIG.rightLeg );
+    leftArm     = new IKSet( IKSET_CONFIG.leftArm );
+    rightArm    = new IKSet( IKSET_CONFIG.rightArm );
+    spine       = new IKSet( IKSET_CONFIG.spine );
+
+    spineData   = null;
+    
+    constructor( tpose, autoGen=false ){
+        this.tpose = tpose;
+        this.wpose = tpose.clone();
+        if( autoGen ) this.autoGen();
+    }
+
+    autoGen(){
+        const bMap = new BoneMap( this.tpose );
+
+        // console.log( bMap );
+        // console.log( this.tpose.arm.names );
+
+        this.leftArm.setChain( bMap.getBoneSet( 'leftArm' ) );
+        this.leftArm.target.setPositions( this.getTargetPos( 'leftArm' ), this.getPolePos( 'leftArm' ) );
+
+        this.rightArm.setChain( bMap.getBoneSet( 'rightArm' ) );
+        this.rightArm.target.setPositions( this.getTargetPos( 'rightArm' ), this.getPolePos( 'rightArm' ) );
+
+        this.leftLeg.setChain( bMap.getBoneSet( 'leftLeg' ) );
+        this.leftLeg.target.setPositions( this.getTargetPos( 'leftLeg' ), this.getPolePos( 'leftLeg' ) );
+
+        this.rightLeg.setChain( bMap.getBoneSet( 'rightLeg' ) );
+        this.rightLeg.target.setPositions( this.getTargetPos( 'rightLeg' ), this.getPolePos( 'rightLeg' ) );
+
+        this.spine.setChain( bMap.getBoneSet( 'spine' ) );
+        // this.spine.target.setSpline( new SpineNurbs() );
+        // this.spine.target.setSpline( new SpineCatmullRom() );
+        this.spine.chain.usePlacementForSwing( this.tpose, [0,0,1] );
+        this.spine.target.setSpline( new SpineBezierQuad() );
+        this.spine.target.setPositions( this.getTargetPos( 'spine' ), this.getPolePos('spine') );
+
+        /*
+        chain.usePlacementForSwing( twistDir );
+
+        swing = new Vec3()
+        for( i=1; i < cnt; i++ )
+            a = links[i]
+            b = links[i-1]
+            swing.fromSub(a, b).norm();
+
+            axes
+                .setOrthogonal( swing, [0,0,1] )
+                .applyInvertQuat( q );
+        */
+
+        return this;
+    }
+    // #endregion
+
+    // #region GETTERS / SETTERS
+    setTargetPos( sName, pos ){
+        const s = this[ sName ];
+        s.target.setPositions( pos );
+        return this;
+    }
+
+    setPolePos( sName, pos ){
+        const s = this[ sName ];
+        s.target.setPolePos( pos );
+        return this;
+    }
+
+    getTargetPos( sName ){
+        const s = this[ sName ];
+        const i = s.chain.links.at(-1).index;
+        return this.wpose.getWorldTransform( i ).pos;
+    }
+
+    getPolePos( sName ){
+        const s     = this[ sName ];
+        const pos   = new Vec3();
+
+        const al    = s.chain.links[0];
+        const a     = this.wpose.getWorldTransform( al.index );
+        const bl    = s.chain.links.at(-1);
+        const b     = this.wpose.getWorldTransform( bl.index );
+
+        switch( s.type ){
+            case 'limb': 
+                const dir = new Vec3().fromQuat( a.rot, al.axes.twist ).scale( 0.3 );
+                pos.fromLerp( a.pos, b.pos, 0.5 ).add( dir );
+                break;
+
+            case 'spine':
+                pos.fromLerp( a.pos, b.pos, 0.5 )
+                // pos[2] -= 0.05;
+
+                const pnts = new Array( s.chain.links.length );
+                for( const [i,lnk] of s.chain.links.entries() ){
+                    pnts[i] = this.wpose.bones[ lnk.index ].world.pos;
+                }
+
+                const centParam = calcCentripetalParams( pnts );
+                const aa = findOptimalControlPoint( pnts, centParam );
+                return aa;
+        }
+
+        return pos;
+    }
+    // #endregion
+
+    runSolvers(){
+        this.wpose.reset();
+        this.spineData = this.spine.updatePose( this.wpose );
+        this.leftArm.updatePose( this.wpose );
+        this.rightArm.updatePose( this.wpose );
+        this.leftLeg.updatePose( this.wpose );
+        this.rightLeg.updatePose( this.wpose );
+    }
+}
+
+class SpineNurbs extends NurbsSpline{
+    constructor(){
+        super();
+        this.appendCurve( [[0,0,0],[0,0,0],[0,0,0]] );
+    }
+
+    get rootPos(){ return this.points[0].pos.slice() };
+    set rootPos( v ){ this.points[0].pos.copy(v) };
+    
+    get polePos(){ return this.points[1].pos.slice() };
+    set polePos( v ){ this.points[1].pos.copy(v) };
+
+    get targetPos(){ return this.points[2].pos.slice() };
+    set targetPos( v ){ this.points[2].pos.copy(v) };
+
+    // setRootPos( p ){ this.points[0].pos.copy( p ); return this; }
+    // setPolePos( p ){ this.points[1].pos.copy( p ); return this;  }
+    // setTargetPos( p ){ this.points[2].pos.copy( p ); return this; }
+    resolve(){}
+}
+
+class SpineCatmullRom extends CatmullRomSpline{
+    constructor(){
+        super();
+        this.appendCurve( [[0,0,0],[0,0,0],[0,0,0],[0,0,0]] );
+        this.appendCurve( [[0,0,0]] );
+    }
+
+    get rootPos(){ return this.points[1].pos.slice() };
+    set rootPos( v ){ this.points[1].pos.copy(v) };
+    
+    get polePos(){ return this.points[2].pos.slice() };
+    set polePos( v ){ this.points[2].pos.copy(v) };
+
+    get targetPos(){ return this.points[3].pos.slice() };
+    set targetPos( v ){ this.points[3].pos.copy(v) };
+
+    // setRootPos( p ){ this.points[1].pos.copy( p ); return this; }
+    // setPolePos( p ){ this.points[2].pos.copy( p ); return this;  }
+    // setTargetPos( p ){ this.points[3].pos.copy( p ); return this; }
+    resolve(){ this.alignEndPoints(); }
+}
+
+class SpineBezierQuad extends BezierQuadSpline{
+    constructor(){
+        super();
+        this.appendCurve( [[0,0,0],[0,0,0],[0,0,0]] );
+    }
+
+    get rootPos(){ return this.points[0].pos.slice() };
+    set rootPos( v ){ this.points[0].pos.copy(v) };
+    
+    get polePos(){ return this.points[1].pos.slice() };
+    set polePos( v ){ this.points[1].pos.copy(v) };
+
+    get targetPos(){ return this.points[2].pos.slice() };
+    set targetPos( v ){ this.points[2].pos.copy(v) };
+    resolve(){}
+}
+
+// #endregion
+
+
+// #region CHARACTER LOADING
+
+class Character {
+    // #region MAIN
+    name    = '';       // Character Name
+    arm     = null;     // Armature
+    rig     = null;     // IK Rig
+    models  = [];       // Collection of skinned models that make character
+    constructor( name ){
+        if( name ) this.name = name;
+    }
+    // #endregion
+
+    // #region SETUP
+    setTPose( tpose, autoGen=true ){
+        this.arm = tpose.arm;
+        this.rig = new IKPoseRig( tpose, autoGen );
+        return this;
+    }
+
+    setOffsetPos( v ){ this.rig.pose.offset.pos.copy( v ); return this; }
+    // #endregion
+
+    // #region METHODS
+    
+    runSolvers(){ 
+        this.rig.runSolvers();
+        this.arm.skin.updateFromPose( this.rig.wpose );
+        return this;
+    }
+
+    // #endregion
+}
+
+async function fetchCharacter( url ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Load JSON Character File
+    const res = await fetch( url );
+    if( !res.ok ) throw new Error( `fetchCharacter: ${res.status} - ${res.statusText}` );
+
+    const json = await res.json();
+    if( !json.src || !json.src.includes( '.gltf' ) ) throw new Error( 'fetchCharacter: Src not GLTF' );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Download GLTF File
+    const path = url.substring( 0, url.lastIndexOf( '/' )+1 );
+    const gltf = await Gltf2.fetch( `${path}${json.src}` );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Parse skeleton & setup Ossos Armature
+    const arm = parseArmature( gltf, json.skinIndex || 0 );
+    // console.log( arm );
+
+    // BindPose might be an APose, so TPose can be stored 
+    // as a single frame animation
+    if( json.tpose && json.tpose.type === 'animation' ){
+        const tpose = arm.newPose( 'tpose' );
+        getAnimationPose( gltf, tpose, json.tpose.name, json.tpose.frame );
+        // arm.skin.updateFromPose( tpose );
+    }
+
+    const char = new Character( json.name )
+        .setTPose( arm.poses.tpose ?? arm.poses.bind );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Get all primitives to a gl mesh & create 3JS Meshes
+    const gmesh  = gltf.getMesh( json.meshName );
+    if( !gmesh || gmesh.primitives.length == 0 ){
+        console.error( `No gltf mesh found: ${id}` );
+        return null;
+    }
+
+    for( const p of gmesh.primitives ){
+        // --------------------------
+        let col = 'gray';
+        if( p.materialNam ){
+            const gmat = gltf.getMaterial( p.materialName );
+            
+            if( gmat.baseTexture && gmat.baseTexture.uri ){
+                col       = new THREE.TextureLoader().load( gltf.path + gmat.baseTexture.uri );
+                col.flipY = json.textureYFlip ?? true;
+            }else if( gmat.baseColor ) col = gmat.baseColor;
+        }
+        
+        // --------------------------
+        const mat  = MatrixSkinMaterial( col, arm.skin );
+        const geo  = geoPrimitive( p );
+        const mesh = new THREE.Mesh( geo, mat );
+        char.models.push( mesh );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    return char;
+}
+
+function geoPrimitive( prim, useSkin=true ){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute( 'position', new THREE.BufferAttribute( prim.position.data, prim.position.componentLen ) );
+
+    if( prim.indices )    geo.setIndex( new THREE.BufferAttribute( prim.indices.data, 1 ) );
+    if( prim.normal )     geo.setAttribute( 'normal', new THREE.BufferAttribute( prim.normal.data, prim.normal.componentLen ) );
+    if( prim.texcoord_0 ) geo.setAttribute( 'uv', new THREE.BufferAttribute( prim.texcoord_0.data, prim.texcoord_0.componentLen ) );
+
+    if( useSkin && prim.joints_0 && prim.weights_0 ){
+        geo.setAttribute( 'skinWeight', new THREE.BufferAttribute( prim.weights_0.data, prim.weights_0.componentLen ) );
+        geo.setAttribute( 'skinIndex',  new THREE.BufferAttribute( prim.joints_0.data,  prim.joints_0.componentLen ) );
+    }
+
+    return geo;
+}
+
+// #endregion
+
+// calcCentripetalParameterization
+function calcCentripetalParams( pnts ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const eIdx = pnts.length - 1;
+    if( eIdx < 1 )   return [0];
+    if( eIdx === 1 ) return [0, 1];
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const aryDist = new Array( eIdx+1 );
+    let sum       = 0;
+    aryDist[0]    = 0;
+
+    for( let i=1; i <= eIdx; i++ ){
+        const a = pnts[ i ];
+        const b = pnts[i-1];
+        
+        // double sqrt is intentional: sqrt( sqrt( dist² ) ) = distance^0.5
+        const lenSq = (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2;
+        const cent  = Math.sqrt( Math.sqrt( lenSq ) );
+        aryDist[i]  = cent;
+        sum        += cent;
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Create cumulative t-values and normalize
+    const out = new Array( eIdx+1 );
+    let curr  = 0;
+    let t;
+
+    out[ eIdx ] = 1;
+    for( let i = 0; i < eIdx; i++ ){
+        curr  += aryDist[i];
+        out[i] = curr / sum;
+    }
+
+    return out;
+}
+
+function findOptimalControlPoint( pnts, wgts ) {
+    // points: array of [x,y,z] points
+    // tValues: corresponding t-values from centripetal parameterization
+    // Returns: optimal control point [x,y,z] for quadratic Bézier
+    
+    let P0 = pnts[0];               // Start point (fixed)
+    let P2 = pnts[pnts.length - 1]; // End point (fixed)
+    
+    // We need to solve for P1 (control point) that minimizes:
+    // Sum of squared distances from curve to all points
+    
+    // Quadratic Bézier formula: B(t) = (1-t)²P0 + 2t(1-t)P1 + t²P2
+    // Rearranging: B(t) = [(1-t)²P0 + t²P2] + [2t(1-t)]P1
+    // Let A(t) = (1-t)²P0 + t²P2  (known part)
+    // Let w(t) = 2t(1-t)          (weight for P1)
+    // So: B(t) = A(t) + w(t)*P1
+    
+    // For least squares, we want to minimize:
+    // Σ |B(ti) - Pi|² = Σ |A(ti) + w(ti)*P1 - Pi|²
+    
+    let sumWeights = 0;          // Σ w(ti)²
+    let sumWeightedDiff = new Vec3(); // Σ w(ti) * (Pi - A(ti))
+    const A = new Vec3();
+    const B = new Vec3();
+    const C = new Vec3();
+    const diff = new Vec3();
+    
+    // Skip first and last points since they're exactly on the curve
+    for (let i = 1; i < pnts.length - 1; i++) {
+        let t = wgts[i];
+        let p = pnts[i];
+        
+        // Calculate weight: w(t) = 2t(1-t)
+        let weight = 2 * t * (1 - t);
+        
+        // Calculate known part: A(t) = (1-t)²P0 + t²P2
+        let ti = 1 - t;
+        // let A = ti * ti * P0 + t * t *P2;  // Vector math
+        A.fromScale( P0, ti*ti );
+        B.fromScale( P2, t * t );
+        C.fromAdd( A, B );
+        
+        // Calculate difference: Pi - A(ti)
+        // let diff = point - A;  // [dx, dy, dz]
+        diff.fromSub( p, C );
+        
+        // Accumulate for normal equations
+        sumWeights += weight * weight;
+        // sumWeightedDiff += weight * diff;  // Element-wise: [wx*dx, wy*dy, wz*dz]
+
+        diff.scale( weight );
+        sumWeightedDiff.add( diff );
+    }
+    
+    // Solve normal equation: P1 = sumWeightedDiff / sumWeights
+    // This gives us the least squares solution
+    // let optimalP1 = sumWeightedDiff / sumWeights;  // Element-wise division
+    A.fromScale( sumWeightedDiff, 1/sumWeights );
+    
+    return A;
+}
+
+
+/*
+1. Exact Interpolation (3 points total)
+2: Least Squares Approximation (4 points total)
+
+Key Considerations:
+Parameterization: You'll need to decide how to map your 3D points to parameter values (t) along the Bézier curve. Common approaches:
+
+Uniform spacing (t = 0, 1/3, 2/3, 1 for 4 points)
+Chord length parameterization (based on distances between points)
+Centripetal parameterization (often gives better results for curved paths)
+
+Optimization Target: Since you're working with 3D points, you can:
+
+Minimize the sum of squared distances from curve to points
+Use weighted distances if some points are more important
+Consider both position and potentially tangent constraints
+
+Chord length or centripetal parameterization usually works better than uniform spacing
+
+Chord length parameterization
+Points: P0, P1, P2, P3
+Distances: d1 = |P1-P0|, d2 = |P2-P1|, d3 = |P3-P2|
+Total distance: D = d1 + d2 + d3
+t-values: t0=0, t1=d1/D, t2=(d1+d2)/D, t3=1
+
+Centripetal Parameterization
+Points: P0, P1, P2, P3
+Distances: d1 = |P1-P0|, d2 = |P2-P1|, d3 = |P3-P2|
+Square roots: s1 = √d1, s2 = √d2, s3 = √d3
+Total: S = s1 + s2 + s3
+t-values: t0=0, t1=s1/S, t2=(s1+s2)/S, t3=1
+
+Key points:
+
+The double square root is intentional: sqrt(sqrt(distance²)) = sqrt(distance) = distance^0.5
+This gives centripetal parameterization its characteristic α=0.5 exponent
+The cumulative sum approach ensures points are spaced according to their relative distances
+Final normalization ensures the parameter range is exactly [0,1]
+
+The resulting t-values will be more evenly distributed than chord length, especially when your 3D points have uneven spacing.
+
+function calculateCentripetalParameterization(points) {
+    // points is array of [x,y,z] arrays
+    // Returns array of t-values from 0 to 1
+    
+    if (points.length < 2) return [0];
+    if (points.length === 2) return [0, 1];
+    
+    let tValues = [0]; // First point always gets t=0
+    let cumulativeDistance = 0;
+    let sqrtDistances = [];
+    
+    // Step 1: Calculate square root of distances between consecutive points
+    for (let i = 1; i < points.length; i++) {
+        let currentPoint = points[i];
+        let previousPoint = points[i - 1];
+        
+        // Calculate 3D distance (like GLSL distance function)
+        let diff = currentPoint - previousPoint; // [dx, dy, dz]
+        let distanceSquared = dot(diff, diff); // dx*dx + dy*dy + dz*dz
+        let distance = sqrt(distanceSquared);
+        
+        // Take square root for centripetal (this is the key difference from chord length)
+        let sqrtDistance = sqrt(distance);
+        sqrtDistances.push(sqrtDistance);
+        
+        cumulativeDistance += sqrtDistance;
+    }
+    
+    // Step 2: Create cumulative t-values and normalize
+    let runningSum = 0;
+    for (let i = 0; i < sqrtDistances.length; i++) {
+        runningSum += sqrtDistances[i];
+        let t = runningSum / cumulativeDistance;
+        tValues.push(t);
+    }
+    
+    // Last point should always be exactly 1.0
+    tValues[tValues.length - 1] = 1.0;
+    
+    return tValues;
+}
+*/
+
+</script></body></html>

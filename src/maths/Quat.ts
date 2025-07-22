@@ -1,8 +1,4 @@
-import type { ConstVec3 }   from './Vec3';
-import Vec3                 from './Vec3';
-
-export type TQuat     = [number,number,number,number] | Float32Array | Array<number>;
-export type ConstQuat = Readonly< TQuat >
+import Vec3 from './Vec3';
 
 export default class Quat extends Array< number >{
     // #region STATIC CONSTANTS
@@ -49,7 +45,7 @@ export default class Quat extends Array< number >{
         return this
     }
 
-    copyTo( a: TQuat ): this{
+    copyTo( a: QuatLike ): this{
         a[ 0 ] = this[ 0 ];
         a[ 1 ] = this[ 1 ];
         a[ 2 ] = this[ 2 ];
@@ -545,7 +541,7 @@ export default class Quat extends Array< number >{
         return out;
     }
 
-    static shortest( from: ConstQuat, to: ConstQuat, out:TQuat ): TQuat{
+    static shortest( from: ConstQuat, to: ConstQuat, out:QuatLike ): QuatLike{
         // if( Quaternion.Dot(a, b) < 0 ){
         //     return a * Quaternion.Inverse( Multiply(b, -1) );
         // }   else return a * Quaternion.Inverse(b);

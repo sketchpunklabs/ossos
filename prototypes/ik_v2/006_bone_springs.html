@@ -8,7 +8,7 @@ import GltfUtil, { Gltf2 }          from '../_lib/misc/GltfUtil.js';
 import MatrixSkinMaterial           from '../_lib/customSkinning/MatrixSkinMaterial.js';
 
 import { 
-    Armature, TranMatrixSkin,
+    Armature, Bone, TranMatrixSkin,
     Quat, Vec3, Transform, BoneMap,
     Pose, PoseAnimator,
 
@@ -30,7 +30,7 @@ let Ref = {};
 window.addEventListener( 'load', async _=>{
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Setup
-    App.sphericalLook( 90, 20, 15, [ 0, 0.8, 0 ] );
+    App.sphericalLook( 60, 40, 5, [ 0, 0.8, 0 ] );
     Debug = await useVisualDebug( App );
 
     // // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -39,32 +39,62 @@ window.addEventListener( 'load', async _=>{
     // Ref.char0.setOffsetPos( [1.2,0,0] );
     // App.scene.add( ...Ref.char0.models );
     const gltf = await Gltf2.fetch( '/prototypes/_res/models/fluffytail/fluffytail.gltf' );
-    console.log( gltf );
-
     const arm  = parseArmature( gltf );
-
     // console.log( arm );
-
+    // console.log( gltf );
     // debugBones( arm.bindPose.bones, Debug );
+    Ref.arm = arm;
 
-    const mesh = parseSkinnedMesh( gltf, arm );
-    App.scene.add( mesh );
+    // // -----------------------
+    Ref.mesh = parseSkinnedMesh( gltf, arm );
+    App.scene.add( Ref.mesh );
+
+    // // -----------------------
+    // const pose = arm.newPose();
+    // for( const b of pose.bones ) b.local.rot.rotX( 10 * Math.PI/180 );
+
+    // arm.skin.updateFromPose( pose );
+    // pose.updateWorld();
+    // debugBones( pose.bones, Debug );
+
+    // TODO:
+    // - How to set individual links    osc:[1.0,1.0,1.01] // IF eq to chain cnt
+    // - How to spread across links:    osc:[1.0,0.1] // IF Two, spread
+    // - How to set same for all links: osc:1   // set all
+
+    const sc = new SpringChain( 'Tail' );
+    sc.setJoints( [0], arm.bindPose, true );
+    sc.setSpring( {
+        type    : 'SemiImplicitEuler',
+        resolve : 'pos', // rot || pos
+        // damp : 0.8,
+        // osc  : 1,
+        osc  : [1.0,0.1],
+        damp : [0.9, 0.15],
+        // osc  : [0.8,1.0],
+        // damp : [0.9, 0.01]
+    } );
+    sc.resetTargets( arm.bindPose );
+
+    Ref.sc = sc;
+    Ref.tpose = arm.bindPose;
+    Ref.pose  = arm.bindPose.clone();
+
+    // Ref.pose.bones[0].local.rot.rotZ( Math.PI * 0.15 )
+    // Ref.pose.offset.rot.rotY( Math.PI * 0.15 );
+    // Ref.pose.updateWorld();
+
+    // sc.updatePose( 0.11, Ref.tpose, Ref.pose );
+    // Ref.pose.updateWorld();
+    // Ref.arm.skin.updateFromPose( Ref.pose );
+
+    // debugBones( Ref.pose.bones, Debug );
 
 
-    const pose = arm.newPose();
-
-    for( const b of pose.bones ){
-        b.local.rot.rotX( 10 * Math.PI/180 );
-    }
-
-    // pose.bones[0].local.rot.rotX( 10 * Math.PI/180 );
-
-    arm.skin.updateFromPose( pose );
-
-    pose.updateWorld();
-    debugBones( pose.bones, Debug );
-
-
+    // Set Target Positions
+    // -- Parent uses child position for springs
+    // -- Leaf bones will use the direction of its previous with an offset
+    // ---- Should I precompute the vector for each joint? 
 
 
     // // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,12 +127,25 @@ window.addEventListener( 'load', async _=>{
     //     .debugBones();
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // App.createRenderLoop( onPreRender ).start();
-    App.renderLoop();
+    App.createRenderLoop( onPreRender ).start();
+    // App.renderLoop();
 });
 
 function onPreRender( dt, et ){
-    // Debug.reset();
+    Debug.reset();
+
+    let t = et / 4;
+    t -= Math.floor(t);
+    t  = Math.sin( Math.PI * t );
+
+    Ref.pose.offset.rot.fromAxisAngle( [0,1,0], t * Math.PI * 0.5 );
+    Ref.pose.updateWorld();
+
+    Ref.sc.updatePose( dt, Ref.tpose, Ref.pose );
+    Ref.pose.updateWorld();
+    debugBones( Ref.pose.bones, Debug );
+
+    Ref.arm.skin.updateFromPose( Ref.pose );
 
     // Ref.retarget
     //     .step( dt )
@@ -872,15 +915,406 @@ class SpringItem{
 const spring = new BoneSpring( { 
     bones   : [], 
     solver  : 'SemiImplicitEuler', 
-    damp    : 1, 
-    osc     : 2
+    damp    : 1 || [ 0.2, 0.5 ]
+    osc     : 2 || [ 2, 2 ]
+
+    damp    : 1   // Start at this then
+    incDamp : 0.1 // spread as inc
 });
 
 spring.updatePose( pose );
 
-
-
 */
+// #endregion
+
+/* SIE
+// A Cheaper version of ImplicitEuler with some limitions
+// -- OSC no higher then 10 else can make things unstable
+class SemiImplicitEuler extends ISpring{
+    // #region MAIN
+    osc_ps = 0; // Oscillation Per Second ( Math.PI * 2 * i ) : 0 < i < 10
+    damp   = 0; // Final dammping value depending on the various options
+    
+    constructor( props={} ){
+        super();
+        
+        this.props.osc          = 1; // Oscillation Time
+        this.props.dampTime     = 0; // Apply a time cycle to damping
+        this.props.halfLifeTime = 0; // Apply time to half life damping
+        this.props.expoTime     = 0; // Critical Damping with time
+        
+        if( props ) this.loadConfig( props );
+    }
+    // #endregion
+
+    loadConfig( props, t=0 ){
+        super.loadConfig( props, t );
+        applyDamping( this );
+        return this;
+    }
+
+    update( dt ){
+        //  vel += -2.0 * dt * damp_ratio * osc_ps * vel + dt * osc_ps * osc_ps * (to - pos);
+        //  pos += dt * vel;
+        const damp     = -2.0 * dt * this.damp * this.osc_ps;
+        const osc      = dt * this.osc_ps**2;
+
+        this.vel[ 0 ] += damp * this.vel[ 0 ] + osc * ( this.tpos[ 0 ] - this.pos[ 0 ] );
+        this.vel[ 1 ] += damp * this.vel[ 1 ] + osc * ( this.tpos[ 1 ] - this.pos[ 1 ] );
+        this.vel[ 2 ] += damp * this.vel[ 2 ] + osc * ( this.tpos[ 2 ] - this.pos[ 2 ] );
+
+        this.pos[ 0 ] += dt * this.vel[ 0 ];
+        this.pos[ 1 ] += dt * this.vel[ 1 ];
+        this.pos[ 2 ] += dt * this.vel[ 2 ];
+
+        return this;
+    }
+}
+*/
+
+// damp, osc_ps
+
+class SpringChain{
+    // #region MAIN
+    name        = '';
+    links       = [];
+    resolveType = 'rot'; // rot | pos
+    constructor( n = 'string'+Math.round(Math.random()*100000) ){
+        this.name = n;
+    }
+    // #endregion
+
+    // #region SETTERS
+    setJoints( ary, pose, incChildren=false ){
+        const stack = [...ary];
+
+        let i;
+        let idx;
+        while( stack.length > 0 ){
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Check which data used to identify joint
+            i   = stack.shift();
+            idx = -1;
+            switch( i.constructor.name ){
+                case 'Number': idx = i; break;
+                case 'Bone'  : idx = i.index; break;
+                default:
+                    console.log( 'Unknown joint reference sent', i );
+                    continue;
+            }
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Create Link
+            if( idx === -1 ){ console.log( 'Bad joint index', idx ); continue; }
+
+            const j  = pose.bones[ idx ];
+            const sl = new SpringLink( j );
+            this.links.push( sl );
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Turn child joints into links
+            if( incChildren ){
+                for( const c of j.children ) stack.push( pose.bones[ c ] );
+            }
+        }
+
+        this.recalcVectors( pose );
+        return this
+    }
+    
+    setSpring( props ){
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        if( !props.type || !AVAILABLE_SPRINGS[ props.type ] ){
+            console.log( 'No spring found', props.type );
+            return this;
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        const spr = AVAILABLE_SPRINGS[ props.type ];
+        const cnt = this.links.length-1;
+
+        for( const [i,lnk] of this.links.entries() ){
+            // console.log( i, lnk );
+            lnk.setSolver( new spr( props, i, i/cnt ) );
+        }
+ 
+
+        if( props.resolve ) this.resolveType = props.resolve;
+
+        return this;
+    }
+    
+    resetTargets( pose ){
+        if( this.resolveType === 'rot' ){
+            const v = new Vec3();
+            for( const lnk of this.links ){
+                v.fromQuat( pose.bones[lnk.index].world.rot, lnk.vector );
+                lnk.resetTarget( v );
+            }
+        }else{
+            const ptran  = new Transform(); // Parent Transform
+            const ctran  = new Transform(); // Child Transform
+            const v      = new Vec3();
+
+            for( const lnk of this.links ){
+                // WS Transform
+                pose.getWorldTransform( lnk.pindex, ptran );
+                ctran.fromMul( ptran, pose.bones[ lnk.index ].local );
+                
+                // Get Vector from parent as target
+                v.fromSub( ctran.pos, ptran.pos );
+                lnk.resetTarget( v );
+            }
+        }
+        return this;
+    }
+    
+    // #endregion
+
+    // #region CALC
+
+    updatePose( dt, tpose, pose ){
+        if( this.resolveType === 'rot' ) this.resolveRot( dt, tpose, pose );
+        else                             this.resolvePos( dt, tpose, pose );
+    }
+
+    // Compute the vector direction for each link
+    recalcVectors( pose ){
+        const v  = new Vec3();
+        const q  = new Quat();
+        let curr = this.links[0];
+        let next;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        for( let i=1; i < this.links.length; i++ ){
+            next = this.links[i];
+
+            // Compute direction to next link in chain
+            curr.vector.fromSub( 
+                pose.bones[ next.index ].world.pos,
+                pose.bones[ curr.index ].world.pos,
+            );
+
+            // Transform it to inverse quat space
+            v.copy( curr.vector );
+            q.fromInvert( pose.bones[ curr.index ].world.rot );
+            curr.vector.transformQuat( q );
+
+            // console.log( curr.index, curr.vector );
+            // console.log( curr.index, pose.bones[ curr.index ].world.rot, pose.bones[ curr.index ].local.rot );
+
+            curr = next;
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Final Link - Reusable same vector
+        curr.vector.copy( v );
+        q.fromInvert( pose.bones[ curr.index ].world.rot );
+        curr.vector.transformQuat( q );
+
+        return this
+    }
+
+    resolveRot( dt, tpose, pose ){
+        const ptran  = new Transform(); // Parent Transform
+        const ctran  = new Transform(); // Child Transform
+        
+        const tar = new Vec3();  // Target Vector
+        const v   = new Vec3();  // Spring Vector
+        const q   = new Quat();  // Work out rotation
+
+        const t   = new Vec3();
+
+        for( const [i,lnk] of this.links.entries() ){
+            // ------------------------------------
+            // Compute WS transform of joint
+            pose.getWorldTransform( lnk.pindex, ptran );
+            ctran.fromMul( ptran, tpose.bones[ lnk.index ].local );
+
+            // ------------------------------------
+            // Find the new target vector in rotated world space
+            tar.fromQuat( ctran.rot, lnk.vector );
+            Debug.pnt.add( t.fromAdd( ctran.pos, tar ), 0x00ff00, 8, 7 );
+
+            // ------------------------------------
+            // Run spring with the new target position
+            lnk.solver.update( dt, tar );
+            Debug.pnt.add( t.fromAdd( ctran.pos, lnk.solver.pos ), 0x00ffff, 5, 1 );
+            
+            v.fromNorm( lnk.solver.pos ); // Normalize spring position 
+
+            // ------------------------------------
+            // Use spring vector to compute swing vector
+            q.fromSwing( tar.norm(), v )        // From Target vector to Spring Vector
+                .mul( ctran.rot )               // Apply to joint in world space
+                .pmulInvert( ptran.rot )        // Convert to joint local space
+
+            pose.setLocalRot( lnk.index, q );
+        }
+    }
+
+    resolvePos( dt, tpose, pose ){
+        const ptran  = new Transform(); // Parent Transform
+        const ctran  = new Transform(); // Child Transform
+        const inv    = new Transform(); // For to localspace transformation
+        const tar    = new Vec3();      // Target Vector
+        let tarLenSq = 0;
+
+        // const t   = new Vec3();
+
+        for( const [i,lnk] of this.links.entries() ){
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Compute WS transform of joint
+            pose.getWorldTransform( lnk.pindex, ptran );
+            ctran.fromMul( ptran, tpose.bones[ lnk.index ].local );
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Compute vector from parent which is used for spring manipulation
+            tar.fromSub( ctran.pos, ptran.pos );
+            lnk.solver.update( dt, tar );
+            tarLenSq = Vec3.lenSqr( tar );
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Point moved to far away from parent, clamp it to the max distance of target
+            // Update child ws transform to later compute new localspace
+            if( Vec3.lenSqr( lnk.solver.pos ) > tarLenSq ){
+                // Apply constraint on spring data
+                lnk.solver.pos.norm().scale( Math.sqrt( tarLenSq ) );
+                ctran.pos.fromAdd( ptran.pos, lnk.solver.pos );
+
+                // Apply constraint only to transformn data
+                // ctran.pos
+                //     .fromNorm( lnk.solver.pos )
+                //     .scale( Math.sqrt( tarLenSq ) )
+                //     .add( ptran.pos );
+            }else{
+                ctran.pos.fromAdd( ptran.pos, lnk.solver.pos );
+            }
+
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // Need the whole transform of child to compute
+            // the new localspace position.
+            inv.fromInvert( ptran ).mul( ctran );
+
+            // Debug.pnt.add( t.fromAdd( tar, ptran.pos ), 0x00ff00, 5, 7 );
+            // Debug.pnt.add( ctran.pos, 0x00ff00, 3, 1 );
+
+            pose.setLocalPos( lnk.index, inv.pos );
+        }
+    }
+
+    // #endregion
+}
+
+class SpringLink{
+    index   = -1;           // Joint Index in Pose
+    pindex  = -1;
+    vector  = new Vec3();   // Direction in bind or t pose in local space
+    solver  = null;         // Spring to be applied on joints
+
+    constructor( j ){
+        this.index  = j.index;
+        this.pindex = j.pindex;
+    }
+
+    resetTarget( tar ){
+        this.solver.tar.copy( tar );
+        this.solver.pos.copy( tar );
+        this.solver.vel.xyz( 0, 0, 0 );
+        return this;
+    }
+
+    setSolver( s ){
+        this.solver = s;
+        return this;
+    }
+
+    updatePose( pose ){
+        return this;
+    }
+}
+
+
+// #region SPRING
+
+class ISpring{
+    tar = new Vec3();   // Target Position
+    pos = new Vec3();   // Current Position
+    vel = new Vec3();   // Current Velocity
+    constructor( props={}, i=-1, t=-1 ){}
+
+    // Prop values can be numeric, Array[2] for lerping or Array[n] for individual settings
+    _getPropValue( v, i, t ){
+        if( Array.isArray( v ) ){
+            return ( v.length === 2 )
+                ? v[0] * (1-t) + v[1] * t   // Interpolate value
+                : v[i]                      // Specific value
+        }
+        return v;                           // Same value for all
+    }
+}
+
+class SemiImplicitEuler extends ISpring{
+    // #region MAIN
+    osc_ps = 1 * Math.PI * 2; // Oscillation Per Second ( Math.PI * 2 * i ) : 0 < i < 10
+    damp   = 1; // Final dammping value depending on the various options
+    
+    constructor( props={}, i=-1, t=-1 ){
+        super();        
+        if( props ) this.loadConfig( props, i, t );
+    }
+    // #endregion
+
+    loadConfig( props, i=0, t=0 ){
+        // this.damp   = props.damp;
+        // this.osc_ps = props.osc * Math.PI * 2
+
+        this.damp   = this._getPropValue( props.damp, i, t ) 
+                      || 1;
+        
+        this.osc_ps = ( this._getPropValue( props.osc, i, t ) * Math.PI*2 )
+                      || Math.PI * 2;
+        /*
+        if( Array.IsArray( prop.damp ) ){
+            if( prop.damp.length === 2 ){
+                this.damp = prop.damp[0] * (1-t) + prop.damp[1] * t;
+            }else{
+                this.damp = prop.damp[i];
+            }
+        }else{
+            this.damp = props.damp;
+        }
+
+
+        */
+        
+        
+        return this;
+    }
+
+    update( dt, tar=null ){
+        if( tar ) this.tar.copy( tar );
+
+        //  vel += -2.0 * dt * damp_ratio * osc_ps * vel + dt * osc_ps * osc_ps * (to - pos);
+        //  pos += dt * vel;
+        const damp     = -2.0 * dt * this.damp * this.osc_ps;
+        const osc      = dt * this.osc_ps**2;
+
+        this.vel[ 0 ] += damp * this.vel[ 0 ] + osc * ( this.tar[ 0 ] - this.pos[ 0 ] );
+        this.vel[ 1 ] += damp * this.vel[ 1 ] + osc * ( this.tar[ 1 ] - this.pos[ 1 ] );
+        this.vel[ 2 ] += damp * this.vel[ 2 ] + osc * ( this.tar[ 2 ] - this.pos[ 2 ] );
+
+        this.pos[ 0 ] += dt * this.vel[ 0 ];
+        this.pos[ 1 ] += dt * this.vel[ 1 ];
+        this.pos[ 2 ] += dt * this.vel[ 2 ];
+
+        return this;
+    }
+}
+
+const AVAILABLE_SPRINGS = {
+    'SemiImplicitEuler': SemiImplicitEuler,
+};
 
 // #endregion
 

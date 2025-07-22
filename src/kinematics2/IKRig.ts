@@ -1,7 +1,7 @@
 // #region IMPORTS
-import type { TIKSolver }   from './consts';
+import type { TIKSolver, TSolverOptions }   from './consts';
 import type Pose            from '../armature/Pose';
-import type { ConstVec3, TVec3 } from '../maths/Vec3';
+import type { TVec3 } from '../maths/Vec3';
 
 import { IK_SOLVERS }   from './consts';
 import { IKChain }      from './IKChain';
@@ -11,12 +11,12 @@ import BoneAxes         from './BoneAxes';
 // #endregion
 
 type TSetOptions = {
-    name    : string,
-    bones   : Array<string>,
-    solver  : string | TIKSolver,
-
-    order  ?: number,
-    axes   ?: number,  // BoneAxes.UFR,
+    name            : string,
+    bones           : Array<string>,
+    solver          : string | TIKSolver,
+    solverOptions  ?: TSolverOptions;
+    order          ?: number,
+    axes           ?: number,  // BoneAxes.UFR,
 }
 
 /** A collection set for running ik, consisting of a Target, Solver and Bone Chain */
@@ -28,6 +28,7 @@ export class IKSet {
     // target2  : IKTarget | null  = null;
     solver  !: TIKSolver;                           // Any IK Solver
     chain   !: IKChain;                             // IK Bone Chain
+    solverOptions : TSolverOptions = {};
 
     constructor( name: string, order=0 ){
         this.name  = name;
@@ -41,13 +42,17 @@ export class IKSet {
     }
 
     /** set which solver to be executed using the target onto the chain */
-    setSolver( s: string | TIKSolver ){
+    setSolver( s: string | TIKSolver, o ?: TSolverOptions ){
         this.solver = ( typeof s === 'string' )? IK_SOLVERS[ s ] : s;
+        if( o ) this.solverOptions = o;
         return this;
     }
     // #endregion
 
-    updatePose( pose: Pose, debug: any ){ this.solver( this.target, this.chain, pose, debug ); }
+    updatePose( pose: Pose ){ 
+        // console.log( 'Solver', this.name );
+        this.solver( this.target, this.chain, pose, this.solverOptions );
+    }
 }
 
 /** Barebones IK Rig, use to extend for specialized rigs */
@@ -65,15 +70,16 @@ export class IKRig {
     // #endregion
 
     // #region SETUP
-    addSet( opt: TSetOptions ): this{
+    addSet( opt: TSetOptions  ): this{
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         // Setup Defaults
         opt = Object.assign( {
-            order   : 0,
-            name    : '',
-            bones   : [],
-            axes    : BoneAxes.UFR,
-            solver  : 'look',
+            order           : 0,
+            name            : '',
+            bones           : [],
+            axes            : BoneAxes.UFR,
+            solver          : 'look',
+            solverOptions   : undefined,
         }, opt );
 
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,7 +91,7 @@ export class IKRig {
         // Build IK Set
         const s = new IKSet( opt.name, opt.order )
             .setBones( opt.bones, this.pose, opt.axes )
-            .setSolver( opt.solver );
+            .setSolver( opt.solver, opt.solverOptions );
 
         this.sets.push( s );
         this.#reorder();
@@ -123,12 +129,12 @@ export class IKRig {
     // #endregion
 
     // #region EXECUTION
-    runSolvers( debug: any ){ this.executor( this, debug ); return this; }
+    runSolvers(){ this.executor( this ); return this; }
 
     // Default Executor, Will use IKSet.order to determine execution order
-    executor = ( _rig: IKRig, debug: any )=>{
+    executor = ( _rig: IKRig )=>{
         // Run IK solver for each chain set
-        for( const s of this.sets ) s.updatePose( this.pose, debug );
+        for( const s of this.sets ) s.updatePose( this.pose );
 
         // Recompute worldspace pose
         // Note: Don't really need to updateWorld when only being

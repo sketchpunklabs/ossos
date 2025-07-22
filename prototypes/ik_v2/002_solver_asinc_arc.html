@@ -127,6 +127,18 @@ function boneCube( scl=[0.1,1,0.1] ){
 }
 
 function updateCubes(){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if( !Ref.cubes ){
+        Ref.cubes = [];
+        const scl   = 0.2;
+        for( let i=0; i < Ref.chain.links.length-1; i++ ){
+            const c = boneCube( [scl,  Ref.chain.links[i].len, scl ] );
+            Ref.cubes.push( c )
+            App.scene.add( c );
+        }
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     const c     = Ref.cubes;
     const p     = Ref.pose;
     const ch    = Ref.chain;
@@ -220,7 +232,7 @@ function calcAsincArc( tar, chain, pose ){
 function calcArcPoints( tar, chain, o, useChord=true ){
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Init Point Data
-    const points = Array.from( { length: chain.len }, ()=>new Vec3() );
+    const points = Array.from( { length: chain.links.length }, ()=>new Vec3() );
     points[0].copy( tar.startPos );
 
     // const tt = new Vec3();

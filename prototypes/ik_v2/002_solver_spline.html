@@ -1,0 +1,661 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import useTransformControl          from '../_lib/useTransformControl.js';
+import Util                         from '../_lib/misc/Util.js';
+import ShapePointsMesh              from '../_lib/meshes/ShapePointsMesh.js';
+
+import ScreenPicker, { Tasker }     from '../_lib/misc/ScreenPicker.js';
+import facedCube                    from '../_lib/meshes/facedCube.js';
+
+import { 
+    Armature, Quat, Vec3, Transform,
+} from '../../src/index';
+
+import {
+    BoneAxes, IKTarget, IKChain, lookSolver,
+} from '../../src/kinematics2/index';
+
+import { NurbsSpline, SplineSampler, SplineSample, Rmf, } 
+    from '../../src/maths/curves/index';
+// #endregion
+
+// #region MAIN
+let Debug;
+let App = useDarkScene( useThreeWebGL2() );
+let Ref = {
+    pnts    : new ShapePointsMesh(),
+    gizmo   : useTransformControl( App ).useAxes().hide(),
+    picker  : new ScreenPicker( App ),
+    tasks   : new Tasker(),
+    selPnt  : -1,
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 60, 20, 3, [ 0, 1.0, 0 ] );
+    Debug = await useVisualDebug( App );
+    // Ref.gizmo.setPos( 0, Ref.tarPos );
+    // Ref.gizmo.setPos( 1, Ref.polPos );
+
+    Ref.pnts.renderOrder = 100;
+    Ref.pnts.material.depthTest = false;
+    App.scene.add( Ref.pnts );
+
+    globalThis.Debug = Debug;
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Spline
+    Ref.spline = new NurbsSpline();
+    Ref.spline.appendCurve( [ [0, 0.2, 0], [0, 1.0, 0], [0, 1.8, 0] ] );
+    // renderSpline( Ref.spline );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Build Skeleton
+    const arm = new Armature();
+    const b0  = arm.addBone( { name:'b0', pos:[0,0.5,0], } );
+    const b1  = arm.addBone( { name:'b1', pos:[0,0.3,0], parent:b0 } );
+    const b2  = arm.addBone( { name:'b2', pos:[0,0.7,0], parent:b1 } );
+    const b3  = arm.addBone( { name:'b3', pos:[0,0.3,0], parent:b2 } );
+    arm.bind( 0.001 );
+
+    // Util.debugBones( arm.poses.bind.bones, Debug, 0.2, 1, false );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const pose   = arm.bindPose.clone();
+    const chain  = new IKChain( arm.bindPose.getBones( ['b0','b1','b2','b3'] ), BoneAxes.UFR );
+    const target = new IKSplineTarget( Ref.spline );
+
+    const mid = new Vec3().fromLerp(
+        pose.bones[0].world.pos,
+        pose.bones.at(-1).world.pos,
+        0.5
+    );
+    mid[2] -= 0.2;
+
+    Ref.pnts
+        .add( pose.bones.at(-1).world.pos, 0x00ffff, 5, 5 ) // Target
+        .add( mid, 0xffff00, 5, 5 )                         // Arc Target
+
+    
+    // const overreach_t = [0, 2.1380226007698733, 0.9224178083306681];
+    // const overreach_p = [0, 1.15, -0.2];
+    // target.setTargetPos( overreach_t ).setPos( 1, overreach_p );
+
+    // const overdraw_t = [0, 1.0856179139850244, 0.17124750321236898]
+    // const overdraw_p = [0, 1.15, -0.2];
+    // target.setTargetPos( overdraw_t ).setPos( 1, overdraw_p );
+
+    // const overdraw_t = [0, 0.9517226221478685, 0]; // [0, 0.7175220719228409, -0.0643371147726774] // more extream
+    // const overdraw_p = [0, 1.15, -0.27006309805203754]
+    // target.setTargetPos( overdraw_t ).setPos( 1, overdraw_p );
+
+    const undershoot_t = [0, 1.0196819916950324, 0.6757914064224311];
+    const undershoot_p = [0, 1.15, -1.069153079354891];
+    target.setTargetPos( undershoot_t ).setPos( 1, undershoot_p );
+
+    splineCompose( target, chain, pose, { useReach:true } );
+
+    // target
+    //     .setTargetPos( pose.bones.at(-1).world.pos )
+    //     .setPos( 1, mid )
+    //     .resolveTarget( chain, pose );
+
+    // splineSolver( target, chain, pose );
+
+    // for( let p of target.spline.points ) Debug.pnt.add( p.pos, p.type === 0? 0x00ff00 : 0xffff00, 3 );
+    // renderSpline( Ref.spline );
+
+    // pose.updateWorld();
+    // Util.debugBones( pose.bones, Debug, 0.2, 1, false );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.chain   = chain;
+    Ref.pose    = pose;
+    Ref.target  = target;
+    Ref.arm     = arm;
+
+    updateCubes();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // const cubes = [];
+    // const scl   = 0.2;
+    // for( let i=0; i < chain.links.length-1; i++ ){
+    //     const c = boneCube( [scl, chain.links[i].len, scl ] );
+    //     cubes.push( c )
+    //     App.scene.add( c );
+    // }
+
+    // Ref.cubes = cubes;
+    // updateCubes();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( null, onPostRender ).start();
+    // App.renderLoop();
+});
+
+function runSolver(){
+    Debug.reset();
+
+    // Ref.target.resolveTarget( Ref.chain, Ref.pose );
+    // splineSolver( Ref.target, Ref.chain, Ref.pose );
+    // Ref.pose.updateWorld();
+    splineCompose( Ref.target, Ref.chain, Ref.pose, { useReach:true }  )
+
+    // Util.debugBones( Ref.pose.bones, Debug, 0.2, 1, false );
+    updateCubes();
+    // renderSpline( Ref.target.spline, 20 );
+}
+
+Ref.gizmo.onMove = p=>{
+    if( Ref.selPnt === -1 ) return;
+
+    updateSplinePos( Ref.selPnt, p );
+    console.log( p );
+    runSolver();
+
+    // Debug.reset();
+    
+    // // ----------------------
+    // switch( i ){
+    //     case 0: Ref.tarPos = p; break;
+    //     case 1: Ref.polPos = p; break;
+    // }
+
+    // // ----------------------
+    // Ref.pose.reset();
+    // Ref.target.setPositions( Ref.tarPos, Ref.polPos );
+    // asincArcCompose( Ref.target, Ref.chain, Ref.pose );
+
+    // // ----------------------
+    // Ref.pose.updateWorld();
+    // Util.debugBones( Ref.pose.bones, Debug, 0.2, 1, false );
+    // updateCubes();
+};
+
+function onPreRender( dt, et ){}
+function onPostRender( dt, et ){ Ref.tasks.run(); }
+
+window.addEventListener( 'pointerdown', e=>{
+    if( e.button === 2 ) Ref.gizmo.hide();
+
+    if( Ref.gizmo.o.dragging ) return;
+    Ref.tasks.push( Ref.picker.pixelTaskFromEvent(e, onPicker, false) );
+});
+
+function onPicker( o ){
+    // console.log( 'Pick', o );
+    // if( o.id === -1 || o.type !== "shapePoint" ) return;
+    if( o.id === -1 || o.obj !== Ref.pnts ) return;
+    // console.log( 'Pick', o );
+    Ref.gizmo.show( o.hit );
+    Ref.selPnt = o.idx;
+}
+// #endregion
+
+// #region VISUALIZING
+
+function boneCube( scl=[0.1,1,0.1] ){
+    const geo = new THREE
+        .BoxGeometry( 1, 1, 1 )
+        .translate( 0, 0.5, 0 )
+        .scale( scl[0], scl[1], scl[2] );
+
+    const mat = [
+        // new THREE.MeshBasicMaterial( { color: 0x00ff00 } ), // Left
+        // new THREE.MeshBasicMaterial( { color: 0x777777 } ), // Right
+        // new THREE.MeshBasicMaterial( { color: 0x0000ff } ), // Top
+        // new THREE.MeshBasicMaterial( { color: 0x222222 } ), // Bottom
+        // new THREE.MeshBasicMaterial( { color: 0xff0000 } ), // Forward
+        // new THREE.MeshBasicMaterial( { color: 0xffffff } ), // Back
+
+        new THREE.MeshBasicMaterial( { color: 0xE61A1A } ), // Left
+        new THREE.MeshBasicMaterial( { color: 0x260D0D } ), // Right
+        new THREE.MeshBasicMaterial( { color: 0x1AE61A } ), // Top
+        new THREE.MeshBasicMaterial( { color: 0x0D260D } ), // Bottom
+        new THREE.MeshBasicMaterial( { color: 0x1A1AFF } ), // Forward
+        new THREE.MeshBasicMaterial( { color: 0x0D0D26 } ), // Back
+    ];
+
+    return new THREE.Mesh( geo, mat );
+}
+
+function updateCubes(){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if( !Ref.cubes ){
+        Ref.cubes = [];
+        const scl = 0.08;
+        for( let i=0; i < Ref.chain.links.length-1; i++ ){
+            const c = boneCube( [scl, Ref.chain.links[i].len, scl ] );
+            Ref.cubes.push( c )
+            App.scene.add( c );
+        }
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const c     = Ref.cubes;
+    const p     = Ref.pose;
+    const ch    = Ref.chain;
+
+    let b;
+    for( let i=0; i < ch.links.length-1; i++ ){
+        b = p.getBone( ch.links[i].index );
+        c[ i ].position.fromArray( b.world.pos );
+        c[ i ].quaternion.fromArray( b.world.rot );
+    }
+}
+
+function updateSplinePos( i, pos ){
+    Ref.pnts.setPosAt( i, pos );
+    switch( i ){
+        case 0: Ref.target.setTargetPos( pos ); break;
+        case 1: Ref.target.setPos( 1, pos ); break;
+    }
+}
+
+function renderSpline( spline, samp=9 ){
+    const curr = new Vec3();
+    const prev = new Vec3();
+
+    spline.at( 0, prev );
+    Debug.pnt.add( prev, 0x00ff00, 2 );
+    
+    for( let i=1; i <= samp; i++ ){
+        const t = i / samp;
+        spline.at( t, curr );
+        Debug.ln.add( prev, curr, 0xffa500 );
+        // Debug.pnt.add( curr, 0x00ff00, 2 );
+        prev.copy( curr );
+    }
+}
+
+// #endregion
+
+// #region SOLVER
+
+class IKSplineTarget{
+    spline      = null;
+    pworld      = new Transform();  // Parent Bone WS Transform
+    rworld      = new Transform();  // Root Bone WS Transform
+
+    swing       = new Vec3();
+    twist       = new Vec3();
+    dist        = 0;                // Distance from Origin & Target Position
+
+    twistRadA   = 0;                // Apply extra twist to start of spline
+    twistRadB   = 0;                // Apply extra twist to end of spline
+
+    constructor( spline ){
+        this.spline = spline;
+    }
+
+    setTargetPos( v ){ this.spline.points.at(-1).setPos( v ); return this; }
+    setPos( i, v ){ this.spline.setPos( i, v ); return this; }
+
+    get endPos(){ return this.spline.points.at(-1).pos; }
+    get startPos(){ return this.spline.points[0].pos; }
+
+    resolveTarget( chain, pose ){
+        const sp = this.spline;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Get the World transform to the root's parent bone of the chain
+        pose.getWorldTransform( chain.links[0].pindex, this.pworld );
+
+        // Then add bone's LS bind transform to get its current unmodified world transform
+        this.rworld.fromMul( this.pworld, chain.links[0].bind );
+
+        // Set root's position as the start of the curve
+        sp.points[0].setPos( this.rworld.pos );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Compute ik direction & dist
+        const aPnt = sp.points[0];
+        const bPnt = sp.points.at( -1 );
+
+        this.swing.fromSub( bPnt.pos, aPnt.pos );
+        this.dist = this.swing.len;
+        this.swing.norm();
+
+        // HACK - this won't work for all splines as there is no defined pole position in a spline
+        // Twist is needed by look solver when target is beyond reach
+        const v = new Vec3().fromSub( sp.points[0].pos, sp.points[1].pos ).norm();
+        this.twist.fromReflect( v, this.swing );        // Refective vector as it should work better in this case to compute a pole vector
+        v.fromCross( this.twist, this.swing );          // Start orthogonal fix
+        this.twist.fromCross( this.swing, v ).norm();   // Realign twist to be ortho to swing
+    }
+}
+
+
+/* TODO
+- If Target distance is > chain's reach, reset all bones to bind and aim chain at target
+- If Link passes arc length
+  - Set every link afterwards with bind
+  - Aim last joint toward IK target with the rest with bind
+- Check flipping when arc control goes below the first point
+- If last point hasn't reached target, try F&B to apply reach
+    - This will require realigning the tangets again
+- Add Twist controls to IK Target
+*/
+
+function splineSolver( tar, chain, pose, opts={} ){
+    // if( tar.dist >= chain.len ) console.log( 'Target is out of reach')
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Sample Spline
+    const sampler = new SplineSampler()
+        .fromSpline( tar.spline, chain.links.length * 2 );
+
+    // -----------------------------
+    // Transport the twist direction across samples
+    const v = new Vec3();
+    v.fromQuat( tar.rworld.rot, chain.links[0].axes.twist ); 
+    
+    Rmf.transportNormal( sampler.items, v );
+
+    // -----------------------------
+    // Apply additional twisting to samples if available
+    if( tar.twistRadA !== 0 && tar.twistRadB !== 0 ){
+        Rmf.applyLinearTwist( sampler.points, tar.twistRadA, tar.twistRadB );
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Get sample for each link
+    const points = new Array();
+    let travel = 0;
+    let overSample; // ?: SplineSample;
+
+    // -------------------------------
+    // Create samples for each joint in the change
+    for( const lnk of chain.links ){
+        if( travel > sampler.arcLength ){
+            // UseCase: Handle when curve is shorter then chain
+            if( !overSample ){              
+                // Clone last sample, set its position to the end
+                // of the curve then adjust tangent & fix normal  
+                const prev = points.at(-1);
+                overSample = prev.clone();
+
+                overSample.pos.copy( sampler.items.at(-1).pos );
+                overSample.tangent
+                    .fromSub( overSample.pos, prev.pos )
+                    .norm();
+
+                Rmf.fixOrthogonal( overSample );
+                points.push( overSample );
+
+            }else{
+                // More joints outside the curve, clone the overshoot
+                // sample. Then shift its position by its tangent.
+                // All joints after first overshoot will have the same
+                // orientation.
+                const next = overSample.clone();
+                v.fromScale( overSample.tangent, lnk.len );
+                next.pos.add( v );
+                points.push( next );
+            }
+            console.log( 'Link is passed arcLength', lnk );
+        }else{
+            points.push( sampler.atDist( travel ) );
+        }
+
+        travel += lnk.len;
+    }
+
+    // -------------------------------
+    // UseCase: When chain is shorter then spline
+    if( travel <= sampler.arcLength ){
+        console.log( 'UNDERSHOOT' );
+
+        // Project the world position of the last joint
+        const al = chain.links.at( -3 );
+        const a  = points.at( -3 );
+        const b  = points.at( -2 );
+    
+        b.pos.fromSub( b.pos, a.pos )
+            .norm()
+            .scale( al.len )
+            .add( a.pos );
+
+        // Last point should point to end of curve
+        // This will make the last joint aim toward
+        // the target pos after realigning all tangents
+        const e = points.at( -1 );  // End Point
+        e.pos.copy( tar.endPos );
+        console.log( opts );
+        if( opts.useReach ){
+            iterateForward( tar, chain, points );
+            iterateBackward( chain, points );
+        }
+    }
+
+    // -------------------------------
+    // Do a pass to apply corrections to tangents
+    // since lerping by distance creates discontinuity
+    Rmf.realignTangentsFromPoints( points );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    applySamplesToPose( chain, pose, points );
+
+    v.copy( points[0].pos );
+    for( const p of sampler.items ){
+        Debug.ln.add( v, p.pos, 0xffa000 );
+        v.copy( p.pos );
+    }
+    for( const p of points ){
+        Debug.pnt.add( p.pos, 0xffa000, 2 );
+        Debug.ln.add( p.pos, v.fromScaleThenAdd( 0.15, p.normal, p.pos), 0xffa000 );
+    }
+
+    // for( const samp of points ){
+    //     Debug.pnt.add( samp.pos, 0x00ff00, 2 );
+    //     Debug.ln.add( samp.pos, v.fromScaleThenAdd( 0.9, samp.tangent, samp.pos ), 0xffff00 );
+    //     Debug.ln.add( samp.pos, v.fromScaleThenAdd( 0.5, samp.normal, samp.pos ), 0xff00ff );
+    // }
+
+    // const v = new Vec3();
+    // for( const i of samp.items ){
+    //     Debug.pnt.add( i.pos, 0x00ff00, 3 );
+    //     Debug.ln.add( i.pos, v.fromScaleThenAdd( 0.5, i.tangent, i.pos ), 0xffff00 );
+    // }
+
+    // const eIdx = 9;
+    // let prev = samp.atDist( 0 );
+    // Debug.ln.add( prev.pos, v.fromScaleThenAdd( 0.3, prev.normal, prev.pos ), 0xffff00 );
+    // for( let i=1; i <=eIdx; i++ ){
+    //     const c = samp.atDist( samp.arcLength * ( i / eIdx ) );
+    //     prev = c;
+    //     Debug.pnt.add( c.pos, 0x00ff00, 3 );
+    //     // Debug.ln.add( c.pos, v.fromScaleThenAdd( 2, c.tangent, c.pos ), 0xffff00 );
+    //     Debug.ln.add( c.pos, v.fromScaleThenAdd( 0.3, c.normal, c.pos ), 0xffff00 );
+    // }
+}
+
+function applySamplesToPose( chain, pose, pnts ){
+    const parent  = new Transform();
+    const fromDir = new Vec3();
+    const sRot    = new Quat();
+    let lnk;
+    let joint;
+
+    // const v = new Vec3();
+
+    for( let i=0; i < chain.links.length-1; i++ ){
+        lnk   = chain.links[ i ];
+        joint = pose.getBone( lnk.index );
+        
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Joints unchanged ws transform
+        pose.getWorldTransform( joint.pindex, parent );
+        joint.world.fromMul( parent, lnk.bind );
+
+        // Debug.pnt.add( joint.world.pos, 0x00ff00, 3, 0 );
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // SWING
+        // Direction bone is pointing toward
+        fromDir.fromQuat( joint.world.rot, lnk.axes.swing ).norm();
+        // Debug.ln.add( joint.world.pos, v.fromScaleThenAdd( 1, fromDir, joint.world.pos ), 0xffff00 );
+        // Debug.ln.add( joint.world.pos, v.fromScaleThenAdd( 1, pnts[i].tangent, joint.world.pos ), 0xff00ff );
+        
+        // Direction toward target point
+        // toDir.fromSub( pnts[i+1], bone.world.pos ).norm();
+
+        sRot
+            .fromSwing( fromDir, pnts[i].tangent )  // Rotation FROM > TO
+            .mul( joint.world.rot )                  // Apply to WS Rotation of bone
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // TWIST + Finalize
+        fromDir.fromQuat( sRot, lnk.axes.twist ).norm();
+        // tRot.fromSwing( fromDir, pnts[i].normal );
+
+        joint.local.rot
+            .fromSwing( fromDir, pnts[i].normal ) // Create Twist
+            .mul( sRot )                          // Apply Swing
+            .pmulInvert( parent.rot )             // To Local Space
+            .norm();                              // To unit quaternion
+
+        // Debug.ln.add( joint.world.pos, v.fromScaleThenAdd( 1, fromDir, joint.world.pos ), 0xffff00 );
+        // Debug.ln.add( joint.world.pos, v.fromScaleThenAdd( 0.5, pnts[i].normal, joint.world.pos ), 0xff00ff );
+    }
+}
+
+function splineCompose( target, chain, pose, opts={} ){
+    const props = Object.assign( {
+        useReach : false,   // Allow use of Fwd & Back to try to reach target when applicable
+    }, opts );
+
+    console.log( opts )
+
+
+    // Resolve the target to the current pose data
+    target.resolveTarget( chain, pose );
+
+    // If the target is to far away, straighten the chain
+    if( target.dist >= chain.len ){
+        // Align the the root bone to the target direction
+        lookSolver( target, chain, pose );
+        chain.resetPoseLocal( pose, 1 );
+    }else{
+        splineSolver( target, chain, pose, props );
+    }
+
+    pose.updateWorld();
+}
+
+// Move points torward the target point
+function iterateForward( tar, chain, pnts ){
+    const v = new Vec3();
+    pnts.at( -1 )?.pos.copy( tar.endPos );      // Move last point to target position
+
+    for( let i = chain.links.length-1; i > 1; i-- ){
+        v   .fromSub( pnts[i-1].pos, pnts[i].pos )  // Direction to parent point
+            .norm()
+            .scale( chain.links[ i-1 ].len )        // Resize to bone's length
+            .add( pnts[i].pos )                     // Move away from child
+            .copyTo( pnts[i-1].pos );               // Save result back as parent position
+    }
+}
+
+// Move points toward the origin point
+function iterateBackward( chain, pnts ){
+    const v = new Vec3();
+    for( let i = 0; i < chain.links.length-1; i++ ){
+        v   .fromSub( pnts[i+1].pos, pnts[i].pos )  // Direction to child point
+            .norm()
+            .scale( chain.links[ i ].len )          // Resize to bone's length
+            .add( pnts[i].pos )                     // Move away from parent
+            .copyTo( pnts[i+1].pos );               // Save result back as child position
+    }
+}
+
+// #endregion
+
+/*
+SplineIK
+- Root Bone - Start Pos
+- Last Bone - End Pos
+- Control points between
+- While placing for short curves, keep adding up total len traveled
+  and check if the point is past the end, if so just keep the rest of the points straight in the last known direction
+
+IKSplineTarget
+- curve         : nurbs, catmull, cubicbezier
+- twistStart    : number
+- twistEnd      : number
+- setPos( i:int, p:TVec3 )
+
+Point
+- pos   : TVec3
+- type  : point | control
+- index : int = -1
+
+Curve
+- points: Array<Point>
+
+Spline
+- points        : Array<Point> // Flatten out all 
+- curves        : Array<Curve>
+- pointCount    : int
+- curveCount    : int
+- addCurve( points )
+- at( t, pos, tan )
+- curveAt( n, t, pos, tan )
+
+[ { pos:[0,0,0], type: 'pnt' }, { pos:[0,0,0], type: 'ctrl' } ]
+
+
+const pose      = skin.tpose.clone();
+const chain     = new IKChain( [bones], BoneAxes.UFR )
+const spline    = new NurbsSpline( curveCount, ctrlCount );
+const spline    = new CubicBezierSpline( curveCount );
+const spline    = new CatmullSpline( pointCount );
+const ikTarget  = IKSplineTarget( spline );
+
+ikTarget.setPoint( i, pos )
+
+ikTarget.spline.points[0]   // Root Chain WSPosition
+ikTarget.spline.points[1]   // A Control Point, can be 
+ikTarget.spline.points[-1]  // IK Target Position
+
+    // const pose   = arm.newPose();
+    // const chain  = new IKChain( arm.bindPose.getBones( ['b0','b1','b2','b3'] ), BoneAxes.UFR );
+    // const target = new IKTarget();
+
+    // target
+    //     .setPositions( Ref.tarPos, Ref.polPos )
+    //     .resolveTarget( chain, pose );
+
+    // target.debug( Debug );
+
+    // // pose.reset();
+    // asincArcCompose( target, chain, pose );
+
+    // pose.updateWorld();
+    // Util.debugBones( pose.bones, Debug, 0.2, 1, false );
+
+
+UAP ERB
+
+Whats deCasteljau ?
+- https://en.wikipedia.org/wiki/De_Casteljau%27s_algorithm
+- Split a single Bézier curve into two Bézier curves at an arbitrary parameter value
+
+in Graphics Gem 4 - Fiber Bundle Twist Reduction
+Had an interesting idea about checking the twist at each frame
+and fixing it to better align with the previous frame. The only
+thing is mentions is checking the angle between the twist vectors
+then at a certain threshold realign the twist.
+
+I have an interesting idea. Project the previous twist vector
+onto the plane of the current frame. Using the position &
+tangent to form the plane. From there can check the angle
+between the two vectors to see if its worth fixing. If fix
+is needed, then do a fromSwing rotation to realign the twist vector
+*/
+
+</script></body></html>

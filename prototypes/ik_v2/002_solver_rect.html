@@ -1,0 +1,466 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import useTransformMultiControl from '../_lib/useTransformMultiControl.js';
+import Util                     from '../_lib/misc/Util.js';
+
+import facedCube                from '../_lib/meshes/facedCube.js';
+
+import { 
+    Armature, Quat, Vec3, Transform,
+} from '../../src/index';
+
+import {
+    BoneAxes, IKTarget, IKChain, zCompose
+} from '../../src/kinematics2/index';
+// #endregion
+
+// #region MAIN
+let Debug;
+let App = useDarkScene( useThreeWebGL2() );
+let Ref = {
+    // gizmo       : useTransformMultiControl( App, 2 ).useAxes(),
+    tarPos      : [0,0.7,1],
+    polPos      : [0,0.7,-1],
+    bCnt        : 4,
+    bStep       : 0.7,
+    cubes       : [],
+};
+
+// https://www.youtube.com/watch?v=UNrrd_XhPMA
+// https://www.youtube.com/watch?v=S-zAk6VqL-E
+// https://www.youtube.com/watch?v=docgrYp6A88
+// https://discussions.unity.com/t/ik-chain/406592/10
+// https://www.youtube.com/watch?v=MULuu-bkPKs
+// 1.9630490810141605 1.7868094709271223 0.7137383919268478 2.886979291543343
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( -85, 20, 7, [ 0, 0.9, 0 ] );
+    Debug = await useVisualDebug( App );
+
+    // Ref.gizmo.setPos( 0, Ref.tarPos );
+    // Ref.gizmo.setPos( 1, Ref.polPos );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Build Skeleton
+    // const arm = createTestChain( Ref.bCnt, Ref.bStep );
+    const arm = createTestChainByLengths( [1.9630490810141605, 1.7868094709271223,0.7137383919268478] );
+    Util.debugBones( arm.poses.bind.bones, Debug, 0.2, 1, false );
+
+    Ref.arm     = arm;
+    Ref.pose    = arm.newPose();
+    Ref.cubes   = createBoxChain( Ref.bCnt );
+
+    Ref.chain   = new IKChain( Ref.pose.bones, BoneAxes.UFR );
+    Ref.ikt     = new IKTarget();
+
+    const hitlen = 0.5;
+    // const rads = calculateSkewedRectangleAngles(1.9630490810141605,1.7868094709271223,0.7137383919268478, hitlen);
+    // const rads = calculateSkewedRectangleAngles2(1.9630490810141605,1.7868094709271223,0.7137383919268478, hitlen);
+    // const rads = calculateCircularArcAngles(1.9630490810141605,1.7868094709271223,0.7137383919268478, hitlen);
+    // const rads = calculateArcAnglesSinc( 1.9630490810141605,1.7868094709271223,0.7137383919268478, hitlen );
+    // const rads = calculateArcAnglesSinc2( 1.9630490810141605,1.7868094709271223,0.7137383919268478, hitlen );
+    const rads = calculateBoneRotations( [1.9630490810141605, 1.7868094709271223, 0.7137383919268478], hitlen );
+    console.log( rads );
+
+    // Ref.pose.bones[0].local.rot.rotX( rads.angle1 - 10 * Math.PI / 180 );
+    // Ref.pose.bones[1].local.rot.rotX( rads.angle2 - 10 * Math.PI / 180 );
+    // Ref.pose.bones[2].local.rot.rotX( rads.angle3 + 30 * Math.PI / 180 );
+
+    // Ref.pose.bones[0].local.rot.rotX( rads.angle2 - 100 * Math.PI / 180 );
+    // Ref.pose.bones[1].local.rot.rotX( rads.angle3 );
+    // Ref.pose.bones[2].local.rot.rotX( rads.angle4 );
+
+    Ref.pose.bones[0].local.rot.rotX( rads[0] - 0 * Math.PI / 180 );
+    Ref.pose.bones[1].local.rot.rotX( rads[1] - 0 * Math.PI / 180 );
+    Ref.pose.bones[2].local.rot.rotX( rads[2] - 0 * Math.PI / 180 );
+
+    // console.log( 'last', rads.angle2, rads.angle2 * 180/Math.PI, (rads.angle2 - 45 * Math.PI / 180) * 180/Math.PI )
+
+
+    Debug.reset();
+    Ref.pose.updateWorld();
+    Util.debugBones( Ref.pose.bones, Debug, 0.2, 1, false );
+
+    Debug.pnt.add( [ 0,0,hitlen], 0x00ff00, 3 );
+
+    // poseCubes( Ref.pose );
+    // runSolver();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //App.createRenderLoop( onPreRender ).start();
+    App.renderLoop();
+});
+
+
+
+// Ref.gizmo.onRotate = (q)=>{ runSolver(); };
+// Ref.gizmo.onMove = (i, p)=>{
+//     switch( i ){
+//         case 0: Ref.tarPos = p; break;
+//         case 1: Ref.polPos = p; break;
+//     }
+
+//     runSolver();
+// };
+
+function onPreRender( dt, et ){}
+// #endregion
+
+// #region SETUP
+function createTestChain( cnt=3, step=0.5 ){
+    const arm = new Armature();
+    let prev  = null;
+
+    for( let i=0; i < cnt; i++ ) prev = arm.addBone( { name:`b${i}`, pos:[0,step,0], parent:prev } );
+
+    // arm.bind( step );
+    arm.bind( 0.001 );
+    return arm;
+}
+
+function createTestChainByLengths( ary ){
+    const arm = new Armature();
+    let prev  = null;
+
+    for( let i=0; i < ary.length; i++ ) 
+        prev = arm.addBone( { 
+            name    :`b${i}`, 
+            pos     :[0, (!i?0:ary[i-1]), 0], 
+            parent  :   prev 
+        } );
+
+    // arm.bind( step );
+    arm.bind( ary.at( -1 ) );
+    return arm;
+}
+
+function createBoxChain( cnt=3 ){
+    const rtn = [];
+
+    for( let i=0; i < cnt; i++ ){
+        const c = facedCube();
+        c.scale.setScalar( 0.1 );
+        rtn.push( c );
+        App.scene.add( c );
+    }
+
+    return rtn;
+}
+
+function poseCubes( pose, offset=[0,0,0] ){
+    for( const b of Ref.pose.bones ){
+        const c = Ref.cubes[ b.index ];
+        c.quaternion.fromArray( b.world.rot );
+        c.position.fromArray( b.world.pos );
+        c.position.x += offset[0];
+        c.position.y += offset[1];
+        c.position.z += offset[2];
+    }
+}
+// #endregion
+
+function runSolver(){
+    Debug.reset();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup IK Target
+    Ref.ikt.setPositions( Ref.tarPos, Ref.polPos );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Run Solver
+    zCompose( Ref.ikt, Ref.chain, Ref.pose, Debug );
+    Ref.pose.updateWorld();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Visualize Results
+    Util.debugBones( Ref.pose.bones, Debug, 0.2, 1, false );
+    poseCubes( Ref.pose );
+}
+
+function calculateCircularArcAngles(bone1Length, bone2Length, bone3Length, targetDistance) {
+  // Ensure all lengths are positive.
+  if (bone1Length <= 0 || bone2Length <= 0 || bone3Length <= 0 || targetDistance <= 0) {
+    return null; // Invalid input.
+  }
+
+  // Calculate the total arc length.
+  const arcLength = bone1Length + bone2Length + bone3Length;
+
+  // Approximate the radius.
+  const approxRadius = arcLength / (2 * Math.PI);
+
+    // Calculate the central angle subtended by the target distance (chord).
+  const centralAngle = 2 * Math.asin(targetDistance / (2 * approxRadius));
+
+  // Calculate the angles subtended by each bone.
+  const angle1 = 0; // Bone1 is the reference.
+  const angle2 = centralAngle * (bone2Length / arcLength);
+  const angle3 = centralAngle;
+  const angle4 = centralAngle * (bone2Length / arcLength);
+
+  return {
+    angle1: angle1,
+    angle2: angle2,
+    angle3: angle3,
+    angle4: angle4,
+  };
+}
+
+function calculateSkewedRectangleAngles2(bone1Length, bone2Length, bone3Length, targetDistance) {
+  // Ensure all lengths are positive.
+  if (bone1Length <= 0 || bone2Length <= 0 || bone3Length <= 0 || targetDistance <= 0) {
+    return null; // Invalid input.
+  }
+
+  // Triangle 1 (bone1, targetDistance, diagonal1)
+  const diagonal1 = Math.sqrt(bone1Length * bone1Length + targetDistance * targetDistance);
+  const angleA1 = Math.acos((bone1Length * bone1Length + diagonal1 * diagonal1 - targetDistance * targetDistance) / (2 * bone1Length * diagonal1));
+  const angleA2 = Math.acos((targetDistance * targetDistance + diagonal1 * diagonal1 - bone1Length * bone1Length) / (2 * targetDistance * diagonal1));
+
+  // Triangle 2 (bone1, bone2, diagonal2)
+  const diagonal2 = Math.sqrt(bone1Length * bone1Length + bone2Length * bone2Length - 2 * bone1Length * bone2Length * Math.cos(Math.PI/2));
+  const angleB1 = Math.acos((bone1Length * bone1Length + diagonal2 * diagonal2 - bone2Length * bone2Length) / (2 * bone1Length * diagonal2));
+  const angleB2 = Math.acos((bone2Length * bone2Length + diagonal2 * diagonal2 - bone1Length * bone1Length) / (2 * bone2Length * diagonal2));
+
+  // Triangle 3 (bone2, bone3, diagonal3)
+  const diagonal3 = Math.sqrt(bone2Length * bone2Length + bone3Length * bone3Length);
+  const angleC1 = Math.acos((bone2Length * bone2Length + diagonal3 * diagonal3 - bone3Length * bone3Length) / (2 * bone2Length * diagonal3));
+  const angleC2 = Math.acos((bone3Length * bone3Length + diagonal3 * diagonal3 - bone2Length * bone2Length) / (2 * bone3Length * diagonal3));
+
+  // Corner angles (in radians)
+  const angle1 = angleA1;
+  const angle4 = angleB1 + Math.PI/2;
+  const angle2 = angleC1 + Math.PI/2;
+  const angle3 = angleC2;
+
+  return {
+    angle1: angle1,
+    angle2: angle2,
+    angle3: angle3,
+    angle4: angle4,
+  };
+}
+
+function calculateSkewedRectangleAngles(bone1Length, bone2Length, bone3Length, targetDistance) {
+  // Ensure all lengths are positive.
+  if (bone1Length <= 0 || bone2Length <= 0 || bone3Length <= 0 || targetDistance <= 0) {
+    console.log( 'invalid input' );
+    return null; // Invalid input.
+  }
+
+  // Calculate the diagonal of the rectangle using the law of cosines.
+  // We'll use this to find the angles.
+  const diagonal = Math.sqrt(bone1Length * bone1Length + targetDistance * targetDistance);
+  console.log('Dia', diagonal );
+
+  // Calculate the angles using the law of cosines.
+  const angle1 = Math.acos((bone1Length * bone1Length + diagonal * diagonal - targetDistance * targetDistance) / (2 * bone1Length * diagonal));
+  const angle2 = Math.acos((bone2Length * bone2Length + bone3Length * bone3Length - diagonal * diagonal) / (2 * bone2Length * bone3Length));
+//   const angle2 = Math.acos((bone2Length * bone2Length + bone3Length * bone3Length - diagonal * diagonal) / (2 * bone2Length * bone3Length));
+
+  const angle3 = Math.acos((bone3Length * bone3Length + diagonal * diagonal - bone2Length * bone2Length) / (2 * bone3Length * diagonal));
+  const angle4 = Math.acos((bone1Length * bone1Length + bone2Length * bone2Length - (targetDistance * targetDistance + bone3Length * bone3Length - 2*targetDistance*bone3Length*Math.cos(angle2)))/(2*bone1Length*bone2Length));
+
+  console.log('Ang', angle1, angle2, angle3, angle4 );
+
+  // Convert angles to degrees for easier interpretation.
+  const angle1Degrees = angle1;// * (180 / Math.PI);
+  const angle2Degrees = angle2;// * (180 / Math.PI);
+  const angle3Degrees = angle3;// * (180 / Math.PI);
+  const angle4Degrees = angle4;// * (180/Math.PI);
+
+  // Calculate the other angles of the rectangle.
+  const angle5 = 180 - angle1Degrees;
+  const angle6 = 180 - angle2Degrees;
+  const angle7 = 180 - angle3Degrees;
+  const angle8 = 180 - angle4Degrees;
+
+  console.log( 'eep', angle1 * (180 / Math.PI), angle4 * (180/Math.PI),  angle2 * (180 / Math.PI), angle3 * (180 / Math.PI) );
+
+
+  // Ensure angles are within a reasonable range.
+  if (isNaN(angle1Degrees) || isNaN(angle2Degrees) || isNaN(angle3Degrees) || isNaN(angle4Degrees)) {
+    console.log( 'invalid geometry');
+    return null; // Invalid geometry.
+  }
+
+  // Return the angles.
+  return {
+    angle1: angle1Degrees, // between bone1 and diagonal
+    angle2: angle2Degrees, // between bone2 and bone3
+    angle3: angle3Degrees, // between bone3 and diagonal
+    angle4: angle4Degrees, // between bone1 and bone2
+    angle5: angle1, //other bone1 angle
+    angle6: angle2, //other bone2 angle
+    angle7: angle3, //other bone3 angle
+    angle8: angle4, //other bone4 angle
+  };
+}
+
+function calculateArcAnglesSinc(bone1Length, bone2Length, bone3Length, targetDistance) {
+  // Ensure all lengths are positive.
+  if (bone1Length <= 0 || bone2Length <= 0 || bone3Length <= 0 || targetDistance <= 0) {
+    return null; // Invalid input.
+  }
+
+  // Calculate arc length (a) and target distance (b).
+  const a = bone1Length + bone2Length + bone3Length;
+  const b = targetDistance;
+
+  // Function to calculate sinc(x) - b/a.
+  const sincDiff = (x) => Math.sin(x) / x - b / a;
+
+  // Numerical solution using the bisection method.
+  let low = 0;
+  let high = Math.PI; // Maximum possible angle.
+  let x = (low + high) / 2;
+  const tolerance = 1e-6; // Tolerance for convergence.
+  let iteration = 0;
+  const maxIterations = 100;
+
+  while (Math.abs(sincDiff(x)) > tolerance && iteration < maxIterations) {
+    if (sincDiff(x) * sincDiff(low) < 0) {
+      high = x;
+    } else {
+      low = x;
+    }
+    x = (low + high) / 2;
+    iteration++;
+  }
+
+  if(iteration >= maxIterations){
+      return null;
+  }
+
+  // Calculate bone angles.
+  const angle1 = 0; // Bone1 is the reference.
+  const angle2 = x * (bone2Length / a);
+  const angle3 = x;
+  const angle4 = x * (bone2Length / a);
+
+  return {
+    angle1: angle1,
+    angle2: angle2,
+    angle3: angle3,
+    angle4: angle4,
+  };
+}
+
+
+function asinc(x0) {
+  let x = 6 * (1 - x0);
+  let x1 = x;
+  let a = x;
+  x *= x1;
+  a += x / 20.0;
+  x *= x1;
+  a += x * 2.0 / 525.0;
+  x *= x1;
+  a += x * 13.0 / 37800.0;
+  x *= x1;
+  a += x * 4957.0 / 145530000.0;
+  x *= x1;
+  a += x * 58007.0 / 16216200000.0;
+  x *= x1;
+  a += x * 1748431.0 / 4469590125000.0;
+  x *= x1;
+  a += x * 4058681.0 / 92100645000000.0;
+  x *= x1;
+  a += x * 5313239803.0 / 1046241656460000000.0;
+  x *= x1;
+  a += x * 2601229460539.0 / 4365681093774000000000.0;
+  return Math.sqrt(a);
+}
+
+function calculateArcAnglesSinc2(bone1Length, bone2Length, bone3Length, targetDistance) {
+  // Ensure all lengths are positive.
+  if (bone1Length <= 0 || bone2Length <= 0 || bone3Length <= 0 || targetDistance <= 0) {
+    return null; // Invalid input.
+  }
+
+  // Calculate arc length (a) and target distance (b).
+  const a = bone1Length + bone2Length + bone3Length;
+  const b = targetDistance;
+
+  // Calculate x (angle).
+  const x = asinc( b / a );
+
+  // Calculate bone angles.
+  const angle1 = 0; // Bone1 is the reference.
+  const angle2 = x * (bone2Length / a);
+  const angle3 = x;
+  const angle4 = x * (bone1Length / a);
+
+  return {
+    angle1: angle1,
+    angle2: angle2,
+    angle3: angle3,
+    angle4: angle4,
+  };
+}
+
+// Need to test these out
+// function calculateBoneRotations(boneLengths, targetDistance) {
+//   // Ensure all bone lengths are positive and target distance is valid.
+//   if (!Array.isArray(boneLengths) || boneLengths.length < 2 || targetDistance <= 0) {
+//     return null; // Invalid input.
+//   }
+
+//   if (boneLengths.some(length => length <= 0)) {
+//     return null;
+//   }
+
+//   // Calculate total arc length.
+//   const arcLength = boneLengths.reduce((sum, length) => sum + length, 0);
+
+//   // Calculate b/a (targetDistance/arcLength).
+//   const x0 = targetDistance / arcLength;
+
+//   // Calculate x (angle).
+//   const x = asinc(x0);
+
+//   // Calculate bone angles.
+//   const boneAngles = [0]; // First bone is the reference (0 radians).
+
+//   for (let i = 1; i < boneLengths.length; i++) {
+//     boneAngles.push(x * (boneLengths[i] / arcLength));
+//   }
+
+//   return boneAngles;
+// }
+
+function calculateBoneRotations(boneLengths, targetDistance) {
+  // Ensure all bone lengths are positive and target distance is valid.
+  if (!Array.isArray(boneLengths) || boneLengths.length < 2 || targetDistance <= 0) {
+    return null; // Invalid input.
+  }
+
+  if (boneLengths.some(length => length <= 0)) {
+    return null;
+  }
+
+  // Calculate total arc length.
+  const arcLength = boneLengths.reduce((sum, length) => sum + length, 0);
+
+  // Calculate b/a (targetDistance/arcLength).
+  const x0 = targetDistance / arcLength;
+
+  // Calculate x (angle).
+  const x = asinc(x0);
+
+  // Calculate bone angles.
+  const boneAngles = [];
+
+  for (let i = 0; i < boneLengths.length; i++) {
+    boneAngles.push(x * (boneLengths[i] / arcLength));
+  }
+
+  return boneAngles;
+}
+
+</script></body></html>

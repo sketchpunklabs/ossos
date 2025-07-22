@@ -29,7 +29,7 @@ export default function lookSolver( tar: IKTarget, chain: IKChain, pose: Pose, D
         const twistReset = new Quat().fromSwing( tDir, tar.twist );
 
         // Make sure there is no rotational artifacts from opposite hemisphere rotations
-        if( Vec3.dot( twistReset, rot ) < 0 ) twistReset.negate();
+        if( Quat.dot( twistReset, rot ) < 0 ) twistReset.negate();
 
         rot.pmul( twistReset );
     }

@@ -1,0 +1,332 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+import useTransformControl          from '../_lib/useTransformControl.js';
+import Util                         from '../_lib/misc/Util.js';
+import ShapePointsMesh              from '../_lib/meshes/ShapePointsMesh.js';
+
+import ScreenPicker, { Tasker }     from '../_lib/misc/ScreenPicker.js';
+import facedCube                    from '../_lib/meshes/facedCube.js';
+
+import { 
+    Armature, Quat, Vec3, Transform,
+} from '../../src/index';
+
+import {
+    BoneAxes, IKTarget, IKChain, lookSolver,
+    IKSplineTarget, splineSolver, splineCompose,
+} from '../../src/kinematics2/index';
+
+import { NurbsSpline, SplineSampler, SplineSample, Rmf, } 
+    from '../../src/maths/curves/index';
+
+import { Pane }                 from '../_thirdparty/tweakpane-4.0.4.min.js';
+import * as TweakpaneEssentials from '../_thirdparty/tweakpane-plugin-essentials-0.2.1.min.js';
+// #endregion
+
+// #region MAIN
+let Debug;
+let App = useDarkScene( useThreeWebGL2() );
+let Ref = {
+    pnts    : new ShapePointsMesh(),
+    gizmo   : useTransformControl( App ).useAxes().hide(),
+    picker  : new ScreenPicker( App ),
+    tasks   : new Tasker(),
+    selPnt  : -1,
+
+    twistA    : 0,
+    twistB    : 0,
+    // targetPos : new Vec3( 0, 1.8, 0 ),
+    targetPos : new Vec3( 0, 1.5350996259580232, 0.3989262164531562 ),
+    polePos   : new Vec3( 0, 1.15, -0.01 ),
+    sets      : [],
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 30, 20, 5, [ 0, 1.0, 0 ] );
+    globalThis.Debug = Debug = await useVisualDebug( App );
+
+    Ref.pnts.renderOrder = 100;
+    Ref.pnts.material.depthTest = false;
+    App.scene.add( Ref.pnts );
+
+    Ref.pnts
+        .add( Ref.targetPos, 0x00ffff, 4, 6 )
+        .add( Ref.polePos, 0xffff00, 4, 6 );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Build Skeleton
+    const arm = new Armature();
+    const b0  = arm.addBone( { name:'b0', pos:[0,0.5,0], } );
+    const b1  = arm.addBone( { name:'b1', pos:[0,0.3,0], parent:b0 } );
+    const b2  = arm.addBone( { name:'b2', pos:[0,0.7,0], parent:b1 } );
+    const b3  = arm.addBone( { name:'b3', pos:[0,0.3,0], parent:b2 } );
+    arm.bind( 0.001 );
+    // Util.debugBones( arm.poses.bind.bones, Debug, 0.2, 1, false );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup IK Sets
+    const set0 = ikSet( arm, { offset:[-1,0,0], reach:false } );
+    updateCubes( set0 );
+    Ref.sets.push( set0 );
+
+    const set1 = ikSet( arm, { offset:[1,0,0], reach:true } );
+    updateCubes( set1 );
+    Ref.sets.push( set1 );
+
+    updateSplinePos( 0, Ref.targetPos );
+    updateSplinePos( 1, Ref.polePos );
+    // runSolver();
+
+    // // Debugging at specific spline configuration
+    // updateSplinePos( 0, [0, 0.8267651953575288, 0.4014483210523149] );
+    // updateSplinePos( 1, [0, 1.15, -0.41021128108506855] );
+    // runSolver();
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    App.createRenderLoop( null, onPostRender ).start();
+    // App.renderLoop();
+    buildUI();
+});
+
+function runSolver(){
+    Debug.reset();
+    for( const s of Ref.sets ){
+        s.target.twistRadA = Ref.twistA * Math.PI / 180;
+        s.target.twistRadB = Ref.twistB * Math.PI / 180;
+        s.run();
+    }
+}
+
+function updateSplinePos( i, pos ){
+    const v = new Vec3();
+    Ref.pnts.setPosAt( i, pos );    // Update Draggable points
+    switch( i ){
+        case 0: 
+            for( let s of Ref.sets ) s.setTarget( v.fromAdd( pos, s.offset ) );
+            break;
+        case 1: 
+            for( let s of Ref.sets ) s.setPole( v.fromAdd( pos, s.offset ) );
+            break;
+    }
+}
+
+Ref.gizmo.onMove = p=>{
+    if( Ref.selPnt === -1 ) return;
+
+    updateSplinePos( Ref.selPnt, p );
+    runSolver();
+
+    // console.log( p );
+};
+
+function onPreRender( dt, et ){}
+function onPostRender( dt, et ){ Ref.tasks.run(); }
+
+window.addEventListener( 'pointerdown', e=>{
+    if( e.button === 2 ){
+        Ref.gizmo.hide();
+        return;
+    }
+
+    if( Ref.gizmo.o.dragging ) return;
+    Ref.tasks.push( Ref.picker.pixelTaskFromEvent(e, onPicker, false) );
+});
+
+function onPicker( o ){
+    // console.log( 'Pick', o );
+    // if( o.id === -1 || o.type !== "shapePoint" ) return;
+    if( o.id === -1 || o.obj !== Ref.pnts ) return;
+    // console.log( 'Pick', o );
+    Ref.gizmo.show( o.hit );
+    Ref.selPnt = o.idx;
+}
+
+async function buildUI(){
+    const container = document.createElement( 'div' );
+    container.className         = 'ppane';
+    container.style.position    = 'fixed';
+    container.style.top         = '10px';
+    container.style.left        = '50%';
+    // container.style.width       = '400px';
+    container.style.height      = 'fit-content';
+    container.style.transform   = 'translateX(-50%)';
+    document.body.appendChild( container );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const p = new Pane( { container } );
+    p.on( 'change', e=>runSolver() );
+
+    const f = p.addFolder({ title: 'Twisting', expanded: true });
+    f.addBinding( Ref, 'twistA', { min: -180, max: 180, step: 1, label: 'Start' } );
+    f.addBinding( Ref, 'twistB', { min: -180, max: 180, step: 1, label: 'End' } );
+    f.addButton({ title: 'Reset' }).on( 'click', ()=>{
+        Ref.twistA = 0;
+        Ref.twistB = 0;
+        f.refresh();
+    });
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.pane = p;
+}
+// #endregion
+
+// #region VISUALIZING
+
+function boneCube( scl=[0.1,1,0.1] ){
+    const geo = new THREE
+        .BoxGeometry( 1, 1, 1 )
+        .translate( 0, 0.5, 0 )
+        .scale( scl[0], scl[1], scl[2] );
+
+    const mat = [
+        // new THREE.MeshBasicMaterial( { color: 0x00ff00 } ), // Left
+        // new THREE.MeshBasicMaterial( { color: 0x777777 } ), // Right
+        // new THREE.MeshBasicMaterial( { color: 0x0000ff } ), // Top
+        // new THREE.MeshBasicMaterial( { color: 0x222222 } ), // Bottom
+        // new THREE.MeshBasicMaterial( { color: 0xff0000 } ), // Forward
+        // new THREE.MeshBasicMaterial( { color: 0xffffff } ), // Back
+
+        new THREE.MeshBasicMaterial( { color: 0xE61A1A } ), // Left
+        new THREE.MeshBasicMaterial( { color: 0x260D0D } ), // Right
+        new THREE.MeshBasicMaterial( { color: 0x1AE61A } ), // Top
+        new THREE.MeshBasicMaterial( { color: 0x0D260D } ), // Bottom
+        new THREE.MeshBasicMaterial( { color: 0x1A1AFF } ), // Forward
+        new THREE.MeshBasicMaterial( { color: 0x0D0D26 } ), // Back
+    ];
+
+    return new THREE.Mesh( geo, mat );
+}
+
+function updateCubes( s ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if( s.cubes.length === 0 ){
+        const scl = 0.08;
+        for( let i=0; i < s.chain.links.length-1; i++ ){
+            const c = boneCube( [scl, s.chain.links[i].len, scl ] );
+            s.cubes.push( c )
+            App.scene.add( c );
+        }
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const c     = s.cubes;
+    const p     = s.pose;
+    const ch    = s.chain;
+
+    let b;
+    for( let i=0; i < ch.links.length-1; i++ ){
+        b = p.getBone( ch.links[i].index );
+        c[ i ].position.fromArray( b.world.pos );
+        c[ i ].quaternion.fromArray( b.world.rot );
+    }
+}
+
+function renderSpline( spline, samp=6 ){
+    const curr = new Vec3();
+    const prev = new Vec3();
+
+    spline.at( 0, prev );
+    Debug.pnt.add( prev, 0xffa500, 2 );
+    
+    for( let i=1; i <= samp; i++ ){
+        const t = i / samp;
+        spline.at( t, curr );
+        Debug.ln.add( prev, curr, 0xffa500 );
+        Debug.pnt.add( curr, 0xffa500, 2 );
+        prev.copy( curr );
+    }
+}
+
+function renderSolverResult( sampler, points ){
+    const v = new Vec3();
+    v.copy( points[0].pos );
+    for( const p of sampler.items ){
+        Debug.ln.add( v, p.pos, 0xffa000 );
+        v.copy( p.pos );
+    }
+    for( const p of points ){
+        Debug.pnt.add( p.pos, 0xffa000, 2 );
+        Debug.ln.add( p.pos, v.fromScaleThenAdd( 0.15, p.normal, p.pos), 0xffa000 );
+    }
+}
+
+// #endregion
+
+function ikSet( arm, props={} ){
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const opts = Object.assign({
+        offset  : [0,0,0],
+        reach   : false,
+    }, props );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Prepare Initial Pose
+    const pose = arm.bindPose.clone();
+    pose.offset.pos.copy( opts.offset );
+    pose.updateWorld();
+
+    // Util.debugBones( pose.bones, Debug, 0.2, 1, false );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Spline
+    const initPnts = [ new Vec3(0, 0.2, 0), new Vec3(0, 1.0, -0.01), new Vec3(0, 1.8, 0) ];
+    for( const i of initPnts ) i.add( opts.offset );
+
+    const spline = new NurbsSpline();
+    spline.appendCurve( initPnts );
+    // renderSpline( spline );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup IK
+    const chain  = new IKChain( pose.getBones( ['b0','b1','b2','b3'] ), BoneAxes.UFR );
+    const target = new IKSplineTarget( spline );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const self = {
+        target, 
+        chain,
+        pose,
+        cubes       : [],
+        offset      : opts.offset,
+
+        setTarget   : (v)=>target.setTargetPos( v ),
+        setPole     : (v)=>target.setPos( 1, v ),
+
+        run: ()=>{
+            const results = splineCompose( target, chain, pose, { useReach:opts.reach } );
+            pose.updateWorld();
+
+            if( results ){
+                const [sampler,points] = results;
+                renderSolverResult( sampler, points );
+            }
+
+            // Util.debugBones( pose.bones, Debug, 0.2, 1, false );
+            updateCubes( self );
+
+            Debug.pnt.add(spline.points[2].pos, 0x00ffff, 2, 1 );
+            Debug.pnt.add(spline.points[1].pos, 0xffff00, 2, 1 );
+        },
+    };
+
+    return self;
+}
+
+</script>
+<style>
+/* Main Panel */
+.ppane .tp-rotv { width: 300px; }
+
+/* Label  */
+.ppane .tp-lblv_l{ max-width:30px; }
+
+/* Input */
+.ppane .tp-lblv_v { flex:1; flex-grow:1; }
+.ppane .tp-sldtxtv_t { max-width: 40px; }
+</style>
+</body></html>

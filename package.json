@@ -35,17 +35,21 @@
     "scripts": {
         "dev": "vite --config vite.config.js",
         "build": "vite build",
+        "buid:post": "terser dist/ossos.mjs -o dist/ossos.min.js --config-file terser.config.json",
         "build:types": "tsc --declaration --noEmit false --emitDeclarationOnly --strict false --outDir ./dist",
         "build:site": "vite build --mode site",
         "pack": "npm pack",
         "preview-site": "vite preview",
-        "lint": "eslint . --ext .ts"
+        "lint": "eslint . --ext .ts",
+        "pnpm:dev": "pnpm run dev"
     },
     "devDependencies": {
-        "@stylistic/eslint-plugin": "^2.1.0",
-        "@typescript-eslint/eslint-plugin": "^7.10.0",
-        "@typescript-eslint/parser": "^7.10.0",
+        "@eslint/js": "^9.30.1",
+        "@stylistic/eslint-plugin": "^5.1.0",
+        "@typescript-eslint/eslint-plugin": "^8.36.0",
+        "@typescript-eslint/parser": "^8.36.0",
         "eslint": "^9.3.0",
+        "terser": "^5.43.1",
         "three": "^0.148.0",
         "typescript": "^5.0.3",
         "vite": "^4.0.0",

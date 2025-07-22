@@ -10,6 +10,7 @@ export default class ScreenPicker{
     
     bakClearColor   = new THREE.Color();                      // Backup Clear color of renderer
     nulClearColor   = new THREE.Color().setRGB( -1, -1, -1 ); // Clear color for picking
+    // nulClear        = new Int32Array([-1,-1,-1,-1]);          // FOR manual Clearing
     
     texPoint        = genIntRenderTarget( 1, 1, 4 );    // 1x1 Pixel storing RGBA
     matHitID        = new PickingHitIDMaterial();       // Render meshes to get ID and Hit World Space Position
@@ -66,7 +67,7 @@ export default class ScreenPicker{
         this.targetRenderer.readRenderTargetPixels( this.texPoint, 0, 0, 1, 1, pxBuf );
         // console.log( Array.from(pxBuf) );
         
-        if( pxBuf[0] < 0 ) return { id:-1 };
+        if( pxBuf[0] < 0 ) return { type:'noPick', id:-1 };
 
         const itm = this.idMapper[ pxBuf[ 0 ] ];
         return itm.m.decodePixel( pxBuf, itm );
@@ -134,6 +135,13 @@ export default class ScreenPicker{
         rend.setRenderTarget( tex );                // Set which texture to render to
         rend.getClearColor( this.bakClearColor );   // Backup existing clear color
         rend.setClearColor( this.nulClearColor );   // Set new clear color used for picking
+
+        // NOTE There is a version of 3JS that can't clear an int buffer, so doing a manual clear
+        // rend.autoClear = false;
+        // rend.clearDepth();
+        // const gl = rend.getContext();
+        // gl.clearBufferiv( gl.COLOR, 0, this.nulClear );
+
         rend.render( this.emptyScene, cam );
 
         // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -168,7 +176,10 @@ export default class ScreenPicker{
             switch( i.object.type ){
                 case 'Mesh'  : break;
                 case 'Points':
-                    if( i.object.name === 'ShapePointsMesh' ) pickMat = this.materials.shapePnt;
+                    if( i.object.name === 'ShapePointsMesh' ){
+                        pickMat = this.materials.shapePnt;
+                        pickMat.depthTest = i.object.material.depthTest;
+                    }
                     break;
                 
                 // Skip this object

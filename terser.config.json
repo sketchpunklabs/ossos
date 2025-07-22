@@ -1,0 +1,16 @@
+{
+  "module": true,
+  "compress": {
+    "drop_console": false,
+    "drop_debugger": true,
+    "passes": 1
+  },
+  "format": {
+    "comments": false,
+    "beautify": false,
+    "semicolons": true,
+    "quote_style": 0,
+    "indent_level": 0
+  },
+  "mangle": false
+}

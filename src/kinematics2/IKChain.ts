@@ -84,6 +84,37 @@ export class IKChain {
         return this;
     }
 
+    usePlacementForSwing( pose:Pose, twistDir:Vec3Like = [0,1,1] ): this{
+        const swing = new Vec3();
+        let a: IKLink;
+        let b: IKLink;
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        for( let i=1; i < this.links.length; i++ ){
+            // Figure out the direction of previous link to this link
+            a = this.links[i];
+            b = this.links[i-1];
+            swing.fromSub(
+                pose.bones[ a.index ].world.pos,
+                pose.bones[ b.index ].world.pos,
+            ).norm();
+
+            // Create inverse axes for the previous link pointing to this link
+            b.axes
+                .setOrthogonal( swing, twistDir )
+                .applyInvertQuat( pose.bones[ b.index ].world.rot );
+        }
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        // Fix final link's axes, will continue last known swing direction
+        b = this.links.at(-1) as IKLink;
+        b.axes
+            .setOrthogonal( swing, twistDir )
+            .applyInvertQuat( pose.bones[ b.index ].world.rot );
+
+        return this;
+    }
+
 
     debug( debug: any, pose: Pose ){
         const t = new Transform();

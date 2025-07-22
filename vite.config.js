@@ -24,8 +24,8 @@ export default defineConfig(({ command, mode, ssrBuild }) => {
 
             server    : {
                 host        : 'localhost',
-                port        : 3010,
-                // open        : '/',
+                port        : 3111,
+                open        : '/',
                 strictPort  : true,
             },
 
@@ -46,9 +46,29 @@ export default defineConfig(({ command, mode, ssrBuild }) => {
           lib       : {
             entry    : path.resolve(__dirname, "src/index.ts"),
             name     : packageJson.name,
-            formats  : ["es", "cjs", "iife"],
+            formats  : ["es"], // , "cjs", "iife"
             fileName : ( format )=>fileName[format],
           },
+
+          // Configure Terser options
+          terserOptions:{
+            compress: {
+              drop_console: true, // Remove console.log statements
+              drop_debugger: true, // Remove debugger statements
+              // comments: true, // Remove all comments
+            },
+            format: {
+              // Ensure no comments are preserved in the output
+              comments: false,
+              // Remove all extra whitespace (newlines, tabs, spaces)
+              beautify: false, // This ensures no "pretty" formatting
+            },
+            // Do not mangle variable names if you need them for external use (e.g., API)
+            // If you're building a library for internal use and want maximum minification,
+            // you can set mangle: true
+            mangle: true,
+          },
+
         },
       };
       

@@ -1,0 +1,173 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title></title></head>
+<style>canvas{ display:block; } body, html { padding:0px; margin:0px; width:100%; height:100%; }</style>
+<body><script type="module">
+
+// #region IMPORTS
+import useThreeWebGL2, { THREE, useDarkScene, useVisualDebug } from '../_lib/useThreeWebGL2.js';
+
+// https://tweakpane.github.io/docs/
+// https://tweakpane.github.io/docs/plugins/#essentials
+import { Pane }                 from '../_thirdparty/tweakpane-4.0.4.min.js';
+import * as TweakpaneEssentials from '../_thirdparty/tweakpane-plugin-essentials-0.2.1.min.js';
+// #endregion
+
+// #region MAIN
+let Debug;
+let App   = useDarkScene( useThreeWebGL2( ) );
+let Ref   = {
+    baseLen     : 1,
+    inputLen    : 0.5,
+    outputLen   : 0.5,
+    couplerLen  : 1, 
+};
+
+window.addEventListener( 'load', async _=>{
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Setup
+    App.sphericalLook( 0, 20, 5 );
+    Debug = await useVisualDebug( App );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Debug.pnt.add( [0,0.5,0], 0x00ff00, 5, 2 );
+    Debug.ln.add( [0,0.5,0], [0,1,0], 0xffffff );
+    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // App.createRenderLoop( onPreRender ).start();
+    App.renderLoop();
+    buildUI();
+});
+
+function onPreRender( dt, et ){}
+
+async function buildUI(){    
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const p = new Pane();
+    p.registerPlugin( TweakpaneEssentials );
+    p.on( 'change', e=>{
+        // console.log( e );
+        // console.log( e.target.label, e.value );
+    });
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const f = p.addFolder({ title: 'Linkage Lengths', expanded: true });
+    f.addBinding( Ref, 'baseLen', { min: 0.1, max: 4, step: 0.1, label: 'base' } );
+    f.addBinding( Ref, 'inputLen', { min: 0.1, max: 4, step: 0.1, label: 'input' } );
+    f.addBinding( Ref, 'outputLen', { min: 0.1, max: 4, step: 0.1, label: 'output' } );
+    f.addBinding( Ref, 'couplerLen', { min: 0.1, max: 4, step: 0.1, label: 'coupler' } );
+
+    // f.addButton({ title: 'Button1' }).on( 'click', ()=>console.log('Button1') );
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Ref.pane = p;
+}
+// #endregion
+
+
+// #region MATHS
+function lawcosAngle( aLen, bLen, cLen ){
+    // Law of Cosines - SSS : cos(C) = (a^2 + b^2 - c^2) / 2ab
+    // The Angle between A and B with C being the opposite length of the angle.
+    const v = ( aLen**2 + bLen**2 - cLen**2 ) / ( 2 * aLen * bLen );
+    return Math.acos( Math.min( 1, Math.max( -1, v ) ) );  // Clamp to prevent NaN Errors
+}
+// #endregion
+
+// #region GRASHOF
+// https://en.wikipedia.org/wiki/Four-bar_linkage#Grashof_condition
+// A rule that determines if a four-bar linkage can rotate continuously. 
+// It states that the sum of the shortest and longest link lengths must 
+// be less than or equal to the sum of the other two link lengths.
+// If not met, then no link can rotate continuously relative to another.
+
+class GrashofCondition{
+    // #region MAIN
+    inputType   = '';
+    outputType  = '';
+    canFlip     = false;
+    limited     = false;
+    flipPhase   = 0;
+    flipPeriod  = 0;
+    rangeMin    = 0;
+    rangeMax    = 0;
+    grashofType = '';
+    grashofInfo = '';
+    constructor(){}
+    // #endregion
+
+
+    // #region HELPERS
+    calcLimitAngle( idx, bLen, iLen, cLen, oLen ){
+        switch( idx ){
+            case 0: return lawcosAngle( iLen, bLen, cLen + oLen );
+            case 1: return -lawcosAngle( iLen, bLen, cLen + oLen );
+            case 2: return lawcosAngle( iLen, bLen, cLen - oLen );
+            case 3: return 2 * Math.PI - lawcosAngle( iLen, bLen, cLen - oLen );
+            case 4: return lawcosAngle( iLen, bLen, oLen - cLen );
+            case 5: return 2 * Math.PI - lawcosAngle( iLen, bLen, oLen - cLen );
+        }
+    }
+    
+    // Generate key for classification map
+    genKey( ary ){
+        let key = '';
+        for( let i of ary ) key += i == 0 ? 0 : i > 0 ? '+' : '-';
+        return key;
+    }
+    // #endregion
+
+    // #region STATIC PROPERTIES
+    // https://en.wikipedia.org/wiki/Four-bar_linkage#Classification
+    // 27 cases / configurations possible with a four-bar linkage motion
+
+    // crank     : can rotate a full 360 degrees
+    // rocker    : can rotate through a limited range of angles which does not include 0° or 180° ( Small Arc Motion )
+    // 0-rocker  : can rotate through a limited range of angles which includes 0° but not 180° ( Half Circle Motion )
+    // pi-rocker : can rotate through a limited range of angles which includes 180° but not 0° ( Large Arc Motion )
+
+    // period    : one complete circle or rocker motion resulting with all the links back to its original position. 
+    //             Some cases require different period lengths to get the links back to its original position.
+
+    // phase     : Timing when links reach specific positions. Also how output motion leads or lags input motion
+
+    // Key is based on T1,T2,T3 & represents when each one is either negative, positive or 0
+    // 0: Input Type
+    // 1: Output Type
+    // 2: Is Grashof, shortest link rotates fully else it reciprocates
+    // 3: Flip Phase
+    // 4: flip Period, canFlip = ( value > 0 )
+    // 5: Input min limit, value >= 0, index to angle math
+    // 6: Input max limit, value >= 0, index to angle math
+    static classificationMap = {
+        '+++': ['crank',     'rocker',    true,  0, 0, -1, -1],
+        '0++': ['crank',     'pi-rocker', true,  0, 2, -1, -1],
+        '-++': ['pi-rocker', 'pi-rocker', false, 0, 2,  2,  3],
+        '+0+': ['crank',     '0-rocker',  true,  0, 2, -1, -1],
+        '00+': ['crank',     'crank',     true,  0, 2, -1, -1],
+        '-0+': ['crank',     'crank',     true,  0, 2, -1, -1],
+        '+-+': ['pi-rocker', '0-rocker',  false, 0, 2,  4,  5],
+        '0-+': ['crank',     'crank',     true,  0, 2, -1, -1],
+        '--+': ['crank',     'crank',     true,  0, 0, -1, -1],
+        '++0': ['crank',     'pi-rocker', true,  1, 2, -1, -1],
+        '0+0': ['crank',     'pi-rocker', true,  0, 1, -1, -1],
+        '-+0': ['pi-rocker', 'pi-rocker', true,  1, 1,  2,  3],
+        '+00': ['crank',     'crank',     true,  0, 1, -1, -1],
+        '000': ['crank',     'crank',     true,  0, 1, -1, -1],
+        '-00': ['crank',     'crank',     true,  0, 1, -1, -1],
+        '+-0': ['pi-rocker', 'crank',     true,  1, 1,  4,  5],
+        '0-0': ['crank',     'crank',     true,  0, 1, -1, -1],
+        '--0': ['crank',     'crank',     true,  1, 2, -1, -1],
+        '++-': ['0-rocker',  'pi-rocker', false, 0, 2,  1,  0],
+        '0+-': ['0-rocker',  'pi-rocker', true,  1, 1,  1,  0],
+        '-+-': ['rocker',    'rocker',    true,  0, 2,  2,  0],
+        '+0-': ['0-rocker',  'crank',     true,  1, 1,  1,  0],
+        '00-': ['0-rocker',  'crank',     true,  1, 1,  1,  0],
+        '-0-': ['0-rocker',  '0-rocker',  true,  1, 1,  1,  0],
+        '+--': ['rocker',    'crank',     true,  0, 2,  4,  0],
+        '0--': ['0-rocker',  'crank',     true,  1, 1,  1,  0],
+        '---': ['0-rocker',  '0-rocker',  false, 0, 2,  1,  0]
+    };
+    // #endregion
+}
+
+// #endregion
+</script></body></html>

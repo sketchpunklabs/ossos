@@ -1,7 +1,7 @@
 import type { ConstQuat } from './Quat';
 
 export type TVec3     = [number, number, number] | Float32Array | Array<number> | number[];
-export type ConstVec3 = Readonly< TVec3 >;
+// export type ConstVec3 = Readonly< TVec3 >;
 
 export default class Vec3 extends Array< number > {
     // #region STATIC PROPERTIES
@@ -191,6 +191,15 @@ export default class Vec3 extends Array< number > {
         this[0] = offset[0] + radius * ( c * u[0] + s * v[0] );
         this[1] = offset[1] + radius * ( c * u[1] + s * v[1] );
         this[2] = offset[2] + radius * ( c * u[2] + s * v[2] );
+        return this;
+    }
+
+    // https://github.com/Unity-Technologies/UnityCsReference/blob/master/Runtime/Export/Math/Vector3.cs
+    fromReflect( dir: Vec3Like, norm: Vec3Like=[0,1,0] ): this{
+        const factor = -2 * Vec3.dot( norm, dir );
+        this[ 0 ] = factor * norm[ 0 ] + dir[ 0 ];
+        this[ 1 ] = factor * norm[ 1 ] + dir[ 1 ];
+        this[ 2 ] = factor * norm[ 2 ] + dir[ 2 ];
         return this;
     }
     // #endregion
@@ -428,6 +437,17 @@ export default class Vec3 extends Array< number > {
     static dist( a: ConstVec3, b: ConstVec3 ): number{ return Math.sqrt( (a[ 0 ]-b[ 0 ]) ** 2 + (a[ 1 ]-b[ 1 ]) ** 2 + (a[ 2 ]-b[ 2 ]) ** 2 ); }
     static distSqr( a: ConstVec3, b: ConstVec3 ): number{ return (a[ 0 ]-b[ 0 ]) ** 2 + (a[ 1 ]-b[ 1 ]) ** 2 + (a[ 2 ]-b[ 2 ]) ** 2; }
 
+    static norm( v: ConstVec3, out: TVec3 = new Vec3() ): TVec3{
+        let mag = Math.sqrt( v[ 0 ]**2 + v[ 1 ]**2 + v[ 2 ]**2 );
+        if( mag == 0 ) return out;
+
+        mag = 1 / mag;
+        out[ 0 ] = v[ 0 ] * mag;
+        out[ 1 ] = v[ 1 ] * mag;
+        out[ 2 ] = v[ 2 ] * mag;
+        return out;
+    }
+
     static dot( a: ConstVec3, b: ConstVec3 ): number{ return a[ 0 ] * b[ 0 ] + a[ 1 ] * b[ 1 ] + a[ 2 ] * b[ 2 ]; }
     static cross( a: ConstVec3, b: ConstVec3, out: TVec3 = new Vec3() ): TVec3{
         const ax = a[0], ay = a[1], az = a[2],
@@ -439,6 +459,49 @@ export default class Vec3 extends Array< number > {
         return out;
     }
 
+    static orthogonal( fwd: ConstVec3, up: ConstVec3=[0,1,0] ):Array<TVec3>{
+        const zAxis	= new Vec3( fwd );  // Clone Forward, may need to alter it
+        const xAxis = new Vec3()        // Right
+            .fromCross( up, zAxis )
+            .norm(); 
+
+        // FWD & UP are parallel
+        if( Vec3.lenSqr( xAxis ) === 0 ){
+            if( Math.abs( up[2] ) === 1 ) zAxis[0] += 0.0001;  // shift x when Fwd or Bak
+            else                          zAxis[2] += 0.0001;  // shift z
+
+            zAxis.norm();                           // ReNormalize
+            xAxis.fromCross( up, zAxis ).norm();    // Redo Right
+        }
+
+        const yAxis = new Vec3() // Realign Up
+            .fromCross( zAxis, xAxis )
+            .norm();
+
+        return [ xAxis, yAxis, zAxis ];
+    }
+
+    // static orthogonal( fwd: ConstVec3, up: ConstVec3=[0,1,0] ):Array<TVec3>{
+    //     const zAxis	= fwd.slice();                      // Clone Forward, may need to alter it
+    //     const xAxis = Vec3.cross( up, zAxis, [0,0,0] ); // Right
+    //     Vec3.norm( xAxis, xAxis );
+
+    //     // FWD & UP are parallel
+    //     if( Vec3.lenSqr( xAxis ) === 0 ){
+    //         if( Math.abs( up[2] ) === 1 ) zAxis[0] += 0.0001;  // shift x when Fwd or Bak
+    //         else                          zAxis[2] += 0.0001;  // shift z
+
+    //         Vec3.norm( zAxis, zAxis );      // ReNormalize
+    //         Vec3.cross( up, zAxis, xAxis ); // Redo Right
+    //         Vec3.norm( xAxis, xAxis );
+    //     }
+        
+    //     const yAxis = Vec3.cross( zAxis, xAxis, [0,0,0] );  // Realign Up
+    //     Vec3.norm( yAxis, yAxis );
+
+    //     return [ xAxis, yAxis, zAxis ];
+    // }
+    
     static scaleThenAdd( scale: number, a: ConstVec3, b: ConstVec3, out:TVec3 = new Vec3() ){
         out[0] = a[0] * scale + b[0];
         out[1] = a[1] * scale + b[1];

@@ -1,4 +1,4 @@
-import { AxesHelper }        from 'three';
+import { Object3D }        from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 
 export default function useTransformControl( tjs ){
@@ -18,7 +18,7 @@ export default function useTransformControl( tjs ){
         attach      : o=>gizmo.attach( o ),
         detach      : ()=>{
             gizmo.detach();
-            if( self.axes ) self.axes.visible = false;
+            // if( self.axes ) self.axes.visible = false;
         },
 
         toTranslate : ()=>{ gizmo.setMode( 'translate' ); return self; },
@@ -29,14 +29,26 @@ export default function useTransformControl( tjs ){
             return self;
         },
 
-        useAxes     : ( s=0.5 )=>{
+        show        : ( pos=null )=>{
+            if( gizmo.object ){
+                if( pos ) gizmo.object.position.fromArray( pos );
+            }
+            gizmo.visible = true;
+            gizmo.enabled = true;
+        },
+        hide        : ()=>{ 
+            gizmo.visible = false;
+            gizmo.enabled = false;
+            return self;
+        },
+        useAxes     : ()=>{
             if( !self.axes ){
-                self.axes = new AxesHelper();
-                self.axes.scale.setScalar( s );
+                // self.axes = new AxesHelper();
+                // self.axes.scale.setScalar( s );
+                self.axes = new Object3D();
                 tjs.scene.add( self.axes );
             }
-
-            self.axes.visible = true;
+            // self.axes.visible = true;
             gizmo.attach( self.axes );
             return self;
         },
