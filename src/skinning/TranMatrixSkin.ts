@@ -64,7 +64,13 @@ export default class TranMatrixSkin implements ISkin {
 
             // Compute Bone's world space transform
             if( b.pindex !== -1 ) w[ i ].fromMul( w[ b.pindex ], b.local );
-            else                  w[ i ].fromMul( pose.offset,   b.local );
+            else {
+                if( pose.linkedBone ){
+                    w[ i ].fromMul( pose.linkedBone.world, pose.offset ).mul( b.local );
+                }else{
+                    w[ i ].fromMul( pose.offset, b.local );
+                }
+            }
 
             // Compute Offset Transform that will be used for skinning a mesh
             // OffsetTransform = Bone.WorldTransform * Bone.BindTransform

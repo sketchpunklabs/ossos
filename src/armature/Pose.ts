@@ -1,9 +1,9 @@
 // #region IMPORT
-import type Armature              from './Armature';
-import type Bone                  from './Bone';
-import Transform                  from '../maths/Transform';
-import Vec3, { TVec3, ConstVec3 } from '../maths/Vec3';
-import Quat, { ConstQuat }        from '../maths/Quat';
+import type Armature    from './Armature';
+import type Bone        from './Bone';
+import Transform        from '../maths/Transform';
+import Vec3             from '../maths/Vec3';
+import Quat             from '../maths/Quat';
 // #endregion
 
 export default class Pose {
@@ -199,8 +199,12 @@ export default class Pose {
     getWorldTransform( boneId: string | number, out = new Transform() ): Transform{
         let bone = this.getBone( boneId );
         if( !bone ){
-            if( boneId === -1 ) out.copy( this.offset );
-            else                console.error( 'Pose.getWorldTransform - bone not found', boneId );
+            if( boneId === -1 ){
+                if( this.linkedBone ) out.fromMul( this.linkedBone.world, this.offset );
+                else                  out.copy( this.offset );
+            }else{
+                console.error( 'Pose.getWorldTransform - bone not found', boneId );
+            }
             return out;
         }
 
@@ -220,7 +224,7 @@ export default class Pose {
         return out;
     }
 
-    getWorldPosition( boneId: string | number, out = new Vec3() ): TVec3{
+    getWorldPosition( boneId: string | number, out = new Vec3() ): Vec3Like{
         return out.copy( this.getWorldTransform( boneId ).pos );
     }
     // #endregion
@@ -246,7 +250,7 @@ export default class Pose {
         if( bone ){
             const pWRot     = this.getWorldRotation( bone.pindex );                         // Get Parent World Space
             const cWRot     = new Quat( pWRot ).mul( bone.local.rot );                      // Get Bone's World Space
-            const ax: TVec3 = ( axis == 'y' )? [ 0, 1, 0 ] : ( axis == 'z' )? [ 0, 0, 1 ] : [ 1, 0, 0 ]; // Rotation Axis
+            const ax: Vec3Like = ( axis == 'y' )? [ 0, 1, 0 ] : ( axis == 'z' )? [ 0, 0, 1 ] : [ 1, 0, 0 ]; // Rotation Axis
 
             cWRot
                 .pmulAxisAngle( ax, deg * Math.PI / 180 )   // Apply rotation in world space
