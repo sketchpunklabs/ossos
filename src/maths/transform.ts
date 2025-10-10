@@ -170,6 +170,13 @@ export default class Transform{
         // return out;
     }
 
+    // WORKS, WorldSpace Position to Local Space
+    // const ptran = pose.getWorldTransform(b.pindex);
+    //     ptran.pos
+    //     .fromSub(v, ptran.pos)
+    //     .transformQuat(ptran.rot.invert())
+    //     .mul(ptran.scl.invert());
+
     // Create a temp inverted transform then apply it to a vector
     // invTransformVec3( v: Vec3, out:Vec3=new Vec3() ): Vec3{
     //     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

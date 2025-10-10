@@ -3,12 +3,11 @@ import Vec3 from '../Vec3'
 // #endregion
 
 // #region POINTS
+export type PointType = typeof PointType[keyof typeof PointType];
 export const PointType = Object.freeze({
     Point   : 0,
     Control : 1,
 });
-
-export type PointType = typeof PointType[keyof typeof PointType];
 
 export class Point{
     attrib : Record<string, any> = {};

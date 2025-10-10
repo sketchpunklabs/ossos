@@ -1,0 +1,55 @@
+Working on an inverse kinematrics application. Im looking for a solver that doesn't perform iterations like other solvers like jacobian, fabric or ccd, so avoid using those as a solution. The problem Im trying to solve the rotations of 3 bones to reach a target position in 2D space. The bones can be thought of 3 sides of a rectangle with the first bone being the left side, second being the top and third being the right side. Finally we can use the distance from the first bone torward the target position as the bottom side of a rectangle. For this problem we have the length of all 4 sides of the rectangle but none of its angles. Since the lengths are not uniform in anyway, the rectangle may be skewed. So write a function that will take in the length of the first 3 bones plus the length to the target position and compute the angles for each corner of the rectangle it forms. Since the rectangle can skew, try to keep the bottom and top sides as parallal and centered to eachother if possible, does not need to be perfect but decent enough to look like a rectangle. Use javascript.
+
+
+
+function asinc(x0:float):float{
+	var x :float = 6*(1-x0);	
+	var x1:float = x;	
+	var a :float = x;									        x*=x1;	
+	a += x					 /20.0;						x*=x1;	
+	a += x* 2.0				 /525.0;						x*=x1;	
+	a += x* 13.0			 /37800.0;					x*=x1;	
+	a += x* 4957.0			 /145530000.0;				x*=x1;	
+	a += x* 58007.0			 /16216200000.0;			x*=x1;
+	a += x* 1748431.0		 /4469590125000.0;			x*=x1;	
+	a += x* 4058681.0		 /92100645000000.0;		x*=x1;
+	a += x* 5313239803.0	 /1046241656460000000.0;	x*=x1;
+	a += x* 2601229460539.0/4365681093774000000000.0;	// x^10
+	return sqrt(a);
+}
+
+arc angle = 2 * asinc( arc length / chord len )
+radius = arc length / arc angle
+
+midpoint = M = (P1 + P2) / 2
+chord dir = P2 - P1
+planeNormal = normalize(cross(V, up))
+N = normalize(cross(planeNormal,chord dir))
+
+function circleCenter3D(P1, P2, r) {
+  // Calculate the midpoint (M) of the chord.
+  M = (P1 + P2) / 2; // Vector addition and scalar division
+
+  // Calculate the chord vector (V).
+  V = P2 - P1; // Vector subtraction
+
+  // Define the "up" vector (assuming general orientation).
+  up = [0, 1, 0];
+
+  // Calculate the plane normal vector (planeNormal).
+  planeNormal = normalize(crossProduct(V, up));
+
+  // Calculate the perpendicular vector (N) from M to the center.
+  N = normalize(crossProduct(planeNormal, V));
+
+  // Calculate the chord length (c).
+  c = magnitude(V);
+
+  // Calculate the distance (d) from M to the circle center.
+  d = sqrt(r^2 - (c/2)^2);
+
+  // Calculate the circle center (C).
+  C = M + N * d; // Vector addition and scalar multiplication
+
+  return C;
+}

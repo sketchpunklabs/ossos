@@ -199,18 +199,43 @@ function normAngle( a ){
     return x;
 }
 
-// function isBetween( dMin, dMax, d ){
-//     const nMin = normAngle( dMin );
-//     const nMax = normAngle( dMax );
-//     const nD   = normAngle( d );
+// Helper function to find the shortest angular distance
+function angleDist(a1, a2) {
+  const diff = Math.abs( normAngle(a1) - normAngle(a2) );
+  return Math.min(diff, 360 - diff);
+}
 
-//     if( nMin < nMax ) return ( nD >= nMin ) && ( nD <= nMax );
 
-//     // Crosses -180/180 boundary like 170 to -170
-//     return ( nD >= nMin && nD <= 180 ) ||
-//            ( nD >= -180 && nD <= nMax );
-// }
+function clamp(dMin, dMax, d) {
+  const nMin = normAngle(dMin);
+  const nMax = normAngle(dMax);
+  const nD = normAngle(d);
 
+  if (isBetween(nMin, nMax, nD)) {
+    return nD;
+  }
+
+  // Calculate the distance to both min and max angles
+  // and return the closer one.
+  const distToMin = angleDist(nD, nMin);
+  const distToMax = angleDist(nD, nMax);
+
+  return distToMin < distToMax ? nMin : nMax;
+}
+
+function isBetween( dMin, dMax, d ){
+    const nMin = normAngle( dMin );
+    const nMax = normAngle( dMax );
+    const nD   = normAngle( d );
+
+    if( nMin < nMax ) return ( nD >= nMin ) && ( nD <= nMax );
+
+    // Crosses -180/180 boundary like 170 to -170
+    return ( nD >= nMin && nD <= 180 ) ||
+           ( nD >= -180 && nD <= nMax );
+}
+
+// Total Arc Angle & Starting Offset angle to visualize min & max
 // function arcAndOffset( dMin, dMax ){ // [ arc, offset ]
 //     const nMin = normAngle( dMin );
 //     const nMax = normAngle( dMax );
